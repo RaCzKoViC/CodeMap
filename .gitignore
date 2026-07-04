@@ -5,6 +5,7 @@ Sejf/
 server/node_modules/
 server/data/
 server/.env
+server/*.log
 
 # lokalne ustawienia narzędzi
 .claude/settings.local.json
