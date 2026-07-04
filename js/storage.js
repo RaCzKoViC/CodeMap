@@ -24,6 +24,7 @@ CM.Storage = (function(){
   const SESS_LS='codemap-session';
   async function saveSession(mapJSON){
     const rec={id:'current', ts:Date.now(), map:mapJSON};
+    try{ if(CM.Sync) CM.Sync.onSessionSaved(); }catch(e){}
     try{ const os=await sessTx('readwrite'); if(os){ os.put(rec); return; } }catch(e){}
     try{ localStorage.setItem(SESS_LS, JSON.stringify(rec)); }catch(e){}   // fallback (may overflow on big maps)
   }
@@ -53,6 +54,7 @@ CM.Storage = (function(){
     };
     const os=await tx('readwrite');
     if(os){ os.put(snap); } else { const arr=lsAll(); arr.push(snap); lsSave(arr); }
+    try{ if(CM.Sync) CM.Sync.onSnapshot(snap, JSON.stringify(graph.toJSON())); }catch(e){}
     return snap;
   }
 
@@ -75,6 +77,7 @@ CM.Storage = (function(){
   async function deleteSnapshot(id){
     const os=await tx('readwrite');
     if(os){ os.delete(id); } else { lsSave(lsAll().filter(s=>s.id!==id)); }
+    try{ if(CM.Sync) CM.Sync.onSnapshotDeleted(id); }catch(e){}
   }
   async function importSnapshots(arr){
     for(const s of arr){ if(!s.id) s.id=Date.now()+'-'+Math.floor(Math.random()*1e6);

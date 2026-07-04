@@ -7,6 +7,12 @@
       "runtimeArgs": ["serve.py"],
       "port": 8778,
       "autoPort": true
+    },
+    {
+      "name": "codemap-api",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=server/.env", "server/index.js"],
+      "port": 8787
     }
   ]
 }

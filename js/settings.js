@@ -8,6 +8,7 @@ CM.Settings = (function(){
   const STR={
   pl:{
     'title':'Ustawienia',
+    'tab.account':'Konto','acct.head':'Konto i synchronizacja','acct.desc':'Rejestracja, logowanie i synchronizacja danych (mapy, migawki, ustawienia, Sejf) między urządzeniami.',
     'tab.lang':'Język','tab.appearance':'Wygląd','tab.ai':'AI','tab.install':'Instalacja',
     'tab.shortcuts':'Skróty',
     'tab.tutorial':'Samouczek','tab.spec':'Specyfikacja','tab.manual':'Instrukcja obsługi','tab.about':'O aplikacji',
@@ -109,6 +110,7 @@ CM.Settings = (function(){
   },
   en:{
     'title':'Settings',
+    'tab.account':'Account','acct.head':'Account & sync','acct.desc':'Registration, login and data sync (maps, snapshots, settings, Vault) across devices.',
     'tab.lang':'Language','tab.appearance':'Appearance','tab.ai':'AI','tab.install':'Installation',
     'tab.shortcuts':'Shortcuts',
     'sc.head':'Keyboard & mouse shortcuts','sc.desc':'The full list of shortcuts. Keys are shown as keys; the action depends on the mode (CodeMap / MindMap).',
@@ -289,7 +291,7 @@ CM.Settings = (function(){
     const bodyWrap=el('div',{class:'set-wrap'});
     const nav=el('div',{class:'set-nav'});
     const content=el('div',{class:'set-content'});
-    const TABS=[['lang','settings'],['appearance','palette'],['ai','sparkle'],['install','download'],['shortcuts','keyboard'],['tutorial','play'],['spec','info'],['manual','book'],['about','layers']];
+    const TABS=[['lang','settings'],['account','user'],['appearance','palette'],['ai','sparkle'],['install','download'],['shortcuts','keyboard'],['tutorial','play'],['spec','info'],['manual','book'],['about','layers']];
     TABS.forEach(([key,icon])=>{
       const b=el('button',{class:'set-tab'+(key===curTab?' active':''),'data-tab':key,
         html:ic.svg(icon,{size:16})+'<span>'+t('tab.'+key)+'</span>',onclick:()=>showTab(key)});
@@ -307,7 +309,7 @@ CM.Settings = (function(){
     if(!overlay) return;
     overlay.querySelectorAll('.set-tab').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===key));
     const c=overlay._content; if(!c) return; c.innerHTML='';
-    ({lang:tabLang, appearance:tabAppearance, ai:tabAI, install:tabInstall, shortcuts:tabShortcuts, tutorial:tabTutorial, spec:tabSpec, manual:tabManual, about:tabAbout}[key]||tabLang)(c);
+    ({lang:tabLang, account:tabAccount, appearance:tabAppearance, ai:tabAI, install:tabInstall, shortcuts:tabShortcuts, tutorial:tabTutorial, spec:tabSpec, manual:tabManual, about:tabAbout}[key]||tabLang)(c);
     c.scrollTop=0;
   }
 
@@ -328,6 +330,11 @@ CM.Settings = (function(){
       row.appendChild(b);
     });
     c.appendChild(row);
+  }
+
+  function tabAccount(c){
+    section(c, t('acct.head'), 'acct.desc');
+    try{ CM.Auth.renderAccount(c); }catch(e){}
   }
 
   function tabAppearance(c){

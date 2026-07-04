@@ -1993,3 +1993,26 @@ body.cb-panel-open #rot-dial,body.cb-panel-open #rot-reopen{transform:translateX
 .mm-tpl-chip.mm-tpl-tag .mm-tpl-chip-lbl{color:#0a1018;text-shadow:0 1px 1px rgba(255,255,255,.25)}
 /* subtle hover affordance on nodes (no layout/shadow interference) */
 .mm-node:not(.sel):not(.multi):hover{outline:2px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:2px}
+
+/* ===================== konto / auth ===================== */
+#btn-account{position:relative}
+#btn-account.logged-in::after{content:'';position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;
+  background:var(--accent-3);box-shadow:0 0 6px var(--accent-3)}
+.auth-box{display:flex;flex-direction:column;gap:10px;max-width:340px;margin:6px auto;padding:4px 2px}
+.auth-box.compact{margin:4px 0;max-width:300px}
+.auth-field{display:flex;flex-direction:column;gap:4px}
+.auth-box input[type=email],.auth-box input[type=password]{width:100%;padding:8px 10px;border-radius:8px;
+  border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.25);color:inherit;font:inherit}
+body.light .auth-box input[type=email],body.light .auth-box input[type=password]{background:rgba(255,255,255,.6);border-color:rgba(0,0,0,.18)}
+.auth-box input:focus{outline:none;border-color:var(--accent)}
+.auth-main{width:100%;justify-content:center;margin-top:2px}
+.auth-link{background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;font-size:12.5px;padding:2px;align-self:center}
+.auth-link:hover{text-decoration:underline}
+.auth-err{color:var(--danger);font-size:12.5px;min-height:0;margin:0}
+.auth-info{font-size:13px;line-height:1.5;margin:0}
+.auth-quota{height:8px;border-radius:6px;background:rgba(255,255,255,.10);overflow:hidden;max-width:340px}
+body.light .auth-quota{background:rgba(0,0,0,.10)}
+.auth-quota-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.tb-btn.busy{opacity:.55;pointer-events:none}
+.tb-btn.danger{color:var(--danger);border-color:rgba(248,113,113,.4)}
+.tb-btn.danger:hover{background:rgba(248,113,113,.15)}

@@ -27,6 +27,7 @@ const q = {
   putSnap: db.prepare(`INSERT INTO snapshots (id, user_id, project_key, ts, label, name, source, signature, size_bytes, blob_path) VALUES (?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(user_id, id) DO NOTHING`),
   delSnap: db.prepare('DELETE FROM snapshots WHERE user_id = ? AND id = ?'),
+  setSnapSig: db.prepare('UPDATE snapshots SET signature = ? WHERE user_id = ? AND id = ?'),
 
   vaultMeta: db.prepare('SELECT album, updated_at FROM vault_meta WHERE user_id = ?'),
   vaultFiles: db.prepare('SELECT album, name, size_bytes, mtime FROM vault_files WHERE user_id = ?'),
@@ -142,12 +143,21 @@ export async function registerSync(app) {
     const rel = `${req.user.id}/snapshots/${id}.bin`;
     const size = await handleUpload(req, reply, rel, 0);
     if (size === null) return;
-    let sig = null;
-    try { sig = req.headers['x-cm-signature'] ? String(req.headers['x-cm-signature']).slice(0, 4096) : null; } catch (e) {}
     q.putSnap.run(id, req.user.id, S(req.query?.projectKey) || 'projekt', Number(req.query?.ts) || now(),
-      S(req.query?.label, 200) || null, S(req.query?.name, 200) || null, S(req.query?.source) || null, sig, size, rel);
+      S(req.query?.label, 200) || null, S(req.query?.name, 200) || null, S(req.query?.source) || null, null, size, rel);
     bumpUsage(req.user.id, size);
     return { ok: true, size };
+  });
+
+  // Sygnatura (duży JSON do porównań między migawkami) nie mieści się w nagłówku ani query —
+  // dociera osobnym małym PUT-em po wgraniu treści.
+  app.put('/api/snapshots/:id/meta', auth, async (req, reply) => {
+    const id = req.params.id;
+    if (!ID_RE.test(id) || !q.getSnap.get(req.user.id, id)) return reply.code(404).send({ error: 'notfound' });
+    const sig = req.body?.signature;
+    if (typeof sig !== 'string' || sig.length > 3 * 1024 * 1024) return reply.code(400).send({ error: 'signature' });
+    q.setSnapSig.run(sig, req.user.id, id);
+    return { ok: true };
   });
 
   app.delete('/api/snapshots/:id', auth, async (req, reply) => {
