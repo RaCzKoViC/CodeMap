@@ -1,11 +1,11 @@
 /* ===================== sw.js — CodeMap service worker (offline app shell) ===================== */
-const CACHE = 'codemap-shell-v76';
+const CACHE = 'codemap-shell-v77';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
 const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js','js/languages.js',
   'js/analysis.js','js/graph.js','js/layouts.js','js/renderer.js','js/loaders.js','js/storage.js',
-  'js/ui.js','js/settings.js','js/drive.js','js/inspect.js','js/localai.js','js/ollama.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js','js/app.js','js/sim-worker.js'];
+  'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js','js/app.js','js/sim-worker.js'];
 
 self.addEventListener('install', (e)=>{
   e.waitUntil((async()=>{
@@ -44,6 +44,8 @@ self.addEventListener('fetch', (e)=>{
   if(req.method !== 'GET') return;
   let url; try{ url = new URL(req.url); }catch(_){ return; }
   if(url.origin !== self.location.origin) return;
+  // API (konto, synchronizacja) NIGDY nie przechodzi przez cache — zawsze świeże dane z sieci.
+  if(url.pathname.startsWith('/api/')) return;
 
   const isHTML = req.mode === 'navigate' || (req.headers.get('accept')||'').includes('text/html');
   if(isHTML){

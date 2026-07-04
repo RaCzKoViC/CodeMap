@@ -224,7 +224,7 @@ CM.Sync = (function(){
   async function pushAlbum(album){
     const D=CM.Drive&&CM.Drive._cloud, api=CM.Auth.api;
     if(!D) return;
-    if(D.state(album)==='plain'){ U.toast(t('vaultNeedPass'),'error'); return; }
+    if((await D.state(album))==='plain'){ U.toast(t('vaultNeedPass'),'error'); return; }
     const meta=await D.getMeta(album);
     if(!meta||meta.enc!==true){ U.toast(t('vaultNeedPass'),'error'); return; }
     const remote=await api('/api/vault/'+album);
@@ -234,14 +234,14 @@ CM.Sync = (function(){
     }
     await api('/api/vault/'+album+'/meta',{method:'PUT',json:{json:JSON.stringify(meta), updatedAt:Date.now()}});
     const remoteByName=new Map((remote.files||[]).map(f=>[f.name,f]));
-    const local=await D.listRaw(album);
+    const local=await D.listRaw(album);              // [{name,size,ts}] — ts = lastModified pliku OPFS
     let sent=0;
     for(const f of local){
       const r=remoteByName.get(f.name);
-      if(r && r.size===f.size && r.mtime>=(f.mtime||0)) continue;
+      if(r && r.size===f.size) continue;             // ten sam szyfrogram (rozmiar) — pomijamy
       const bytes=await D.readRaw(album, f.name);
       if(!bytes) continue;
-      await api('/api/vault/'+album+'/files/'+encodeURIComponent(f.name)+'?mtime='+(f.mtime||Date.now()),
+      await api('/api/vault/'+album+'/files/'+encodeURIComponent(f.name)+'?mtime='+(f.ts||Date.now()),
         {method:'PUT', body:bytes, headers:{'Content-Type':'application/octet-stream'}});
       sent++;
     }
@@ -260,8 +260,9 @@ CM.Sync = (function(){
       U.toast(t('vaultPassDiffers'),'error'); return;
     }
     if(!localMeta || !localMeta.enc){
-      if(D.state(album)==='plain' && (await D.listRaw(album)).length){ U.toast(t('vaultPassDiffers'),'error'); return; }
-      await D.writeMeta(album, rMeta);                    // świeże urządzenie przejmuje meta (salt/verifier) z chmury
+      // lokalny album bez hasła: przejęcie meta z chmury jest bezpieczne tylko, gdy jest pusty
+      if((await D.listRaw(album)).length){ U.toast(t('vaultPassDiffers'),'error'); return; }
+      await D.writeMeta(album, rMeta);               // świeże urządzenie przejmuje meta (salt/verifier) z chmury
     }
     const localByName=new Map((await D.listRaw(album)).map(f=>[f.name,f]));
     let got=0;
@@ -270,7 +271,7 @@ CM.Sync = (function(){
       if(l && l.size===f.size) continue;
       const res=await api('/api/vault/'+album+'/files/'+encodeURIComponent(f.name));
       const buf=new Uint8Array(await res.arrayBuffer());
-      await D.writeRaw(album, f.name, buf, f.mtime);
+      await D.writeRaw(album, f.name, buf);
       got++;
     }
     U.toast(got? t('vaultPulled')+got : t('vaultNothing'),'success');

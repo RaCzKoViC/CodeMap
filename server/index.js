@@ -37,7 +37,11 @@ await registerVault(app);
 
 if (!CFG.prod) {
   // Dev: Node serwuje też frontend, żeby aplikacja i API były same-origin (prod robi to Caddy).
-  await app.register(fastifyStatic, { root: join(HERE, '..') });
+  // no-store: edytowane pliki mają być widoczne od razu, bez walki z cache przeglądarki.
+  await app.register(fastifyStatic, {
+    root: join(HERE, '..'),
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-store'),
+  });
 }
 
 app.listen({ port: CFG.port, host: CFG.prod ? '127.0.0.1' : '0.0.0.0' })

@@ -98,3 +98,23 @@ js/app.js               # spięcie całości + tryb demo
 
 Wszystko działa po stronie klienta — **żadne dane nie opuszczają Twojego urządzenia**
 (jedyne połączenie sieciowe to opcjonalne pobieranie repozytorium z GitHub na Twoje żądanie).
+
+---
+
+## ☁️ Konto i synchronizacja (opcjonalny backend)
+
+CodeMap ma opcjonalny serwer (katalog `server/` — Node.js + Fastify + SQLite), który dodaje
+**rejestrację z weryfikacją e-mail** i **synchronizację między urządzeniami**: mapy, migawki
+(z pełną treścią), ustawienia oraz Sejf/Ulubione — te ostatnie **wyłącznie jako szyfrogram**
+(AES-GCM po stronie klienta; serwer nigdy nie widzi haseł ani treści plików). Klucze API
+(np. Mistral) nigdy nie są wysyłane na serwer. Bez logowania aplikacja działa w 100% lokalnie,
+dokładnie jak dotychczas.
+
+**Dev (Windows):**
+```powershell
+cd server; copy .env.example .env; npm install; npm start   # → http://localhost:8787
+```
+Maile weryfikacyjne w trybie dev drukują się w konsoli serwera (`EMAIL_MODE=console`).
+
+**Produkcja (Hetzner VPS):** pełna instrukcja krok po kroku w [`deploy/setup-vps.md`](deploy/setup-vps.md);
+wgrywanie: `.\tools\deploy.ps1 -Server deploy@twoja-domena`.

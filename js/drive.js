@@ -23,6 +23,9 @@ CM.Drive = (function(){
     'vault.passSet':'Hasło ustawione — sejf zaszyfrowany.','vault.passRemoved':'Hasło usunięte — sejf nie jest już szyfrowany.','vault.passChanged':'Hasło zmienione.',
     'vault.unlocked.msg':'Sejf odblokowany.','vault.locked.msg':'Sejf zablokowany.',
     'vault.lockedHint':'Wpisz hasło, aby zobaczyć i zapisywać pliki w sejfie.',
+    'cloud.head':'Chmura','cloud.push':'Wyślij do chmury','cloud.pull':'Pobierz z chmury',
+    'cloud.needLogin':'Zaloguj się (przycisk Konto), aby synchronizować z chmurą.',
+    'cloud.needPass':'Chmura przyjmuje wyłącznie zaszyfrowane albumy — najpierw ustaw hasło.',
     'disk.head':'Dysk (folder na Twoim urządzeniu)',
     'disk.desc':'Zamontuj prawdziwy folder przez File System Access API. Po jednej zgodzie CodeMap czyta i zapisuje pliki bezpośrednio na dysku. Folder jest zapamiętywany — przy powrocie wystarczy jedno potwierdzenie.',
     'disk.unavailable':'Dysk niedostępny — ta przeglądarka nie obsługuje File System Access API. Działa w Chrome, Edge, Brave, Opera. Sejf (zakładka obok) działa wszędzie.',
@@ -71,6 +74,9 @@ CM.Drive = (function(){
     'vault.passSet':'Password set — vault encrypted.','vault.passRemoved':'Password removed — vault is no longer encrypted.','vault.passChanged':'Password changed.',
     'vault.unlocked.msg':'Vault unlocked.','vault.locked.msg':'Vault locked.',
     'vault.lockedHint':'Enter the password to view and save files in the vault.',
+    'cloud.head':'Cloud','cloud.push':'Upload to cloud','cloud.pull':'Download from cloud',
+    'cloud.needLogin':'Log in (Account button) to sync with the cloud.',
+    'cloud.needPass':'The cloud accepts only encrypted albums — set a password first.',
     'disk.head':'Drive (a folder on your device)',
     'disk.desc':'Mount a real folder via the File System Access API. After one grant, CodeMap reads and writes files straight to disk. The folder is remembered — one confirmation on return.',
     'disk.unavailable':'Drive unavailable — this browser does not support the File System Access API. Works in Chrome, Edge, Brave, Opera. The Vault (next tab) works everywhere.',
@@ -192,6 +198,15 @@ CM.Drive = (function(){
     const buf=new Uint8Array(await (await fh.getFile()).arrayBuffer());
     if(m.enc){ if(!albKey[a]) throw new Error('locked'); return decBytes(albKey[a], buf); }
     return buf;
+  }
+  // surowe bajty (szyfrogram) — dla synchronizacji z chmurą; nie dotykają kluczy ani szyfrowania
+  async function albReadRaw(a, name){
+    const dir=await albDir(a); const fh=await dir.getFileHandle(name);
+    return new Uint8Array(await (await fh.getFile()).arrayBuffer());
+  }
+  async function albWriteRaw(a, name, bytes){
+    const dir=await albDir(a); const fh=await dir.getFileHandle(name,{create:true});
+    const w=await fh.createWritable(); await w.write(new Blob([bytes])); await w.close();
   }
   async function albDelete(a, name){ const dir=await albDir(a); await dir.removeEntry(name); }
   async function albHas(a, name){ try{ const dir=await albDir(a); await dir.getFileHandle(name); return true; }catch(e){ return false; } }
@@ -437,6 +452,7 @@ CM.Drive = (function(){
     c.appendChild(bar);
 
     c.appendChild(passwordControls(album, st));
+    c.appendChild(cloudBar(album, st));
     if(st==='locked'){ c.appendChild(el('p',{class:'set-desc',text:t(fav?'fav.lockedHint':'vault.lockedHint')})); return; }
 
     c.appendChild(el('p',{class:'set-desc drv-privnote',text:t('gal.privateNote')}));
@@ -445,6 +461,22 @@ CM.Drive = (function(){
 
     const galWrap=el('div',{class:'drv-albumbody'}); c.appendChild(galWrap);
     await fillAlbum(galWrap, album);
+  }
+
+  /* Synchronizacja albumu z chmurą — wyłącznie szyfrogram; wymaga hasła albumu i zalogowania. */
+  function cloudBar(album, st){
+    const box=el('div',{class:'drv-row drv-cloudbar'});
+    const canSync=st!=='plain' && CM.Auth && CM.Auth.isLoggedIn() && CM.Sync;
+    const mk=(label,fn)=>{ const b=el('button',{class:'drv-btn',html:ic.svg('cloud',{size:14})+' '+label,disabled:!canSync});
+      b.onclick=async()=>{ b.disabled=true; try{ await fn(album); }finally{ b.disabled=false; showTab(album); } }; return b; };
+    box.appendChild(el('span',{class:'muted small',text:t('cloud.head')+':'}));
+    box.appendChild(mk(t('cloud.push'), (a)=>CM.Sync.pushAlbum(a)));
+    box.appendChild(mk(t('cloud.pull'), (a)=>CM.Sync.pullAlbum(a)));
+    if(!canSync){
+      box.appendChild(el('span',{class:'muted small',
+        text: (CM.Auth && CM.Auth.isLoggedIn()) ? t('cloud.needPass') : t('cloud.needLogin')}));
+    }
+    return box;
   }
 
   function passwordControls(album, st){
@@ -784,6 +816,13 @@ CM.Drive = (function(){
     _vault:{ state:vaultState, setPassword, unlock, lock, removePassword, write:vaultWrite, read:vaultRead, list:vaultListRaw, del:vaultDelete },
     _alb:{ state:albState, setPassword:albSetPassword, unlock:albUnlock, lock:albLock, removePassword:albRemovePassword,
            write:albWrite, read:albRead, list:albList, del:albDelete, has:albHas },
+    // sync z chmurą: wyłącznie surowy szyfrogram + meta (salt/verifier); nigdy plaintext
+    _cloud:{
+      state:albState, listRaw:albList, readRaw:albReadRaw, writeRaw:albWriteRaw,
+      getMeta:albLoadMeta,
+      writeMeta:async(a,m)=>{ if(!validMeta(m)||m.enc!==true) throw new Error('meta'); albKey[a]=null; await albSaveMeta(a,m); },
+    },
+    refreshAlbum:(a)=>{ try{ if(overlay && !overlay.classList.contains('hidden') && curTab===a) showTab(a); }catch(e){} },
     _fav:{ is:isFav, toggle:toggleFav, move:moveToDisk },
     _disk:{ mount:mountDisk, reconnect:reconnectDisk, list:diskList, read:diskRead, write:diskWrite },
     _has:{ fsa:hasFSA, opfs:hasOPFS, crypto:hasCrypto } };

@@ -1,0 +1,19 @@
+# /etc/systemd/system/codemap-api.service
+# sudo systemctl daemon-reload && sudo systemctl enable --now codemap-api
+[Unit]
+Description=CodeMap API
+After=network.target
+
+[Service]
+User=codemap
+WorkingDirectory=/opt/codemap/server
+ExecStart=/usr/bin/node --env-file=/opt/codemap/server/.env index.js
+Restart=always
+RestartSec=3
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/codemap/data
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
