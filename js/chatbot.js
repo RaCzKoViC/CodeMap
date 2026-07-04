@@ -1,0 +1,794 @@
+/* ===================== chatbot.js — ChatBot (Mistral AI, streaming, app-integrated) =====================
+   Wysuwany z dolnego paska panel rozmowy, głęboko zintegrowany z CodeMap:
+   • zna pełny, żywy stan aplikacji (CMApp.appState) i potrafi wykonywać w niej akcje (CMApp.exec),
+   • boczny pasek z historią rozmów (auto-tytuły, usuwanie, nowe), edycja wiadomości i regeneracja odpowiedzi,
+   • klucz Mistral z DRUGIEGO slotu (Ustawienia → AI), odpowiedzi strumieniowane (tokenizowane),
+   • skromnie animowana ikona (heks + iskra + sieć węzłów). */
+CM.ChatBot = (function(){
+  const U=CM.util, el=U.el, ic=CM.icons, I=CM.i18n;
+
+  /* ---------------- i18n ---------------- */
+  const STR={
+  pl:{
+    'name':'ChatBot','subtitle':'Asystent CodeMap · Mistral',
+    'open':'Otwórz ChatBota','collapse':'Zwiń do paska','newchat':'Nowa rozmowa','history':'Historia rozmów','togglebar':'Pokaż / ukryj historię',
+    'placeholder':'Napisz wiadomość lub zleć akcję w aplikacji…','send':'Wyślij','stop':'Zatrzymaj',
+    'welcome':'Cześć! Jestem **ChatBot** — wbudowany asystent CodeMap. Znam stan Twojej aplikacji i mogę w niej działać. Poproś np. *„wczytaj demo"*, *„zmień układ na force"*, *„pokaż hotspoty"* albo zadaj dowolne pytanie.',
+    'thinking':'ChatBot pisze…','aborted':'(przerwano)','errPrefix':'⚠ ',
+    'noKey':'Brak klucza Mistral API w **drugim slocie**. Dodaj go w Ustawieniach → AI (slot #2) — albo przełącz się tam na **model lokalny** (bez klucza).','goSettings':'Otwórz Ustawienia → AI',
+    'noWebGPU':'Wybrany jest **lokalny model AI**, ale ta przeglądarka nie obsługuje WebGPU (wymagany Chrome/Edge 113+). Przełącz provider w Ustawieniach → AI albo zaktualizuj przeglądarkę.',
+    'subLocal':'Asystent CodeMap · lokalny','notDownloaded':'nie pobrany','modelSel':'Przełącz lokalny model (pobrane w Ustawieniach → AI)',
+    'subOllama':'Asystent CodeMap · Ollama','modelSelOllama':'Przełącz model Ollamy','ollamaOffline':'Ollama offline — uruchom serwer',
+    'noModelsDl':'Brak pobranych modeli — pobierz w Ustawieniach → AI','didActions':'Zrobione ⚡',
+    'thinking':'Myślę…','thoughts':'Przebieg rozumowania','stLoading':'ładuję model…',
+    'copyCode':'Kopiuj kod','runCode':'Uruchom w oknie podglądu','genTime':'Czas utworzenia odpowiedzi / wykonania polecenia','dragHint':'Przeciągnij, aby przenieść (dwuklik = przywróć pozycję)',
+    'untitled':'Nowa rozmowa','today':'dziś','empty':'Brak rozmów.','delConfirm':'Usunąć tę rozmowę?',
+    'edit':'Edytuj wiadomość','save':'Zapisz i wyślij ponownie','cancel':'Anuluj','regen':'Wygeneruj odpowiedź ponownie','copy':'Kopiuj','copied':'Skopiowano',
+    'del':'Usuń rozmowę','done':'✓ wykonano','failed':'nie udało się',
+    'thumbUp':'Pomocna odpowiedź','thumbDown':'Niepomocna odpowiedź',
+    'clickToRun':'Akcja zmieniająca stan — kliknij, aby wykonać',
+    'histTrimmed':'Pamięć prawie pełna — starsze wiadomości nie są już zapisywane.',
+    'histNoSave':'Nie można zapisać historii rozmów (pamięć pełna).',
+  },
+  en:{
+    'name':'ChatBot','subtitle':'CodeMap assistant · Mistral',
+    'open':'Open ChatBot','collapse':'Collapse to bar','newchat':'New chat','history':'Conversations','togglebar':'Show / hide history',
+    'placeholder':'Write a message or command an action in the app…','send':'Send','stop':'Stop',
+    'welcome':"Hi! I'm **ChatBot** — the built-in CodeMap assistant. I know your app's state and can act in it. Try *“load demo”*, *“switch layout to force”*, *“show hotspots”*, or ask me anything.",
+    'thinking':'ChatBot is typing…','aborted':'(stopped)','errPrefix':'⚠ ',
+    'noKey':'No Mistral API key in the **second slot**. Add it in Settings → AI (slot #2) — or switch to the **local model** there (no key needed).','goSettings':'Open Settings → AI',
+    'noWebGPU':'The **local AI model** is selected, but this browser has no WebGPU (Chrome/Edge 113+ required). Switch the provider in Settings → AI or update your browser.',
+    'subLocal':'CodeMap assistant · local','notDownloaded':'not downloaded','modelSel':'Switch local model (download in Settings → AI)',
+    'subOllama':'CodeMap assistant · Ollama','modelSelOllama':'Switch the Ollama model','ollamaOffline':'Ollama offline — start the server',
+    'noModelsDl':'No downloaded models — download in Settings → AI','didActions':'Done ⚡',
+    'thinking':'Thinking…','thoughts':'Reasoning trace','stLoading':'loading the model…',
+    'copyCode':'Copy code','runCode':'Run in the preview window','genTime':'Answer / command execution time','dragHint':'Drag to move (double-click = reset position)',
+    'untitled':'New chat','today':'today','empty':'No conversations.','delConfirm':'Delete this conversation?',
+    'edit':'Edit message','save':'Save & resend','cancel':'Cancel','regen':'Regenerate answer','copy':'Copy','copied':'Copied',
+    'del':'Delete conversation','done':'✓ done','failed':'failed',
+    'thumbUp':'Helpful answer','thumbDown':'Unhelpful answer',
+    'clickToRun':'State-changing action — click to run',
+    'histTrimmed':'Storage nearly full — older messages are no longer saved.',
+    'histNoSave':'Could not save conversation history (storage full).',
+  }};
+  function t(k){ const l=I.getLang(); const d=STR[l]||STR.pl; return (d&&k in d)?d[k]:(STR.pl[k]||k); }
+
+  /* ---------------- key (second slot) + model ---------------- */
+  function chatKey(){
+    let arr=[]; try{ arr=JSON.parse(localStorage.getItem('codemap_mistral_keys')||'[]'); }catch(e){}
+    if(!Array.isArray(arr)) arr=[];
+    const slot2=(arr[1]||'').trim(); if(slot2) return slot2;
+    const any=arr.map(k=>(k||'').trim()).filter(Boolean);
+    return any[0]||(localStorage.getItem('codemap_mistral_key')||'').trim()||'';
+  }
+  function aiModel(){ return localStorage.getItem('codemap_mistral_model')||'mistral-small-latest'; }
+  // local on-device provider (WebLLM) — no key needed; selected in Settings → AI
+  function useLocal(){ return !!(CM.LocalAI && CM.LocalAI.provider()==='local'); }
+  // native Ollama server — the FASTEST local option (no browser GPU/CPU involved)
+  function useOllama(){ return !!(CM.LocalAI && CM.LocalAI.provider()==='ollama' && CM.Ollama); }
+
+  /* ---------------- animated bot icon (hex + sparkle + network) ---------------- */
+  function botIcon(anim){
+    return '<svg class="cb-icon'+(anim?' cb-anim':'')+'" viewBox="0 0 48 48" aria-hidden="true">'
+      +'<g class="bi-net">'
+        +'<line x1="24" y1="24" x2="33.5" y2="15.5"/><line x1="24" y1="24" x2="17" y2="16.5"/>'
+        +'<line x1="24" y1="24" x2="15.5" y2="32.5"/><line x1="24" y1="24" x2="31.5" y2="33"/>'
+        +'<circle class="bi-node" cx="33.5" cy="15.5" r="2.7"/><circle class="bi-node" cx="17" cy="16.5" r="1.9"/>'
+        +'<circle class="bi-node" cx="15.5" cy="32.5" r="2.7"/><circle class="bi-node" cx="31.5" cy="33" r="1.9"/>'
+      +'</g>'
+      +'<polygon class="bi-hex" points="24,5 40.5,14.5 40.5,33.5 24,43 7.5,33.5 7.5,14.5"/>'
+      +'<path class="bi-star" d="M24 11 Q25.6 22.4 37 24 Q25.6 25.6 24 37 Q22.4 25.6 11 24 Q22.4 22.4 24 11 Z"/>'
+      +'<circle class="bi-core" cx="24" cy="24" r="2"/>'
+      +'</svg>';
+  }
+
+  /* ---------------- conversation store (localStorage) ---------------- */
+  const LS='codemap_chatbot_convs', LS_ACTIVE='codemap_chatbot_active';
+  let convs=[], activeId=null;
+  let _seq=0; function uid(){ _seq=(_seq+1); return 'm'+Date.now().toString(36)+_seq.toString(36); }
+  function loadConvs(){ try{ convs=JSON.parse(localStorage.getItem(LS)||'[]'); }catch(e){ convs=[]; } if(!Array.isArray(convs)) convs=[];
+    activeId=localStorage.getItem(LS_ACTIVE)||null;
+    if(!convs.length){ newConversation(false); } else if(!convs.find(c=>c.id===activeId)){ activeId=convs[0].id; } }
+  let _quotaWarned=false;
+  function saveConvs(){
+    if(convs.length>60) convs.length=60;   // keep memory and storage in sync (was: sliced only on write)
+    try{ localStorage.setItem(LS, JSON.stringify(convs)); localStorage.setItem(LS_ACTIVE, activeId||''); return; }
+    catch(e){}
+    // quota exceeded → retry with trimmed history (keep the last 40 messages of each conversation)
+    try{
+      const trimmed=convs.map(c=>Object.assign({}, c, {messages:(c.messages||[]).slice(-40)}));
+      localStorage.setItem(LS, JSON.stringify(trimmed)); localStorage.setItem(LS_ACTIVE, activeId||'');
+      if(!_quotaWarned){ _quotaWarned=true; if(CM.util&&CM.util.toast) CM.util.toast(t('histTrimmed'),'warn'); }
+    }catch(e2){ if(!_quotaWarned){ _quotaWarned=true; if(CM.util&&CM.util.toast) CM.util.toast(t('histNoSave'),'error'); } }
+  }
+  function activeConv(){ return convs.find(c=>c.id===activeId)||null; }
+  function newConversation(doRender){
+    const c={ id:uid(), title:'', titled:false, messages:[], createdAt:Date.now(), updatedAt:Date.now() };
+    convs.unshift(c); activeId=c.id; saveConvs();
+    if(doRender!==false){ renderSidebar(); renderMessages(); if(inputEl) inputEl.focus(); }
+    return c;
+  }
+  function deleteConversation(id){
+    const i=convs.findIndex(c=>c.id===id); if(i<0) return; convs.splice(i,1);
+    if(activeId===id){ if(streaming&&abortCtl) abortCtl.abort(); activeId=convs[0]?convs[0].id:null; if(!activeId) newConversation(false); }
+    saveConvs(); renderSidebar(); renderMessages();
+  }
+  function switchConversation(id){ if(id===activeId) return; if(streaming&&abortCtl) abortCtl.abort(); activeId=id; saveConvs(); renderSidebar(); renderMessages(); }
+
+  /* ---------------- feedback tally (👍/👎, persistent, aggregated across ALL conversations, never reset) ---------------- */
+  const LS_VOTES='codemap_chatbot_votes';
+  function getVotes(){ try{ const v=JSON.parse(localStorage.getItem(LS_VOTES)||'{}'); return {up:Math.max(0,+v.up||0), down:Math.max(0,+v.down||0)}; }catch(e){ return {up:0,down:0}; } }
+  function setVotes(v){ try{ localStorage.setItem(LS_VOTES, JSON.stringify({up:Math.max(0,v.up||0), down:Math.max(0,v.down||0)})); }catch(e){} }
+  // toggle a thumb on message m; adjusts the global tally by the delta (deleting a conversation never removes already-collected votes)
+  function thumb(m, val){
+    const prev=m.rating||0, next=(prev===val?0:val);
+    const v=getVotes();
+    v.up   += (next===1?1:0)  - (prev===1?1:0);
+    v.down += (next===-1?1:0) - (prev===-1?1:0);
+    setVotes(v); m.rating=next; saveConvs();
+  }
+
+  /* ---------------- app context + action protocol ---------------- */
+  function appState(){ try{ return (window.CMApp&&CMApp.appState)?CMApp.appState():{}; }catch(e){ return {}; } }
+  const ACTION_CATALOG=[
+    'loadDemo — load the demo project',
+    'loadRepo {url, branch?} — load a GitHub/GitLab/Bitbucket repository from its URL',
+    'clearProject — clear the currently loaded project',
+    'setMode {mode:"codemap"|"mindmap"} — switch the app mode',
+    'setLayout {layout} — change the CodeMap layout (see availableLayouts in state)',
+    'search {query} — search files/paths and highlight matches on the map',
+    'focusNode {query} — center the camera on the best-matching node',
+    'openNode {query} — focus a node and open its file preview',
+    'fit — fit the whole map to the screen',
+    'zoom {dir:"in"|"out"} — zoom the camera',
+    'rotate {dir:"left"|"right"|"reset"} — rotate the map',
+    'toggle3D — toggle the 3D tilt view',
+    'flyMode — toggle gaming fly navigation (WASD)',
+    'collapseAll — collapse/expand all folders',
+    'toggleImpact — toggle dependency-impact highlighting',
+    'toggleMinimap — collapse/expand the minimap',
+    'setFilter {folders?,files?,externals?,imports?,references?,contains?: boolean} — toggle visibility filters',
+    'setMetric {metric?, min?} — set the complexity/size metric and its minimum threshold',
+    'toggleLang {lang} — toggle visibility of one technology/language (e.g. "js")',
+    'openSettings {tab?} — open Settings (tabs: lang,appearance,ai,install,shortcuts,tutorial,spec,manual,about)',
+    'openDrive {tab?} — open Drive & Vault (tabs: vault,fav,disk)',
+    'openHistory — open the snapshot history',
+    'openCompare — open schema comparison',
+    'saveMap — export the current map as .json',
+    'snapshot — save a snapshot of the current project',
+    'exportImage — export the map as an image',
+    'copyLink — copy a shareable link to the current view',
+    'detectCycles — detect dependency cycles',
+    'hotspots — show hotspots (size × dependencies)',
+    'inspect — run static analysis (anti-pattern detection) on the loaded project',
+    'aiAnalyze — run the AI structure analysis',
+    'setTheme {theme:"dark"|"light"} — switch theme',
+    'setPreset {name:"depth"|"graphite"|"ghdark"|"forest"|"plum"|"paper"|"parchment"|"mist"} — apply a curated theme preset',
+    'setAccent {color:"#hex"} — set the accent color',
+    'setBackground {color:"#hex"} — set the map background color',
+    'setGlass {transparency?,menu?,blur?,tint?: number} — appearance sliders (percent/px values)',
+    'setSpacing {percent} / setNodeScale {percent} / setFontScale {percent} — map scale sliders',
+    'renderOption {grid?,curved?,lockall?,hoverPreview?: boolean} — rendering options',
+    'resetAppearance — restore default appearance',
+    'togglePanel {side:"left"|"right", open?:boolean} — collapse/expand side panels',
+    'setLang {lang:"pl"|"en"} — switch the WHOLE app language',
+    'startTutorial {mode:"codemap"|"mindmap"} — start the interactive tutorial',
+    'mindmap {action:"arrange"|"layout"|"fit"|"save"|"markdown"|"undo"} — MindMap-mode operations',
+    'installPWA — trigger the install-app prompt',
+    'help — list all available actions',
+  ];
+  // Actions the model must NOT auto-run: they load external data, discard the user's work, write files
+  // or trigger prompts. A malicious repo's file names flow into the prompt (appState), so a model-emitted
+  // block for any of these is rendered as a CLICK-TO-RUN chip instead of executing. User-typed imperatives
+  // (intentFallback pre-exec) are trusted and still run immediately.
+  const SIDE_EFFECT=new Set(['loadRepo','clearProject','saveMap','snapshot','exportImage','installPWA']);
+  function buildSystemPrompt(compact){
+    const lang=I.getLang()==='en'?'English':'Polish';
+    const st=appState();
+    if(compact){
+      // SMALL LOCAL MODELS: a long prompt means slow prefill on WebGPU and a confused model that
+      // parrots JSON. Keep it tight: short catalog (signatures only), state WITHOUT the structure
+      // dump, hard style rules and one worked example.
+      // PREFILL IS THE COST on iGPUs (~20-40 tok/s): every character here is paid on EVERY message.
+      // Keep the whole prompt ~250 tokens: one-line persona, one-line protocol, bare action names,
+      // and a MINIMAL state (no availableLayouts/filters/structure dumps).
+      const slim={mode:st.mode, project:st.hasProject?(st.project||'yes'):null, layout:st.layout, theme:st.theme, lang:st.lang};
+      const cat=ACTION_CATALOG.map(a=>a.split(' — ')[0]);
+      return [
+        'You are ChatBot inside CodeMap (a code-map web app). Reply in '+lang+', 1-3 short plain-text sentences.',
+        'ONLY when the user commands an app change, append a fenced block: ```action\n{"action":"<name>","args":{...}}\n```. Greetings/questions: text only, never JSON.',
+        'Actions: '+cat.join('|'),
+        'State: '+JSON.stringify(slim)
+      ].join('\n');
+    }
+    return [
+      'You are ChatBot, the built-in AI assistant of CodeMap — a local, no-build code-cartography web app (pure JavaScript + HTML5 canvas, namespace CM.*).',
+      'CodeMap visualises a codebase as an interactive Maltego-style map (files, folders, dependencies) with metrics, 13 layouts, filters, snapshots & diffs, a MindMap mode, a Drive & Vault (OPFS encrypted local storage + File System Access), GitHub/GitLab/Bitbucket loading, PNG/SVG export, full PL/EN UI and light/dark themes. You know the app deeply and help the user operate it.',
+      'You can PERFORM actions in the app. When the user asks you to DO something, output a fenced code block whose info string is exactly `action` containing a JSON object: {"action":"<name>","args":{ ... }}. Write one short natural sentence before it. You may emit several action blocks. Only act when the user asks you to act — otherwise just answer.',
+      'Available actions:\n- '+ACTION_CATALOG.join('\n- '),
+      'Live application state (JSON, reflects the app right now):\n'+JSON.stringify(st),
+      'Be concise, friendly and practical. Prefer doing what is asked over explaining how. Use light Markdown (**bold**, `code`, ```fences```). Answer in '+lang+'.'
+    ].join('\n\n');
+  }
+  // Deterministic intent fallback for SMALL LOCAL MODELS: they emit the ```action``` block
+  // unreliably. When the user's message is an unambiguous app command and the model produced no
+  // action, match it here so "zleć akcję" works regardless of model quality. Requires an
+  // imperative verb to avoid firing on questions/small talk.
+  function intentFallback(userText){
+    const s=(userText||'').toLowerCase();
+    if(s.includes('?')) return null;   // questions are answered, never auto-executed
+    // negation / conditional → let the model decide, don't blindly fire ("nie przełączaj", "don't switch")
+    if(/\b(nie|don'?t|do not|never|zamiast|instead|jeśli|jesli|gdyby|czy)\b/.test(s)) return null;
+    // long, prose-y requests likely want more than a bare command → route through the model
+    if(s.length>90) return null;
+    const verb=/\b(włącz|wlacz|przełącz|przelacz|ustaw|zmień|zmien|uruchom|pokaż|pokaz|otwórz|otworz|zrób|zrob|załaduj|zaladuj|wczytaj|wykonaj|zrestartuj|switch|turn|set|change|start|open|load|run|enable|show|make)\b/;
+    if(!verb.test(s)) return null;
+    const has=(re)=>re.test(s);
+    if(has(/motyw|theme/)){ if(has(/jasn|light|biał|bial/)) return {action:'setTheme',args:{theme:'light'}};
+      if(has(/ciemn|dark|czarn/)) return {action:'setTheme',args:{theme:'dark'}}; }
+    if(has(/\bdemo\b/)) return {action:'loadDemo',args:{}};
+    if(has(/samouczek|tutorial|przewodnik/)) return {action:'startTutorial',args:{mode:has(/mind/)?'mindmap':'codemap'}};
+    if(has(/język|jezyk|language/)){ if(has(/angielsk|english|\ben\b/)) return {action:'setLang',args:{lang:'en'}};
+      if(has(/polsk|polish|\bpl\b/)) return {action:'setLang',args:{lang:'pl'}}; }
+    if(has(/tryb|mode/)){ if(has(/mind/)) return {action:'setMode',args:{mode:'mindmap'}};
+      if(has(/code|kod|mapa kodu/)) return {action:'setMode',args:{mode:'codemap'}}; }
+    if(has(/analiz|antywzorc|inspek/)) return {action:'inspect',args:{}};
+    if(has(/dopasuj|zmieść|zmiesc|\bfit\b/)) return {action:'fit',args:{}};
+    if(has(/\b3d\b/)) return {action:'toggle3D',args:{}};
+    if(has(/tryb lotu|fly/)) return {action:'flyMode',args:{}};
+    if(has(/minimap/)) return {action:'toggleMinimap',args:{}};
+    if(has(/ustawienia|settings/)) return {action:'openSettings',args:{}};
+    if(has(/dysk|sejf|vault|drive/)) return {action:'openDrive',args:{}};
+    if(has(/histori|snapshot|migawk/)) return {action:has(/zapisz|save/)?'snapshot':'openHistory',args:{}};
+    if(has(/cykl|cycles/)) return {action:'detectCycles',args:{}};
+    if(has(/hotspot/)) return {action:'hotspots',args:{}};
+    return null;
+  }
+  // <think> support (reasoning models like DeepSeek R1): split the thought stream from the visible
+  // answer; an UNCLOSED block during streaming reports open=true so the UI can show it live.
+  function splitThink(text){
+    let think='', rest='', open=false; const s=String(text);
+    const re=/<think>([\s\S]*?)(<\/think>|$)/g; let last=0, m;
+    while((m=re.exec(s))){ think+=(think?'\n':'')+m[1]; if(!m[2]) open=true; rest+=s.slice(last,m.index); last=m.index+m[0].length; }
+    rest+=s.slice(last);
+    return {think:think.trim(), rest, open};
+  }
+  function stripThink(text){ return splitThink(text).rest; }
+  function thinkHTML(th, collapsed){
+    if(!th.think) return '';
+    return '<details class="cb-think'+(th.open?' cb-think-live':'')+'"'+((collapsed&&!th.open)?'':' open')+'>'+
+      '<summary>'+(th.open?'<span class="cb-think-dot"></span>':'🧠 ')+esc(t(th.open?'thinking':'thoughts'))+'</summary>'+
+      '<div class="cb-think-b">'+esc(th.think)+'</div></details>';
+  }
+  function extractActions(text){ const out=[]; const re=/```action\s*([\s\S]*?)```/g; let m;
+    while((m=re.exec(text))){ try{ const o=JSON.parse(m[1].trim()); if(o&&o.action) out.push(o); }catch(e){} } return out; }
+  function stripActions(text){ return String(text).replace(/```action\s*[\s\S]*?```/g,'').replace(/\n{3,}/g,'\n\n').trim(); }
+
+  /* ---------------- safe light markdown ---------------- */
+  function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // languages the built-in runtime (CM.Runner) can execute in its sandboxed preview window
+  const RUNNABLE=/^(html|htm|css|js|javascript|svg|json|md|markdown|php)$/i;
+  function sniffLang(code){
+    const s=code.trim();
+    if(/^<svg[\s>]/i.test(s)) return 'svg';
+    if(/^<!doctype|^<html|^<(div|body|head|section|main|p|h[1-6]|table|form|button|span)[\s>]/i.test(s)) return 'html';
+    if(/^[{\[][\s\S]*[}\]]$/.test(s)){ try{ JSON.parse(s); return 'json'; }catch(e){} }
+    if(/^<\?php/i.test(s)) return 'php';
+    return '';
+  }
+  function fmt(text){
+    const parts=String(text).split(/```/); let html='';
+    for(let i=0;i<parts.length;i++){
+      if(i%2===1){ const lang=((parts[i].match(/^([a-zA-Z0-9+\-]+)\n/)||[])[1]||'').toLowerCase(); const code=parts[i].replace(/^[a-zA-Z0-9+\-]*\n/,'');
+        let body; try{ body=(CM.UI&&CM.UI.highlight)?CM.UI.highlight(code,lang):esc(code); }catch(e){ body=esc(code); }
+        const runLang=RUNNABLE.test(lang)?lang:sniffLang(code);
+        const runBtn=runLang?('<button class="cb-cbtn cb-run" data-runlang="'+esc(runLang)+'" title="'+esc(t('runCode'))+'">'+
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>'):'';
+        html+='<div class="cb-codewrap">'+
+          '<div class="cb-ctools">'+(lang?('<span class="cb-clang">'+esc(lang)+'</span>'):'')+runBtn+
+          '<button class="cb-cbtn cb-copy" title="'+esc(t('copyCode'))+'">'+
+          '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>'+
+          '<pre class="cb-code hl">'+body+'</pre></div>';
+      } else { let s=esc(parts[i]); s=s.replace(/`([^`\n]+)`/g,'<code class="cb-ic">$1</code>'); s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+        s=s.replace(/\*([^*\n]+)\*/g,'<i>$1</i>'); s=s.replace(/\n/g,'<br>'); html+=s; } }
+    return html;
+  }
+
+  /* ---------------- state / DOM refs ---------------- */
+  let panel=null, launcher=null, sidebarEl=null, msgsEl=null, inputEl=null, sendBtn=null, builtLang=null;
+  let subEl=null, modelSel=null;   // dynamic header: provider/model name + local-model switcher
+  let isOpen=false, streaming=false, abortCtl=null, sbOpen=true;
+
+  /* ---------------- build ---------------- */
+  function build(){
+    const lang=I.getLang();
+    if(panel && builtLang===lang) return;
+    builtLang=lang;
+    if(!launcher){ launcher=el('button',{id:'cb-launcher',onclick:open}); document.body.appendChild(launcher); }
+    launcher.innerHTML=botIcon(true)+'<span>'+t('name')+'</span>'; launcher.title=t('open');
+
+    if(!panel){ panel=el('div',{id:'cb-panel',class:'hidden'+(sbOpen?' cb-sb-open':'')}); document.body.appendChild(panel); }
+    panel.classList.toggle('cb-sb-open', sbOpen);
+    panel.innerHTML='';
+    // header
+    const head=el('div',{class:'cb-head'});
+    head.appendChild(el('button',{class:'cb-hbtn',title:t('togglebar'),html:ic.svg('layers',{size:16}),onclick:toggleSidebar}));
+    head.appendChild(el('span',{class:'cb-avatar',html:botIcon(true)}));
+    const ttl=el('div',{class:'cb-titles'});
+    ttl.appendChild(el('div',{class:'cb-title',text:t('name')}));
+    subEl=el('div',{class:'cb-sub',text:t('subtitle')});
+    ttl.appendChild(subEl);
+    head.appendChild(ttl);
+    head.appendChild(el('span',{class:'cb-grow'}));
+    // local-model switcher (visible only when the local provider is active; lists DOWNLOADED models)
+    modelSel=el('select',{class:'cb-modelsel',title:t('modelSel')});
+    modelSel.onchange=async()=>{
+      if(useOllama()){ CM.Ollama.setModel(modelSel.value); updateSub(); return; }   // stateless — safe anytime
+      // switching the engine mid-answer would terminate the worker under the live stream
+      if(streaming){ modelSel.value=CM.LocalAI.modelId(); return; }
+      CM.LocalAI.setModel(modelSel.value); updateSub();
+      try{ await CM.LocalAI.ensureEngine(); }catch(e){ if(!e||e.name!=='AbortError') updateSub((e&&e.message)||String(e)); return; } updateSub(); };
+    head.appendChild(modelSel);
+    head.appendChild(el('button',{class:'cb-hbtn',title:t('newchat'),html:ic.svg('plus',{size:16}),onclick:()=>newConversation()}));
+    head.appendChild(el('button',{class:'cb-hbtn',title:t('collapse'),html:ic.svg('collapse',{size:16}),onclick:close}));
+    panel.appendChild(head);
+    // ---- drag the whole panel by its header (persisted; double-click header = reset) ----
+    head.title=t('dragHint'); head.classList.add('cb-draggable');
+    head.addEventListener('pointerdown',(e)=>{
+      if(e.button!==0 || e.target.closest('button,select,input')) return;
+      const r=panel.getBoundingClientRect(); const ox=e.clientX-r.left, oy=e.clientY-r.top;
+      try{ head.setPointerCapture(e.pointerId); }catch(err){}
+      panel.classList.add('cb-dragging');
+      const move=(ev)=>{
+        const L=Math.max(4, Math.min(ev.clientX-ox, Math.max(4, innerWidth-r.width-4)));
+        const T=Math.max(4, Math.min(ev.clientY-oy, Math.max(4, innerHeight-72)));
+        panel.style.left=L+'px'; panel.style.top=T+'px'; panel.style.right='auto'; panel.style.bottom='auto';
+      };
+      const up=()=>{ head.removeEventListener('pointermove',move); head.removeEventListener('pointerup',up);
+        head.removeEventListener('pointercancel',up); head.removeEventListener('lostpointercapture',up);
+        panel.classList.remove('cb-dragging');
+        if(panel.style.left) try{ localStorage.setItem('codemap_chatbot_pos',
+          JSON.stringify({l:parseInt(panel.style.left)||0, t:parseInt(panel.style.top)||0})); }catch(err){} };
+      head.addEventListener('pointermove',move); head.addEventListener('pointerup',up);
+      head.addEventListener('pointercancel',up); head.addEventListener('lostpointercapture',up);   // gesture aborted → clean up (no stuck drag / listener leak)
+    });
+    head.addEventListener('dblclick',(e)=>{ if(e.target.closest('button,select,input')) return;
+      panel.style.left=panel.style.top=panel.style.right=panel.style.bottom='';
+      try{ localStorage.removeItem('codemap_chatbot_pos'); }catch(err){} });
+    applySavedPos();
+    // body = sidebar + main
+    const body=el('div',{class:'cb-body'});
+    sidebarEl=el('div',{class:'cb-sidebar'});
+    const main=el('div',{class:'cb-main'});
+    msgsEl=el('div',{class:'cb-msgs'});
+    // delegated: copy / run buttons on generated code blocks
+    msgsEl.addEventListener('click',(e)=>{
+      const copy=e.target.closest('.cb-copy'), run=e.target.closest('.cb-run');
+      if(!copy && !run) return;
+      const wrap=e.target.closest('.cb-codewrap'); const pre=wrap&&wrap.querySelector('.cb-code');
+      if(!pre) return;
+      const code=pre.textContent;
+      if(copy && navigator.clipboard){ navigator.clipboard.writeText(code).then(()=>{
+        copy.classList.add('cb-copied'); setTimeout(()=>copy.classList.remove('cb-copied'),900); }); }
+      else if(run && CM.Runner){ CM.Runner.open(code, run.dataset.runlang||''); }
+    });
+    const comp=el('div',{class:'cb-composer'});
+    inputEl=el('textarea',{class:'cb-input',rows:'1',placeholder:t('placeholder')});
+    inputEl.addEventListener('input',autoGrow);
+    inputEl.addEventListener('keydown',(e)=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); onSend(); } });
+    sendBtn=el('button',{class:'cb-send',title:t('send'),html:ic.svg('flow',{size:17}),onclick:onSend});
+    comp.appendChild(inputEl); comp.appendChild(sendBtn);
+    main.appendChild(msgsEl); main.appendChild(comp);
+    body.appendChild(sidebarEl); body.appendChild(main);
+    panel.appendChild(body);
+
+    renderSidebar(); renderMessages(); refreshModelUI();
+  }
+  function autoGrow(){ if(!inputEl) return; inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,120)+'px'; }
+  function toggleSidebar(){ sbOpen=!sbOpen; if(panel) panel.classList.toggle('cb-sb-open', sbOpen); }
+  function applySavedPos(){
+    if(!panel) return;
+    let p=null; try{ p=JSON.parse(localStorage.getItem('codemap_chatbot_pos')||'null'); }catch(e){}
+    if(!p) return;
+    const L=Math.min(Math.max(p.l,4), Math.max(4,innerWidth-320)), T=Math.min(Math.max(p.t,4), Math.max(4,innerHeight-120));
+    panel.style.left=L+'px'; panel.style.top=T+'px'; panel.style.right='auto'; panel.style.bottom='auto';
+  }
+
+  /* ---------------- dynamic header: provider / local-model name + switcher ---------------- */
+  function updateSub(override){
+    if(!subEl) return;
+    if(override){ subEl.textContent=override; return; }
+    if(useOllama()){ subEl.textContent=t('subOllama')+' · '+(CM.Ollama.model()||'…'); return; }
+    if(!useLocal()){ subEl.textContent=t('subtitle'); return; }
+    const st=CM.LocalAI.status(), name=CM.LocalAI.shortLabel();
+    subEl.textContent=t('subLocal')+' · '+name+(st==='ready'?' ✓':(st==='loading'?' …':''));
+  }
+  async function refreshModelUI(){
+    if(!modelSel) return;
+    if(useOllama()){
+      modelSel.style.display=''; updateSub();
+      try{
+        const list=await CM.Ollama.models();
+        if(!modelSel || !useOllama()) return;
+        modelSel.innerHTML='';
+        for(const m of list){
+          const o=el('option',{value:m.name, text:m.name+(m.sizeGB?(' ('+m.sizeGB+' GB)'):'')});
+          if(m.name===CM.Ollama.model()) o.selected=true;
+          modelSel.appendChild(o);
+        }
+        modelSel.title=t('modelSelOllama');
+      }catch(e){ modelSel.innerHTML=''; modelSel.appendChild(el('option',{text:t('ollamaOffline')})); }
+      updateSub(); return;
+    }
+    if(!useLocal()){ modelSel.style.display='none'; updateSub(); return; }
+    modelSel.style.display='';
+    updateSub();
+    try{
+      const list=await CM.LocalAI.listDownloaded();
+      if(!modelSel || !useLocal()) return;
+      modelSel.innerHTML='';
+      let anyDl=false;
+      for(const m of list){
+        const o=el('option',{value:m.id, text:(m.downloaded?'✓ ':'')+CM.LocalAI.shortLabel(m.id)+(m.downloaded?'':' — '+t('notDownloaded'))});
+        o.disabled=!m.downloaded; if(m.downloaded) anyDl=true;
+        if(m.id===CM.LocalAI.modelId()) o.selected=true;
+        modelSel.appendChild(o);
+      }
+      modelSel.title=anyDl?t('modelSel'):t('noModelsDl');
+    }catch(e){}
+    updateSub();
+  }
+
+  /* ---------------- sidebar render ---------------- */
+  function renderSidebar(){
+    if(!sidebarEl) return; sidebarEl.innerHTML='';
+    sidebarEl.appendChild(el('button',{class:'cb-newbtn',html:ic.svg('plus',{size:14})+' '+t('newchat'),onclick:()=>newConversation()}));
+    sidebarEl.appendChild(el('div',{class:'cb-sb-head',text:t('history')}));
+    const list=el('div',{class:'cb-convs'});
+    if(!convs.length){ list.appendChild(el('div',{class:'cb-sb-empty',text:t('empty')})); }
+    convs.forEach(c=>{
+      const item=el('div',{class:'cb-conv'+(c.id===activeId?' active':''),onclick:()=>switchConversation(c.id)});
+      const tt=el('div',{class:'cb-conv-t',text:c.title||t('untitled')});
+      const meta=el('div',{class:'cb-conv-m',text:(c.messages.filter(m=>m.role==='user').length)+' · '+(U.relTime?U.relTime(c.updatedAt||c.createdAt):'')});
+      const txt=el('div',{class:'cb-conv-txt'}); txt.appendChild(tt); txt.appendChild(meta);
+      const del=el('button',{class:'cb-conv-del',title:t('del'),html:ic.svg('trash',{size:13}),onclick:(e)=>{ e.stopPropagation(); if(confirm(t('delConfirm'))) deleteConversation(c.id); }});
+      item.appendChild(txt); item.appendChild(del);
+      list.appendChild(item);
+    });
+    sidebarEl.appendChild(list);
+  }
+
+  /* ---------------- messages render ---------------- */
+  function renderMessages(){
+    if(!msgsEl) return; msgsEl.innerHTML='';
+    const conv=activeConv();
+    if(!conv || !conv.messages.length){ msgsEl.appendChild(welcomeRow()); return; }
+    conv.messages.forEach((m,idx)=>{ if(m.role==='system') return; msgsEl.appendChild(messageRow(m, idx, conv)); });
+    scrollBottom();
+  }
+  function welcomeRow(){ const r=el('div',{class:'cb-row cb-row-assistant'});
+    r.appendChild(el('span',{class:'cb-bavatar',html:botIcon(true)}));
+    const b=el('div',{class:'cb-bubble cb-bubble-assistant'}); b.innerHTML=fmt(t('welcome')); r.appendChild(b); return r; }
+  function messageRow(m, idx, conv){
+    const row=el('div',{class:'cb-row cb-row-'+m.role,'data-mid':m.id});
+    if(m.role==='assistant') row.appendChild(el('span',{class:'cb-bavatar',html:botIcon(false)}));
+    const wrap=el('div',{class:'cb-bwrap'});
+    const b=el('div',{class:'cb-bubble cb-bubble-'+m.role});
+    let thHtml='';
+    let bodyTxt=m.content;
+    if(m.role==='assistant'){
+      const th=splitThink(m.content);
+      thHtml=thinkHTML({think:th.think, rest:'', open:false}, true);   // collapsed in history
+      bodyTxt=stripActions(th.rest);
+      if(!String(bodyTxt).trim() && m.actions && m.actions.some(a=>!a.pending)) bodyTxt=t('didActions');
+    }
+    b.innerHTML=thHtml+fmt(bodyTxt);
+    wrap.appendChild(b);
+    if(m.role==='assistant' && m.genMs){
+      const s=m.genMs/1000;
+      const txt=s<10?(s.toFixed(1).replace('.',I.getLang()==='en'?'.':',')+' s'):(s<90?Math.round(s)+' s':(Math.floor(s/60)+' min '+Math.round(s%60)+' s'));
+      wrap.appendChild(el('span',{class:'cb-time',title:t('genTime'),text:'⏱ '+txt}));
+    }
+    // executed-action chips (assistant)
+    if(m.actions&&m.actions.length){ const chips=el('div',{class:'cb-chips'});
+      m.actions.forEach(a=>{
+        if(a.pending){   // side-effect action awaiting the user's click (survives re-render)
+          const c=el('div',{class:'cb-chip cb-chip-confirm',html:'▶ '+esc(a.action),title:t('clickToRun')});
+          c.onclick=()=>{
+            try{ const r=(window.CMApp&&CMApp.exec)?CMApp.exec(a.action, a.args):''; a.result=r||t('done'); a.ok=true; }
+            catch(e){ a.result=(e&&e.message)||t('failed'); a.ok=false; }
+            delete a.pending; saveConvs(); renderMessages();
+          };
+          chips.appendChild(c);
+        } else chips.appendChild(el('div',{class:'cb-chip'+(a.ok?'':' cb-chip-err'),html:(a.ok?'⚡ ':'⚠ ')+esc(a.result||a.action)}));
+      }); wrap.appendChild(chips); }
+    // hover toolbar
+    const tb=el('div',{class:'cb-mtools'});
+    if(m.role==='user'){ tb.appendChild(el('button',{class:'cb-mt',title:t('edit'),html:ic.svg('pencil',{size:13}),onclick:()=>startEdit(row,m)})); }
+    else {
+      // 👍 / 👎 feedback — collected into a persistent global tally shown in Settings → AI
+      const up=el('button',{class:'cb-mt cb-thumb'+(m.rating===1?' cb-up-on':''),title:t('thumbUp'),text:'👍'});
+      const dn=el('button',{class:'cb-mt cb-thumb'+(m.rating===-1?' cb-down-on':''),title:t('thumbDown'),text:'👎'});
+      const refl=()=>{ up.classList.toggle('cb-up-on',m.rating===1); dn.classList.toggle('cb-down-on',m.rating===-1); };
+      up.onclick=()=>{ thumb(m,1); refl(); }; dn.onclick=()=>{ thumb(m,-1); refl(); };
+      tb.appendChild(up); tb.appendChild(dn);
+      tb.appendChild(el('button',{class:'cb-mt',title:t('regen'),html:ic.svg('refresh',{size:13}),onclick:()=>regenerate(m.id)}));
+    }
+    tb.appendChild(el('button',{class:'cb-mt',title:t('copy'),html:ic.svg('copy',{size:13}),onclick:()=>{ try{ navigator.clipboard.writeText(m.content); U.toast(t('copied'),'success'); }catch(e){} }}));
+    wrap.appendChild(tb);
+    row.appendChild(wrap);
+    return row;
+  }
+  function startEdit(row, m){
+    const wrap=row.querySelector('.cb-bwrap'); wrap.innerHTML='';
+    const ta=el('textarea',{class:'cb-edit-ta'}); ta.value=m.content;
+    const bar=el('div',{class:'cb-edit-bar'});
+    bar.appendChild(el('button',{class:'cb-btn-primary',text:t('save'),onclick:()=>commitEdit(m.id, ta.value)}));
+    bar.appendChild(el('button',{class:'cb-btn-ghost',text:t('cancel'),onclick:renderMessages}));
+    wrap.appendChild(ta); wrap.appendChild(bar);
+    ta.focus(); ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,160)+'px';
+    ta.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); commitEdit(m.id, ta.value); } if(e.key==='Escape') renderMessages(); });
+  }
+  function commitEdit(mid, text){
+    text=(text||'').trim(); if(!text) return;
+    const conv=activeConv(); const i=conv.messages.findIndex(x=>x.id===mid); if(i<0) return;
+    conv.messages[i].content=text; conv.messages.length=i+1;   // drop everything after the edited message
+    conv.updatedAt=Date.now(); saveConvs(); renderMessages(); runAssistant();
+  }
+  function regenerate(mid){
+    const conv=activeConv(); const i=conv.messages.findIndex(x=>x.id===mid); if(i<0) return;
+    conv.messages.length=i;   // drop this assistant reply (+ anything after)
+    conv.updatedAt=Date.now(); saveConvs(); renderMessages(); runAssistant();
+  }
+  function scrollBottom(){ if(msgsEl) msgsEl.scrollTop=msgsEl.scrollHeight; }
+
+  /* ---------------- open / close ---------------- */
+  function open(){ build(); isOpen=true; panel.classList.remove('hidden');
+    refreshModelUI();   // provider/model may have changed in Settings while the panel was closed
+    setTimeout(()=>{ if(isOpen) panel.classList.add('cb-open'); },20);
+    document.body.classList.add('cb-panel-open');   // shifts the compass left so it never touches the panel
+    if(launcher) launcher.classList.add('cb-hidden');
+    setTimeout(()=>{ if(inputEl) inputEl.focus(); },120); }
+  function close(){ isOpen=false; if(panel) panel.classList.remove('cb-open');
+    document.body.classList.remove('cb-panel-open');
+    if(launcher) launcher.classList.remove('cb-hidden');
+    setTimeout(()=>{ if(panel&&!isOpen) panel.classList.add('hidden'); },340); }
+  function toggle(){ isOpen?close():open(); }
+
+  /* ---------------- send / stream / run ---------------- */
+  function onSend(){
+    if(streaming){
+      // STOP must feel instant: abort the race in chat(), hard-interrupt the engine, and give
+      // immediate visual feedback even before the promise chain unwinds
+      if(abortCtl) abortCtl.abort();
+      if(CM.LocalAI&&CM.LocalAI.interrupt) CM.LocalAI.interrupt();
+      const c=msgsEl&&msgsEl.querySelector('.cb-caret'); if(c) c.remove();
+      setSending(false);
+      return; }
+    const text=(inputEl.value||'').trim(); if(!text) return;
+    const conv=activeConv()||newConversation(false);
+    conv.messages.push({id:uid(), role:'user', content:text, ts:Date.now()});
+    conv.updatedAt=Date.now(); saveConvs();
+    inputEl.value=''; autoGrow(); renderMessages(); renderSidebar();
+    runAssistant();
+  }
+  async function runAssistant(){
+    const conv=activeConv(); if(!conv) return;
+    const key=chatKey();
+    if(useLocal() && !CM.LocalAI.hasWebGPU()){
+      conv.messages.push({id:uid(), role:'assistant', content:t('noWebGPU'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages();
+      const last=msgsEl.querySelector('.cb-row-assistant:last-child .cb-bwrap');
+      if(last) last.appendChild(el('button',{class:'cb-inline-go',text:t('goSettings'),onclick:()=>{ if(CM.Settings) CM.Settings.open('ai'); }}));
+      return; }
+    if(!useLocal() && !useOllama() && !key){ conv.messages.push({id:uid(), role:'assistant', content:t('noKey'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages();
+      const last=msgsEl.querySelector('.cb-row-assistant:last-child .cb-bwrap');
+      if(last) last.appendChild(el('button',{class:'cb-inline-go',text:t('goSettings'),onclick:()=>{ if(CM.Settings) CM.Settings.open('ai'); }}));
+      return; }
+
+    streaming=true; setSending(true); abortCtl=new AbortController();
+    const tStart=performance.now();   // exact answer/command time shown on the message
+    // transient typing indicator with a live STAGE label (loading model / thinking / writing)
+    const typing=el('div',{class:'cb-row cb-row-assistant'});
+    typing.appendChild(el('span',{class:'cb-bavatar',html:botIcon(true)}));
+    typing.appendChild(el('div',{class:'cb-bubble cb-bubble-assistant cb-typing',
+      html:'<span></span><span></span><span></span><em class="cb-stage"></em>'}));
+    msgsEl.appendChild(typing); scrollBottom();
+    const setStage=(txt)=>{ const s=typing.parentNode&&typing.querySelector('.cb-stage'); if(s) s.textContent=txt||''; };
+
+    const local=useLocal();
+    const think=local&&CM.LocalAI.isThinking&&CM.LocalAI.isThinking();
+    let hist=conv.messages.filter(m=>m.role!=='system'&&!m.noKey);
+    if(local && hist.length>8) hist=hist.slice(-8);   // cap prefill for small on-device models
+    // few-shot for small local models: one chat turn + one action turn teach the format far better
+    // than instructions alone (tiny models parrot examples, so show BOTH behaviours).
+    // REASONING models (DeepSeek R1): per vendor guidance NO few-shot and NO system role —
+    // examples without <think> teach the model to drop its reasoning stream.
+    const pl=I.getLang()!=='en';
+    const FEWSHOT=(local&&!think)?[
+      {role:'user',content:pl?'cześć':'hi'},
+      {role:'assistant',content:pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?'},
+      {role:'user',content:pl?'włącz jasny motyw':'switch to the light theme'},
+      {role:'assistant',content:(pl?'Już się robi!':'On it!')+'\n```action\n{"action":"setTheme","args":{"theme":"light"}}\n```'},
+    ]:[];
+    const mapped=hist.map(m=>({role:m.role, content:m.role==='assistant'?stripActions(stripThink(m.content)):m.content}));
+    let messages;
+    if(think){
+      messages=mapped.slice();
+      const fi=messages.findIndex(m=>m.role==='user');
+      if(fi>=0) messages[fi]={role:'user',content:buildSystemPrompt(true)+'\n\n'+messages[fi].content};
+      else messages.unshift({role:'user',content:buildSystemPrompt(true)});
+    } else {
+      messages=[{role:'system',content:buildSystemPrompt(local)}].concat(FEWSHOT).concat(mapped);
+    }
+
+    let acc='', liveRow=null, liveInner=null, chipsEl=null;
+    const ensureLive=()=>{ if(liveRow) return; if(typing.parentNode) typing.remove();
+      liveRow=el('div',{class:'cb-row cb-row-assistant'});
+      liveRow.appendChild(el('span',{class:'cb-bavatar',html:botIcon(true)}));
+      const wrap=el('div',{class:'cb-bwrap'});
+      liveInner=el('div',{class:'cb-bubble cb-bubble-assistant'}); wrap.appendChild(liveInner);
+      liveRow.appendChild(wrap); msgsEl.appendChild(liveRow);
+      if(chipsEl) wrap.appendChild(chipsEl); };   // chips created during pre-exec move under the live bubble
+    // ---- LIVE action execution: run each ```action``` block the moment it CLOSES in the stream,
+    // and run unambiguous user commands (intentFallback) IMMEDIATELY — before the model even starts.
+    const liveActs=[]; const actKeys=new Set();
+    // once the command is DONE, generating more tokens is pure cost on an iGPU — soft-stop ends the
+    // stream cleanly (no "aborted" note); also fires when the model re-states an already-executed action
+    let _softStop=false;
+    const softStop=()=>{ if(_softStop) return; _softStop=true; try{ if(abortCtl) abortCtl.abort(); }catch(e){} };
+    const chipsBox=()=>{
+      if(!chipsEl) chipsEl=el('div',{class:'cb-chips'});
+      const host=liveRow?liveRow.querySelector('.cb-bwrap'):typing;
+      if(host && chipsEl.parentNode!==host) host.appendChild(chipsEl);
+      return chipsEl; };
+    const runInto=(entry, chip)=>{   // execute an action and reflect the result on its chip + entry
+      chip.onclick=null; chip.classList.remove('cb-chip-confirm','cb-chip-run'); chip.classList.add('cb-chip-run'); chip.innerHTML='⏳ '+esc(entry.action);
+      try{ const r=(window.CMApp&&CMApp.exec)?CMApp.exec(entry.action, entry.args):'';
+        entry.result=r||t('done'); entry.ok=true; delete entry.pending;
+        chip.classList.remove('cb-chip-run'); chip.innerHTML='⚡ '+esc(entry.result); }
+      catch(e){ entry.result=(e&&e.message)||t('failed'); entry.ok=false; delete entry.pending;
+        chip.classList.remove('cb-chip-run'); chip.classList.add('cb-chip-err'); chip.innerHTML='⚠ '+esc(entry.result); }
+    };
+    const execLive=(a, fromStream, trusted)=>{
+      const key=a.action+'|'+JSON.stringify(a.args||{});
+      if(actKeys.has(key)){ if(fromStream&&(local||useOllama())) softStop(); return; }
+      actKeys.add(key);
+      // model-emitted side-effect action → do NOT run it; offer a click-to-run chip and let the model
+      // keep explaining (no soft-stop). User-typed commands (trusted) run immediately as before.
+      if(!trusted && SIDE_EFFECT.has(a.action)){
+        const entry={action:a.action, args:a.args, pending:true};
+        liveActs.push(entry);
+        const chip=el('div',{class:'cb-chip cb-chip-confirm',html:'▶ '+esc(a.action),title:t('clickToRun')});
+        chip.onclick=()=>{ runInto(entry, chip); saveConvs(); };
+        chipsBox().appendChild(chip); scrollBottom();
+        return;
+      }
+      const entry={action:a.action}; liveActs.push(entry);
+      const chip=el('div',{class:'cb-chip cb-chip-run',html:'⏳ '+esc(a.action)});
+      chipsBox().appendChild(chip); scrollBottom();
+      runInto(entry, chip);
+      if(fromStream&&(local||useOllama())) softStop();
+    };
+    // hoisted so the finally can stop a trailing paint: a paint() scheduled just before abort/error
+    // would otherwise fire ~100ms later and execLive() a block that closed after Stop was pressed.
+    let _lastPaint=0, _paintT=null, _runDone=false;
+    try{
+      // instant command path: an unambiguous imperative executes NOW, not after generation
+      const lastUserMsg=[...conv.messages].reverse().find(m=>m.role==='user');
+      const pre=lastUserMsg && intentFallback(lastUserMsg.content);
+      if(pre){
+        execLive(pre, false, true);   // user-typed imperative → trusted, runs immediately
+        // a short, PURE command needs no model at all — finish instantly with the result chip
+        // (longer messages may ask for something more, so the model still gets its turn)
+        if((lastUserMsg.content||'').trim().length<=64){
+          if(typing.parentNode) typing.remove();
+          conv.messages.push({id:uid(), role:'assistant', content:'', ts:Date.now(),
+            actions:liveActs.slice(), genMs:Math.round(performance.now()-tStart)});
+          conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv);
+          return;
+        }
+      }
+      // THROTTLED live paint: formatting + innerHTML + layout reads on EVERY token is O(n²) over the
+      // growing text and back-pressures the async token loop — the GPU streams faster than the DOM
+      // can repaint and the answer LOOKS like it "tokenizes slowly". Paint at most ~10×/s.
+      const paint=()=>{ _paintT=null; if(_runDone) return; _lastPaint=performance.now(); if(!acc) return; ensureLive();
+        const near=(msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight)<70;
+        const th=splitThink(acc);                                   // live thought preview (reasoning models)
+        for(const a of extractActions(th.rest)) execLive(a, true, false);  // model output → untrusted
+        liveInner.innerHTML=thinkHTML(th,false)+fmt(stripActions(th.rest))+'<span class="cb-caret"></span>';
+        if(near) scrollBottom(); };
+      const streamOpts={ temperature:think?0.6:0.5, signal:abortCtl.signal,
+        onToken:(d,full)=>{ acc=full;
+          const now=performance.now();
+          if(now-_lastPaint>=95) paint();
+          else if(!_paintT) _paintT=setTimeout(paint,100);   // trailing paint so the tail never lags
+        } };
+      if(local){
+        // reasoning models spend tokens on the <think> stream — give them room; others stay tight
+        streamOpts.maxTokens=think?1200:320;
+        // engine download/load progress lives in the stage label (dots keep animating)
+        const off=CM.LocalAI.onProgress(p=>{ if(p&&p.text) setStage(p.text+(p.pct?(' '+p.pct+'%'):'')); });
+        setStage(CM.LocalAI.status()!=='ready'?t('stLoading'):'');
+        try{ acc=await CM.LocalAI.chat(messages, streamOpts); } finally{ off(); updateSub(); }
+      } else if(useOllama()){
+        streamOpts.maxTokens=900;   // native speed — roomy but bounded
+        acc=await CM.Ollama.chat(messages, streamOpts);
+      } else {
+        await CM.Loaders.mistralStream(messages, Object.assign({key, model:aiModel()}, streamOpts));
+      }
+      _runDone=true;
+      if(_paintT){ clearTimeout(_paintT); _paintT=null; }
+      if(typing.parentNode) typing.remove();
+      // final sweep (covers blocks that closed between last paint and stream end)
+      for(const a of extractActions(stripThink(acc))) execLive(a, false, false);   // model output → untrusted
+      conv.messages.push({id:uid(), role:'assistant', content:acc, ts:Date.now(),
+        actions:liveActs.length?liveActs.slice():undefined, genMs:Math.round(performance.now()-tStart)});
+      conv.updatedAt=Date.now(); saveConvs(); renderMessages();
+      maybeTitle(conv);
+    }catch(e){
+      if(typing.parentNode) typing.remove();
+      const aborted=(e&&e.name==='AbortError');
+      if(aborted && _softStop){
+        // command already executed mid-stream — this is a CLEAN finish, not an abort
+        conv.messages.push({id:uid(), role:'assistant', content:acc, ts:Date.now(),
+          actions:liveActs.length?liveActs.slice():undefined, genMs:Math.round(performance.now()-tStart)});
+        conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv);
+      } else {
+        const msg=aborted?t('aborted'):(t('errPrefix')+((e&&e.message)||String(e)));
+        if(acc){ conv.messages.push({id:uid(), role:'assistant', content:acc+'\n\n'+msg, ts:Date.now(),
+          actions:liveActs.length?liveActs.slice():undefined}); }
+        else { conv.messages.push({id:uid(), role:'assistant', content:msg, ts:Date.now(),
+          actions:liveActs.length?liveActs.slice():undefined}); }
+        conv.updatedAt=Date.now(); saveConvs(); renderMessages();
+      }
+    }finally{
+      _runDone=true; if(_paintT){ clearTimeout(_paintT); _paintT=null; }   // kill any trailing paint (also on abort/error)
+      streaming=false; setSending(false); abortCtl=null; if(inputEl) inputEl.focus();
+    }
+  }
+  function setSending(on){ if(!sendBtn) return;
+    if(modelSel) modelSel.disabled=on;   // model switch mid-generation would kill the engine worker
+    sendBtn.classList.toggle('cb-stopping', on); sendBtn.title=on?t('stop'):t('send');
+    sendBtn.innerHTML=on?ic.svg('x',{size:16}):ic.svg('flow',{size:17}); }
+
+  /* ---------------- auto title from content ---------------- */
+  async function maybeTitle(conv){
+    if(conv.titled) return;
+    const users=conv.messages.filter(m=>m.role==='user'); const asst=conv.messages.find(m=>m.role==='assistant');
+    if(!users.length || !asst) return;
+    let title=''; const key=chatKey();
+    // LOCAL provider: never spend a SECOND on-device generation on a title — on iGPUs it kept the
+    // GPU busy long after the visible answer ("the app still does something"), froze the UI and
+    // delayed the next question. Local titles come from the first user message instead.
+    // Ollama is a privacy choice too — if the user picked a local provider, never ship the first
+    // exchange off to the Mistral cloud just to name the thread.
+    if(key && !useLocal() && !useOllama()){
+      try{
+        const lang=I.getLang()==='en'?'English':'Polish';
+        const msgs=[
+          {role:'system',content:'Generate a very short conversation title: 2 to 5 words, no quotes, no trailing punctuation, in '+lang+'. Reply with ONLY the title.'},
+          {role:'user',content:'User: '+users[0].content.slice(0,400)+'\nAssistant: '+stripActions(stripThink(asst.content)).slice(0,400)}
+        ];
+        const r=await CM.Loaders.mistralChat(msgs, {key, model:aiModel(), temperature:0.3});
+        title=(r||'').trim().split('\n')[0].replace(/^["'#*\s]+|["'.*\s]+$/g,'').slice(0,48);
+      }catch(e){}
+    }
+    if(!title) title=users[0].content.trim().replace(/\s+/g,' ').slice(0,40)||t('untitled');
+    conv.title=title; conv.titled=true; saveConvs(); renderSidebar();
+  }
+
+  /* ---------------- wiring ---------------- */
+  function init(){ loadConvs(); build();
+    // live engine progress in the header subtitle (model download / load / switch)
+    if(CM.LocalAI&&CM.LocalAI.onProgress) CM.LocalAI.onProgress(p=>{
+      if(!useLocal()||!subEl) return;
+      if(p&&p.pct<100&&CM.LocalAI.status()!=='ready') updateSub(CM.LocalAI.shortLabel()+' · '+(p.pct||0)+'%');
+      else updateSub();
+    });
+  }
+  I.onChange(()=>{ const wasOpen=isOpen; builtLang=null; build();
+    if(wasOpen){ panel.classList.remove('hidden'); panel.classList.add('cb-open'); if(launcher) launcher.classList.add('cb-hidden'); } });
+
+  return { init, open, close, toggle, isOpen:()=>isOpen, votes:getVotes, refresh:refreshModelUI,
+    _newChat:()=>newConversation(), _convs:()=>convs, _thumb:thumb, _exec:(a,g)=>CMApp.exec(a,g) };
+})();

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>CodeMap — Kartografia Kodu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- PWA (installable) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b1018">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CodeMap">
+<link rel="stylesheet" href="css/styles.css?v=20260702b">
+</head>
+<body>
+
+<!-- ===================== TOP TOOLBAR ===================== -->
+<header id="toolbar" role="banner">
+  <div class="brand" data-i18n-title="brand.title" title="CodeMap — code cartography (RaCzKoViC)">
+    <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
+      <!-- hex network + compass (white line-art; --logo-ink flips for the light theme) -->
+      <g class="lg-net" stroke="var(--logo-ink,#eef2f8)" stroke-width="2.6" stroke-linecap="round" fill="none">
+        <polygon points="32,6 54.5,19 54.5,45 32,58 9.5,45 9.5,19"/>
+        <line x1="32"   y1="6"  x2="32" y2="17"/>
+        <line x1="54.5" y1="19" x2="45" y2="24.5"/>
+        <line x1="54.5" y1="45" x2="45" y2="39.5"/>
+        <line x1="32"   y1="58" x2="32" y2="47"/>
+        <line x1="9.5"  y1="45" x2="19" y2="39.5"/>
+        <line x1="9.5"  y1="19" x2="19" y2="24.5"/>
+        <circle cx="32" cy="32" r="12.5" stroke-width="2.8" pathLength="100"
+                stroke-dasharray="0 6 38 12 38 6" transform="rotate(-45 32 32)"/>
+      </g>
+      <g class="lg-nodes" fill="var(--logo-ink,#eef2f8)">
+        <circle cx="32" cy="6" r="3.5"/><circle cx="54.5" cy="19" r="3.5"/><circle cx="54.5" cy="45" r="3.5"/>
+        <circle cx="32" cy="58" r="3.5"/><circle cx="9.5" cy="45" r="3.5"/><circle cx="9.5" cy="19" r="3.5"/>
+        <polygon points="46.5,17.5 33.6,33.6 30.4,30.4"/>
+        <polygon points="17.5,46.5 30.4,30.4 33.6,33.6"/>
+        <circle cx="32" cy="32" r="2.4" fill="var(--logo-hole,#0d1424)"/>
+      </g>
+    </svg>
+    <div class="brand-text">
+      <span class="brand-name"><span class="bn-1">Code</span><span class="bn-2">Map</span></span>
+      <span class="brand-sub">code&nbsp;cartography</span>
+    </div>
+  </div>
+
+  <div id="mode-switch" role="group" data-i18n-title="mode.group.title" data-i18n-aria="mode.group.aria" aria-label="Tryb pracy">
+    <button class="mode-btn on" data-mode="codemap" data-i18n-title="mode.codemap.title" title="Tryb CodeMap — mapa kodu"><span data-ic="map" data-ic-size="14"></span> <span data-i18n="mode.codemap">CodeMap</span></button>
+    <button class="mode-btn" data-mode="mindmap" data-i18n-title="mode.mindmap.title" title="Tryb MindMap — mapy myśli"><span data-ic="layers" data-ic-size="14"></span> <span data-i18n="mode.mindmap">MindMap</span></button>
+  </div>
+
+  <!-- collapsible menu: Wczytaj -->
+  <div class="tb-menu" data-menu="load">
+    <button class="tb-btn tb-menu-btn" data-menu-btn="load" data-i18n-title="load.btn.title" title="Wczytywanie projektu">
+      <span data-ic="folder" data-ic-size="15"></span> <span data-i18n="load.btn">Wczytaj</span>
+      <span class="caret" data-ic="chevronDown" data-ic-size="13"></span>
+    </button>
+    <div class="menu-panel" data-menu-panel="load" role="menu">
+      <button class="menu-item" id="btn-load-folder" data-ic="folder" data-i18n="load.folder">Folder z urządzenia</button>
+      <button class="menu-item" id="btn-load-files" data-ic="file" data-i18n="load.files">Pojedyncze pliki</button>
+      <button class="menu-item" id="btn-load-github" data-ic="globe" data-i18n="load.github">Repozytorium GitHub / URL</button>
+    </div>
+  </div>
+
+  <!-- layout selector (styled like the Wczytaj dropdown; hidden <select> is the data source) -->
+  <div class="tb-menu" data-menu="layout">
+    <button class="tb-btn tb-menu-btn" data-menu-btn="layout" data-i18n-title="layout.btn.title" title="Układ rozmieszczenia węzłów">
+      <span data-ic="shapes" data-ic-size="15"></span>
+      <span class="tb-menu-prefix" data-i18n="layout.field">Układ</span><span class="tb-menu-colon">:</span>
+      <span id="layout-menu-label" class="tb-menu-val"></span>
+      <span class="caret" data-ic="chevronDown" data-ic-size="13"></span>
+    </button>
+    <div class="menu-panel" data-menu-panel="layout" role="menu" id="layout-menu-panel"></div>
+    <select id="sel-layout" hidden>
+      <optgroup data-group="structure" label="Struktura (czytelne)">
+        <option value="pack" selected>Upakowane koła</option>
+        <option value="structtree">Drzewo struktury</option>
+        <option value="structradial">Drzewo radialne</option>
+        <option value="treemap">Mapa drzewa (rozmiary)</option>
+        <option value="icicle">Sople (partycja)</option>
+        <option value="sunburst">Sunburst (promienie)</option>
+      </optgroup>
+      <optgroup data-group="deps" label="Zależności i moduły">
+        <option value="force">Siła (graf zależności)</option>
+        <option value="layered">Warstwy zależności</option>
+        <option value="modules">Moduły (klastry)</option>
+        <option value="arcdiagram">Diagram łukowy</option>
+        <option value="galaxy">Galaktyka modułów</option>
+      </optgroup>
+      <optgroup data-group="metrics" label="Prezentacja (metryki)">
+        <option value="nebula">Mgławica (rozmiar)</option>
+        <option value="cosmicrings">Pierścienie (głębokość)</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-ic" data-ic="search" data-ic-size="15"></span>
+    <input type="text" id="search-input" data-i18n-ph="search.ph" placeholder="Szukaj pliku / ścieżki…" autocomplete="off" data-i18n-aria="search.aria" aria-label="Szukaj pliku lub ścieżki">
+    <div id="search-results" class="search-results hidden"></div>
+  </div>
+
+  <div class="tb-spacer"></div>
+
+  <!-- loaded project / file / folder name (hidden until something is loaded) -->
+  <span id="tb-project-name" class="hidden" title=""></span>
+
+  <!-- collapsible menu: Projekt -->
+  <div class="tb-menu" data-menu="project">
+    <button class="tb-btn tb-menu-btn" data-menu-btn="project" data-i18n-title="project.btn.title" title="Operacje na projekcie">
+      <span data-ic="layers" data-ic-size="15"></span> <span data-i18n="project.btn">Projekt</span>
+      <span class="caret" data-ic="chevronDown" data-ic-size="13"></span>
+    </button>
+    <div class="menu-panel menu-panel-right" data-menu-panel="project" role="menu">
+      <button class="menu-item" id="btn-snapshot" data-ic="bookmark" data-i18n="project.snapshot">Zapisz migawkę</button>
+      <button class="menu-item" id="btn-history" data-ic="clock" data-i18n="project.history">Historia i porównania</button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" id="btn-save" data-ic="save" data-i18n="project.save">Zapisz mapę (.json)</button>
+      <button class="menu-item" id="btn-export-img" data-ic="image" data-i18n="project.exportimg">Eksport obrazu (PNG / SVG)</button>
+      <button class="menu-item" id="btn-copylink" data-ic="link" data-i18n="project.copylink">Kopiuj link do widoku</button>
+      <button class="menu-item" id="btn-gist" data-ic="globe" data-i18n="project.gist">Eksportuj jako Gist (GitHub)</button>
+      <button class="menu-item" id="btn-open" data-ic="open" data-i18n="project.open">Otwórz zapisaną mapę</button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" id="btn-cycles" data-ic="flow" data-i18n="project.cycles">Wykryj cykle zależności</button>
+      <button class="menu-item" id="btn-hotspots" data-ic="target" data-i18n="project.hotspots">Hotspoty (rozmiar × zależności)</button>
+      <button class="menu-item" id="btn-inspect" data-ic="search" data-i18n="project.inspect">Analiza statyczna (antywzorce)</button>
+      <div class="menu-sep"></div>
+      <button class="menu-item" id="btn-compare-add" data-ic="layers" data-i18n="project.compareadd">Porównaj: dodaj schemat na mapę</button>
+      <button class="menu-item" id="btn-compare-clear" data-ic="x" data-i18n="project.compareclear">Usuń schematy porównawcze</button>
+      <div class="menu-sep"></div>
+      <button class="menu-item danger" id="btn-clear" data-ic="trash" data-i18n="project.clear">Wyczyść dane</button>
+      <button class="menu-item" id="btn-newwin" data-ic="window" data-i18n="project.newwin">Nowe okno</button>
+    </div>
+  </div>
+
+  <!-- drive/vault — opens the Dysk & Sejf overlay (OPFS encrypted vault + File System Access folder) -->
+  <button class="tb-btn tb-icon-btn" id="btn-drive" aria-label="Dysk i Sejf" title="Dysk i Sejf">
+    <span data-ic="package" data-ic-size="16" aria-hidden="true"></span>
+  </button>
+
+  <!-- settings (gear) — opens the application settings overlay; visible in both modes -->
+  <button class="tb-btn tb-icon-btn" id="btn-settings" data-i18n-title="settings.btn.title" data-i18n-aria="settings.btn.aria" aria-label="Ustawienia aplikacji" title="Ustawienia aplikacji">
+    <span data-ic="settings" data-ic-size="16" aria-hidden="true"></span>
+  </button>
+
+  <div id="gh-authors" class="hidden" data-i18n-title="ghauthors.title" title="Autorzy wczytanych repozytoriów"></div>
+</header>
+
+<!-- ===================== MAIN AREA ===================== -->
+<div id="main">
+
+  <!-- panel toggle rails (always reachable, even when a panel is collapsed) -->
+  <button class="panel-rail left" id="rail-left" data-side="left" data-i18n-title="rail.left.title" data-i18n-aria="rail.left.aria" aria-label="Pokaż lub ukryj panel warstw" title="Pokaż / ukryj panel (warstwy)">‹</button>
+  <button class="panel-rail right" id="rail-right" data-side="right" data-i18n-title="rail.right.title" data-i18n-aria="rail.right.aria" aria-label="Pokaż lub ukryj panel szczegółów" title="Pokaż / ukryj panel (szczegóły)">›</button>
+
+  <!-- LEFT SIDEBAR: layers / filters / legend -->
+  <aside id="left-panel" class="panel" role="complementary" data-i18n-aria="panel.left.title" aria-label="Warstwy i filtry">
+    <div class="panel-head">
+      <span data-i18n="panel.left.title">Warstwy i filtry</span>
+      <button class="collapse-btn" data-side="left" data-i18n-title="panel.collapse.title" data-i18n-aria="panel.collapse.aria" aria-label="Zwiń panel" title="Zwiń panel">‹</button>
+    </div>
+    <div class="panel-body">
+
+      <section class="filter-block">
+        <h4 data-i18n="block.elements">Elementy</h4>
+        <label class="chk"><input type="checkbox" id="show-folders" checked> <span data-i18n="el.folders">Foldery</span></label>
+        <label class="chk"><input type="checkbox" id="show-files" checked> <span data-i18n="el.files">Pliki</span></label>
+        <label class="chk"><input type="checkbox" id="show-externals"> <span data-i18n="el.externals">Zależności zewnętrzne</span></label>
+      </section>
+
+      <section class="filter-block">
+        <h4 data-i18n="block.connections">Połączenia</h4>
+        <label class="chk"><input type="checkbox" id="edge-contains" checked> <span data-i18n="conn.contains">Struktura (zawiera)</span></label>
+        <label class="chk"><input type="checkbox" id="edge-import" checked> <span data-i18n="conn.import">Importy / zależności</span></label>
+        <label class="chk"><input type="checkbox" id="edge-reference"> <span data-i18n="conn.reference">Referencje (zasoby)</span></label>
+      </section>
+
+      <section class="filter-block">
+        <h4><span data-i18n="block.filetypes">Typy plików</span> <button id="lang-toggle-all" class="mini-btn" data-i18n="filetypes.toggle">przełącz</button></h4>
+        <div id="lang-filters" class="lang-filters">
+          <p class="muted small" data-i18n="filetypes.empty">Wczytaj projekt, aby zobaczyć typy plików.</p>
+        </div>
+      </section>
+
+      <section class="filter-block">
+        <h4 data-i18n="block.complexity">Filtr złożoności</h4>
+        <div class="tb-field tb-field-col">
+          <span data-i18n="complexity.metric">Pokaż pliki wg metryki</span>
+          <select id="sel-metric">
+            <option value="lines" selected data-i18n="metric.lines">Liczba wierszy</option>
+            <option value="code" data-i18n="metric.code">Wiersze kodu</option>
+            <option value="complexity" data-i18n="metric.complexity">Złożoność (rozgałęzienia)</option>
+            <option value="funcs" data-i18n="metric.funcs">Liczba funkcji</option>
+            <option value="todos" data-i18n="metric.todos">Znaczniki TODO/FIXME</option>
+            <option value="size" data-i18n="metric.size">Rozmiar (bajty)</option>
+          </select>
+        </div>
+        <label class="rng"><span><span data-i18n="complexity.min">Minimum</span> <b id="val-minmetric">0</b></span>
+          <input type="range" id="rng-minmetric" min="0" max="100" value="0"></label>
+        <p class="muted small" id="minmetric-hint" data-i18n="complexity.hint">Ukrywa pliki poniżej progu. Foldery pozostają widoczne.</p>
+      </section>
+
+      <section class="filter-block">
+        <h4 data-i18n="block.appearance">Wygląd</h4>
+        <label class="rng"><span><span data-i18n="app.trans">Przeźroczystość okien</span> <b id="val-trans">40%</b></span>
+          <input type="range" id="rng-trans" min="0" max="90" value="40"></label>
+        <label class="rng"><span><span data-i18n="app.menu">Przeźroczystość menu</span> <b id="val-menu">30%</b></span>
+          <input type="range" id="rng-menu" min="0" max="92" value="30"></label>
+        <label class="rng"><span><span data-i18n="app.blur">Rozmycie szkła</span> <b id="val-blur">18px</b></span>
+          <input type="range" id="rng-blur" min="0" max="40" value="18"></label>
+        <label class="rng"><span><span data-i18n="app.tint">Nasycenie szkła</span> <b id="val-tint">75%</b></span>
+          <input type="range" id="rng-tint" min="0" max="100" value="75"></label>
+        <div class="seg" id="accent-row">
+          <span class="muted small" data-i18n="app.accent">Akcent:</span>
+          <button class="acc" data-acc="#22d3ee" style="background:#22d3ee" data-i18n-title="accent.cyan" title="Cyjan"></button>
+          <button class="acc" data-acc="#7c5cff" style="background:#7c5cff" data-i18n-title="accent.violet" title="Fiolet"></button>
+          <button class="acc" data-acc="#34d399" style="background:#34d399" data-i18n-title="accent.green" title="Zieleń"></button>
+          <button class="acc" data-acc="#fb7185" style="background:#fb7185" data-i18n-title="accent.pink" title="Róż"></button>
+          <button class="acc" data-acc="#f59e0b" style="background:#f59e0b" data-i18n-title="accent.amber" title="Amber"></button>
+          <input type="color" id="col-accent" class="acc-color" value="#22d3ee" data-i18n-title="accent.custom" title="Dowolny kolor akcentu">
+        </div>
+      </section>
+
+      <section class="filter-block">
+        <h4 data-i18n="block.bgtheme">Tło i motyw</h4>
+        <div class="seg" id="theme-row">
+          <span class="muted small" data-i18n="theme.label">Motyw:</span>
+          <button class="theme-btn active" data-theme="dark" data-i18n="theme.dark">Ciemny</button>
+          <button class="theme-btn" data-theme="light" data-i18n="theme.light">Jasny</button>
+        </div>
+        <!-- curated theme presets: each applies a coherent set (theme + canvas + window tint + accent) -->
+        <div id="theme-presets">
+          <button class="thpre active" data-pre="depth"><span class="thpre-sw" style="background:#070a10"><i style="background:#22d3ee"></i></span><span data-i18n="th.depth">Głębia</span></button>
+          <button class="thpre" data-pre="graphite"><span class="thpre-sw" style="background:#10131c"><i style="background:#60a5fa"></i></span><span data-i18n="th.graphite">Grafit</span></button>
+          <button class="thpre" data-pre="ghdark"><span class="thpre-sw" style="background:#0d1117"><i style="background:#58a6ff"></i></span><span>GitHub Dark</span></button>
+          <button class="thpre" data-pre="forest"><span class="thpre-sw" style="background:#05140f"><i style="background:#34d399"></i></span><span data-i18n="th.forest">Las</span></button>
+          <button class="thpre" data-pre="plum"><span class="thpre-sw" style="background:#14101f"><i style="background:#a78bfa"></i></span><span data-i18n="th.plum">Śliwka</span></button>
+          <button class="thpre" data-pre="paper"><span class="thpre-sw" style="background:#f4f6fb"><i style="background:#2563eb"></i></span><span data-i18n="th.paper">Papier</span></button>
+          <button class="thpre" data-pre="parchment"><span class="thpre-sw" style="background:#fbf6e9"><i style="background:#b45309"></i></span><span data-i18n="th.parchment">Pergamin</span></button>
+          <button class="thpre" data-pre="mist"><span class="thpre-sw" style="background:#e7ecf3"><i style="background:#0f766e"></i></span><span data-i18n="th.mist">Mgła</span></button>
+        </div>
+        <label class="color-field" style="margin-top:9px"><input type="color" id="col-bg" value="#070a10"><span data-i18n="bg.stage">Tło planszy</span></label>
+      </section>
+
+      <section class="filter-block">
+        <h4 data-i18n="block.map">Mapa</h4>
+        <label class="chk"><input type="checkbox" id="opt-animate" checked> <span data-i18n="map.animate">Animowane połączenia</span></label>
+        <label class="chk"><input type="checkbox" id="opt-particles" checked> <span data-i18n="map.particles">Cząsteczki przepływu</span></label>
+        <label class="chk"><input type="checkbox" id="opt-glow" checked> <span data-i18n="map.glow">Poświata zaznaczenia</span></label>
+        <label class="chk"><input type="checkbox" id="opt-grid" checked> <span data-i18n="map.grid">Siatka tła</span></label>
+        <label class="chk"><input type="checkbox" id="opt-curved" checked> <span data-i18n="map.curved">Wygięte połączenia</span></label>
+        <label class="chk"><input type="checkbox" id="opt-lockall"> <span data-i18n="map.lockall">Zablokuj figury (bez ruchu)</span></label>
+        <label class="chk"><input type="checkbox" id="opt-hover-preview" checked> <span data-i18n="map.hoverpreview">Podgląd kodu po najechaniu</span></label>
+      </section>
+
+      <section class="filter-block">
+        <h4 data-i18n="block.figures">Figury</h4>
+        <label class="rng"><span><span data-i18n="fig.nodesize">Rozmiar węzłów</span> <b id="val-nscale">250%</b></span>
+          <input type="range" id="rng-nscale" min="40" max="400" value="250"></label>
+        <label class="rng"><span><span data-i18n="fig.spacing">Odległość między figurami</span> <b id="val-spacing">300%</b></span>
+          <input type="range" id="rng-spacing" min="100" max="2500" value="300"></label>
+        <label class="rng"><span><span data-i18n="fig.labelsize">Rozmiar napisów</span> <b id="val-fscale">100%</b></span>
+          <input type="range" id="rng-fscale" min="60" max="180" value="100"></label>
+      </section>
+
+    </div>
+  </aside>
+
+  <!-- CANVAS STAGE -->
+  <main id="stage">
+    <canvas id="map-canvas" role="application" data-i18n-aria="canvas.aria" aria-label="Interaktywna mapa kodu — przeciągaj, przybliżaj i klikaj węzły"></canvas>
+
+    <!-- Drop hint / empty state -->
+    <div id="empty-state">
+      <div class="empty-card">
+        <button id="empty-close" data-i18n-title="hood.close" title="Zamknij">✕</button>
+        <div class="empty-glyph" data-ic="map" data-ic-size="48" aria-hidden="true"></div>
+        <h2 data-i18n="empty.heading">Wybierz tryb pracy</h2>
+        <div class="mode-pick">
+          <button class="mode-pick-btn" id="pick-codemap">
+            <span class="mp-ic" data-ic="map" data-ic-size="30"></span>
+            <b data-i18n="empty.codemap.title">CodeMap</b><span data-i18n="empty.codemap.desc">Mapa kodu, zależności i metryki Twojego projektu</span>
+          </button>
+          <button class="mode-pick-btn" id="pick-mindmap">
+            <span class="mp-ic" data-ic="layers" data-ic-size="30"></span>
+            <b data-i18n="empty.mindmap.title">MindMap</b><span data-i18n="empty.mindmap.desc">Twórz mapy myśli, notatki i schematy z szablonami ramek</span>
+          </button>
+        </div>
+        <p class="muted small" data-i18n-html="empty.hint1">CodeMap: przeciągnij folder/pliki, <b>wklej (Ctrl+V)</b> lub użyj menu <b>Wczytaj</b>. Tryb możesz zmienić w każdej chwili przełącznikiem na górnym pasku.</p>
+        <div class="empty-actions">
+          <button class="tb-btn primary" id="empty-folder" data-ic="folder" data-i18n="empty.folder">Wybierz folder</button>
+          <button class="tb-btn" id="empty-github" data-ic="globe" data-i18n="empty.github">Z GitHub</button>
+          <button class="tb-btn" id="empty-demo" data-ic="sparkle" data-i18n="empty.demo">Zobacz demo</button>
+          <button class="tb-btn hidden" id="empty-restore" data-ic="clock" data-i18n="empty.restore">Przywróć ostatnią mapę</button>
+          <button class="tb-btn hidden" id="btn-install" data-ic="download" data-i18n="empty.install">Zainstaluj aplikację</button>
+        </div>
+        <p class="muted small" data-i18n-html="empty.hint2">Obsługiwane: kod (JS/TS, Python, C/C++, Go, Rust, Java, C#, PHP, Ruby…), web (HTML/CSS), dane (JSON/YAML/XML/CSV), dokumenty, obrazy, archiwa <b>ZIP / TAR / TAR.GZ / GZ</b>, a także <b>PDF</b> (mapa z zakładek/stron) i ponad 150 innych rozszerzeń. RAR / 7z należy najpierw rozpakować.</p>
+      </div>
+    </div>
+
+    <!-- floating view controls — top center, collapsible -->
+    <div id="view-controls" role="toolbar" data-i18n-aria="vc.toolbar.aria" aria-label="Sterowanie widokiem">
+      <button class="vc-btn" id="vc-zoom-in" data-ic="plus" data-ic-size="18" data-i18n-title="vc.zoomin" data-i18n-aria="vc.zoomin" aria-label="Przybliż" title="Przybliż (+)"></button>
+      <button class="vc-btn" id="vc-zoom-out" data-ic="minus" data-ic-size="18" data-i18n-title="vc.zoomout" data-i18n-aria="vc.zoomout" aria-label="Oddal" title="Oddal (−)"></button>
+      <button class="vc-btn" id="vc-fit" data-ic="fit" data-ic-size="17" data-i18n-title="vc.fit" data-i18n-aria="vc.fit" aria-label="Dopasuj do ekranu" title="Dopasuj do ekranu (F)"></button>
+      <div class="vc-divider-h" aria-hidden="true"></div>
+      <button class="vc-btn" id="vc-rot-left" data-ic="rotateL" data-ic-size="17" data-i18n-title="vc.rotleft" data-i18n-aria="vc.rotleft" aria-label="Obróć w lewo" title="Obróć w lewo (Q)"></button>
+      <button class="vc-btn" id="vc-rot-right" data-ic="rotateR" data-ic-size="17" data-i18n-title="vc.rotright" data-i18n-aria="vc.rotright" aria-label="Obróć w prawo" title="Obróć w prawo (E)"></button>
+      <button class="vc-btn" id="vc-rot-reset" data-ic="target" data-ic-size="17" data-i18n-title="vc.rotreset" data-i18n-aria="vc.rotreset" aria-label="Wyzeruj obrót" title="Wyzeruj obrót"></button>
+      <div class="vc-divider-h" aria-hidden="true"></div>
+      <button class="vc-btn" id="vc-3d" data-ic="cube" data-ic-size="17" data-i18n-title="vc.3d" data-i18n-aria="vc.3d" aria-label="Przełącz perspektywę / pseudo-3D" title="Przełącz perspektywę / pseudo-3D"></button>
+      <div class="vc-divider-h" aria-hidden="true"></div>
+      <button class="vc-btn" id="vc-impact" data-ic="link" data-ic-size="16" data-i18n-title="vc.impact" data-i18n-aria="vc.impact" aria-label="Widok wpływu zależności" aria-pressed="false" title="Widok wpływu zależności — w górę i w dół (X)"></button>
+      <div class="vc-divider-h" aria-hidden="true"></div>
+      <button class="vc-btn" id="vc-fly" data-ic="crosshair" data-ic-size="17" data-i18n-title="vc.fly" data-i18n-aria="vc.fly" aria-label="Tryb nawigacji" title="Tryb nawigacji (WASD + mysz, Spacja/Shift zoom) — klawisz G"></button>
+      <div class="vc-divider-h" aria-hidden="true"></div>
+      <button class="vc-btn vc-toggle-btn" id="vc-collapse" data-ic="chevronUp" data-ic-size="16" data-i18n-title="vc.collapse" data-i18n-aria="vc.collapse" aria-label="Zwiń lub rozwiń pasek narzędzi" title="Zwiń / rozwiń pasek narzędzi"></button>
+    </div>
+
+    <!-- game-navigation HUD (shown only in fly mode) -->
+    <div id="fly-hud" class="hidden">
+      <div id="fly-crosshair"></div>
+      <div id="fly-hint"></div>
+    </div>
+
+    <!-- compass (camera dial; movable via grip, pinnable) -->
+    <div id="rot-dial" class="pinned" data-i18n-title="rot.dial.title" title="Przeciągnij tarczę, aby obrócić kamerę · dwuklik = mapa okolicy">
+      <button id="rot-grip" data-i18n-title="rot.grip" data-i18n-aria="rot.grip" aria-label="Przeciągnij, aby przemieścić kompas" title="Przeciągnij, aby przemieścić kompas"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
+      <button id="rot-pin" data-ic="pin" data-ic-size="11" data-i18n-title="rot.pin" data-i18n-aria="rot.pin" aria-label="Przypnij lub odepnij kompas" title="Przypnij / odepnij kompas"></button>
+      <button id="rot-min" data-ic="minus" data-ic-size="12" data-i18n-title="rot.min" data-i18n-aria="rot.min" aria-label="Zwiń kompas" title="Zwiń kompas"></button>
+      <div id="rot-needle" aria-hidden="true"></div>
+      <span id="rot-label">0°</span>
+    </div>
+    <button id="rot-reopen" class="hidden" data-ic="crosshair" data-ic-size="18" data-i18n-title="rot.reopen" data-i18n-aria="rot.reopen" aria-label="Pokaż kompas" title="Pokaż kompas"></button>
+
+    <!-- minimap -->
+    <div id="minimap-wrap">
+      <button id="minimap-toggle" data-ic="chevronDown" data-ic-size="14" data-i18n-title="minimap.toggle" data-i18n-aria="minimap.toggle" aria-label="Zwiń lub rozwiń minimapę" title="Zwiń / rozwiń minimapę"></button>
+      <canvas id="minimap"></canvas>
+    </div>
+
+    <!-- neighborhood (radar) overlay -->
+    <div id="hood" class="hidden">
+      <div id="hood-disc">
+        <canvas id="hood-canvas"></canvas>
+        <div id="hood-bar">
+          <span id="hood-title" data-i18n="hood.title">Mapa okolicy</span>
+          <label class="hood-3d"><input type="checkbox" id="hood-3d-chk"> 3D</label>
+          <button id="hood-close" data-ic="x" data-ic-size="16" data-i18n-title="hood.close" data-i18n-aria="hood.close" aria-label="Zamknij" title="Zamknij"></button>
+        </div>
+        <button id="hood-teleport" class="hidden">
+          <span class="ht-cap" data-i18n="hood.teleport">Teleportuj do</span>
+          <span id="hood-teleport-name"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- floating repo-author avatars (one per loaded GitHub schema, at its centre) -->
+    <div id="gh-avatars"></div>
+
+    <!-- author credit -->
+    <a id="credit" href="https://github.com/RaCzKoViC" target="_blank" rel="noopener" data-i18n-title="credit.title" title="Autor — GitHub">by RaCzKoViC</a>
+
+    <!-- loading overlay -->
+    <div id="loading" class="hidden">
+      <div class="spinner"><span id="loading-pct">0%</span></div>
+      <div id="loading-text" data-i18n="loading.text">Wczytywanie…</div>
+      <div class="progress"><div id="progress-bar"></div></div>
+      <div id="loading-count" class="muted small"></div>
+    </div>
+  </main>
+
+  <!-- RIGHT SIDEBAR: details / metrics -->
+  <aside id="right-panel" class="panel" role="complementary" data-i18n-aria="panel.right.title" aria-label="Szczegóły">
+    <div class="panel-head">
+      <span data-i18n="panel.right.title">Szczegóły</span>
+      <button class="collapse-btn" data-side="right" data-i18n-title="panel.collapse.title" data-i18n-aria="panel.collapse.aria" aria-label="Zwiń panel" title="Zwiń panel">›</button>
+    </div>
+    <div class="panel-body" id="details-body">
+      <div class="details-empty">
+        <p class="muted" data-i18n="details.empty">Kliknij element na mapie, aby zobaczyć zaawansowane parametry.</p>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ===================== STATUS BAR ===================== -->
+<footer id="statusbar">
+  <span id="st-project" class="st-item">Brak projektu</span>
+  <span class="st-item" id="st-nodes" data-i18n="st.nodes">— węzłów</span>
+  <span class="st-item" id="st-edges" data-i18n="st.edges">— połączeń</span>
+  <span class="st-item" id="st-visible" data-i18n="st.visible">— widocznych</span>
+  <span class="st-spacer"></span>
+  <span class="st-item" id="st-hover"></span>
+  <span class="st-item" id="st-zoom">100%</span>
+  <span class="st-item" id="st-clock" data-i18n-title="st.clock.title" title="Zegar">--:--:--</span>
+  <span class="st-item" id="st-fps"></span>
+</footer>
+
+<!-- ===================== MODALS ===================== -->
+<div class="modal-backdrop hidden" id="modal-github">
+  <div class="modal">
+    <div class="modal-head"><h3 data-i18n="gh.title">Wczytaj z GitHub / GitLab / Bitbucket</h3><button class="modal-x" data-close>✕</button></div>
+    <div class="modal-body">
+      <label class="field-label" data-i18n="gh.addr">Adres repozytorium</label>
+      <div class="input-clear">
+        <input type="text" id="gh-url" placeholder="github.com/owner/repo · gitlab.com/grupa/repo · bitbucket.org/ws/repo">
+        <button class="input-clear-x" type="button" data-clear="gh-url" data-i18n-title="clear.title" title="Wyczyść">✕</button>
+      </div>
+      <div id="gh-recent" class="gh-recent hidden"></div>
+      <div class="row-2">
+        <div>
+          <label class="field-label" data-i18n="gh.branch">Gałąź (opcjonalnie)</label>
+          <div class="input-clear">
+            <input type="text" id="gh-branch" list="gh-branch-list" data-i18n-ph="gh.branch.ph" placeholder="np. main / master">
+            <button class="input-clear-x" type="button" data-clear="gh-branch" data-i18n-title="clear.title" title="Wyczyść">✕</button>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" data-i18n="gh.token">Token (opcjonalnie, prywatne / limity)</label>
+          <div class="input-clear">
+            <input type="password" id="gh-token" placeholder="ghp_…">
+            <button class="input-clear-x" type="button" data-clear="gh-token" data-i18n-title="clear.title" title="Wyczyść">✕</button>
+          </div>
+        </div>
+      </div>
+      <label class="chk mt"><input type="checkbox" id="gh-fetch-content" checked> <span data-i18n="gh.fetch">Pobierz zawartość plików (analiza importów, metryki) — wolniejsze</span></label>
+      <div class="gh-refs-row">
+        <button class="tb-btn" id="gh-load-refs" data-ic="refresh" data-i18n="gh.loadRefs">Pobierz gałęzie / tagi</button>
+        <span id="gh-rate" class="gh-rate"></span>
+      </div>
+      <datalist id="gh-branch-list"></datalist>
+      <div class="gh-cmp">
+        <label class="field-label" data-i18n="gh.compare">Porównaj gałęzie / tagi (diff)</label>
+        <div class="gh-cmp-row">
+          <input type="text" id="gh-cmp-a" list="gh-branch-list" data-i18n-ph="gh.cmpA" placeholder="gałąź A (starsza)">
+          <span class="gh-cmp-arrow">→</span>
+          <input type="text" id="gh-cmp-b" list="gh-branch-list" data-i18n-ph="gh.cmpB" placeholder="gałąź B (nowsza)">
+          <button class="tb-btn primary" id="gh-cmp-go" data-i18n="gh.compareBtn">Porównaj</button>
+        </div>
+        <p class="muted small" data-i18n="gh.compareHint">Zielony = dodane w B, czerwony = usunięte, żółty = zmienione. Mapa pokaże gałąź B. (GitHub / GitLab)</p>
+      </div>
+      <p class="muted small" id="gh-hint" data-i18n-html="gh.hint">Można wkleić też pełny URL podkatalogu, np. <code>.../tree/main/src</code>.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="tb-btn" data-close data-i18n="common.cancel">Anuluj</button>
+      <button class="tb-btn primary" id="gh-go" data-i18n="common.load">Wczytaj</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="modal-history">
+  <div class="modal modal-wide">
+    <div class="modal-head"><h3 data-i18n="hist.title">Historia migawek — rozwój struktury</h3><button class="modal-x" data-close>✕</button></div>
+    <div class="modal-body" id="history-body">
+      <p class="muted" data-i18n="hist.empty">Brak zapisanych migawek.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="tb-btn" id="hist-export" data-ic="download" data-i18n="hist.export">Eksportuj historię</button>
+      <button class="tb-btn" id="hist-import" data-ic="upload" data-i18n="hist.import">Importuj historię</button>
+      <span class="tb-spacer"></span>
+      <button class="tb-btn" data-close data-i18n="common.close">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="modal-diff">
+  <div class="modal modal-wide">
+    <div class="modal-head"><h3 id="diff-title" data-i18n="diff.title">Porównanie migawek</h3><button class="modal-x" data-close>✕</button></div>
+    <div class="modal-body" id="diff-body"></div>
+    <div class="modal-foot">
+      <button class="tb-btn primary" id="diff-apply" data-i18n="diff.apply">Pokaż różnice na mapie</button>
+      <span class="tb-spacer"></span>
+      <button class="tb-btn" data-close data-i18n="common.close">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="modal-fileview">
+  <div class="modal modal-xl">
+    <div class="modal-head"><h3 id="fileview-title" data-i18n="fileview.title">Plik</h3><button class="modal-x" data-close>✕</button></div>
+    <div class="modal-body" id="fileview-body"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="modal-hotspots">
+  <div class="modal modal-wide">
+    <div class="modal-head"><h3 data-i18n="hotspots.title">Hotspoty — pliki o największym wpływie</h3><button class="modal-x" data-close>✕</button></div>
+    <div class="modal-body" id="hotspots-body"></div>
+  </div>
+</div>
+
+<div class="modal-backdrop hidden" id="modal-compare">
+  <div class="modal">
+    <div class="modal-head"><h3 data-i18n="cmp.title">Porównanie — dodaj schemat na mapę</h3><button class="modal-x" data-close>✕</button></div>
+    <div class="modal-body">
+      <label class="field-label" data-i18n="cmp.repo">Repozytorium GitHub / URL</label>
+      <div class="input-clear">
+        <input type="text" id="cmp-gh-url" placeholder="https://github.com/owner/repo  lub  owner/repo">
+        <button class="input-clear-x" type="button" data-clear="cmp-gh-url" data-i18n-title="clear.title" title="Wyczyść">✕</button>
+      </div>
+      <div class="cmp-actions">
+        <button class="tb-btn primary" id="cmp-gh-go" data-ic="globe" data-i18n="cmp.gh">Wczytaj z GitHub</button>
+      </div>
+      <div class="cmp-or"><span data-i18n="cmp.or">— lub —</span></div>
+      <div class="cmp-actions">
+        <button class="tb-btn" id="cmp-files" data-ic="file" data-i18n="cmp.files">Wybierz pliki z urządzenia</button>
+        <button class="tb-btn" id="cmp-map" data-ic="open" data-i18n="cmp.map">Wczytaj zapisaną mapę (.json)</button>
+      </div>
+      <p class="muted small" style="margin-top:14px" data-i18n="cmp.hint">Schemat pojawi się obok obecnego. Przeciągnij jego kolorową etykietę, aby przemieścić cały schemat jednym ruchem.</p>
+    </div>
+  </div>
+</div>
+
+<!-- context menu -->
+<div id="ctx-menu" class="ctx-menu hidden"></div>
+
+<!-- tooltip -->
+<div id="tooltip" class="tooltip hidden"></div>
+<div id="file-preview" class="file-preview hidden"></div>
+
+<!-- hidden file inputs -->
+<input type="file" id="input-folder" webkitdirectory directory multiple hidden>
+<input type="file" id="input-files" multiple hidden>
+<input type="file" id="input-open" accept=".json,.codemap,.codemap.json" hidden>
+<input type="file" id="input-import-hist" accept=".json" hidden>
+<input type="file" id="input-compare" accept=".json,.codemap,.codemap.json" hidden>
+<input type="file" id="input-compare-files" multiple hidden>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="js/util.js?v=20260702b"></script>
+<script src="js/icons.js?v=20260702b"></script>
+<script src="js/i18n.js?v=20260702b"></script>
+<script src="js/languages.js?v=20260702b"></script>
+<script src="js/analysis.js?v=20260702b"></script>
+<script src="js/graph.js?v=20260702b"></script>
+<script src="js/layouts.js?v=20260702b"></script>
+<script src="js/renderer.js?v=20260702b"></script>
+<script src="js/loaders.js?v=20260702b"></script>
+<script src="js/storage.js?v=20260702b"></script>
+<script src="js/ui.js?v=20260702b"></script>
+<script src="js/settings.js?v=20260702b"></script>
+<script src="js/drive.js?v=20260702b"></script>
+<script src="js/inspect.js?v=20260702b"></script>
+<script src="js/localai.js?v=20260702b"></script>
+<script src="js/ollama.js?v=20260702b"></script>
+<script src="js/runner.js?v=20260702b"></script>
+<script src="js/mmdraw.js?v=20260702b"></script>
+<script src="js/mindmap.js?v=20260702b"></script>
+<script src="js/chatbot.js?v=20260702b"></script>
+<script src="js/app.js?v=20260702b"></script>
+</body>
+</html>

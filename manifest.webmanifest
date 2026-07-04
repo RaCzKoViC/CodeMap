@@ -1,0 +1,20 @@
+{
+  "name": "CodeMap — Kartografia Kodu",
+  "short_name": "CodeMap",
+  "description": "Interaktywna kartografia kodu i mapy myśli — wizualizacja struktury, zależności i metryk projektów oraz repozytoriów.",
+  "lang": "pl",
+  "start_url": ".",
+  "scope": ".",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#070a10",
+  "theme_color": "#0b1018",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    { "src": "icon-192.png?v=2", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png?v=2", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

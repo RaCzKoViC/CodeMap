@@ -1,0 +1,11 @@
+# dane użytkownika — nie kod aplikacji
+Sejf/
+
+# backend
+server/node_modules/
+server/data/
+server/.env
+
+# system
+Thumbs.db
+Desktop.ini
