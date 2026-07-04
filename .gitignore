@@ -6,6 +6,9 @@ server/node_modules/
 server/data/
 server/.env
 
+# lokalne ustawienia narzędzi
+.claude/settings.local.json
+
 # system
 Thumbs.db
 Desktop.ini
