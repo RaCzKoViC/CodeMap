@@ -17,28 +17,28 @@ Słabości: zero testów automatycznych, analiza zależności regexami na poziom
 README opisujące aplikację sprzed kilkunastu wersji, konfiguracja dev backendu serwująca cały
 katalog repozytorium w sieci lokalnej.
 
-## Faza 0 — zanim ktoś to zobaczy (bezpieczna publikacja)
+## Faza 0 — zanim ktoś to zobaczy (bezpieczna publikacja) — WYKONANA 2026-09-25
 
 Bezpieczeństwo backendu:
-- [ ] Dev serwuje tylko frontend (nie `server/`, `Sejf/`, `.git`, `.claude`), bind `127.0.0.1` poza produkcją (`server/index.js:41-47`).
-- [ ] Aktualizacja zależności: `fastify ≥ 5.12.1`, `@fastify/static ≥ 10.1.4` (path traversal), `npm update`.
-- [ ] `Cache-Control: no-store` dla odpowiedzi `/api/*`.
-- [ ] Rezerwacja quoty atomowo przed zapisem (`UPDATE … WHERE used_bytes + ? <= quota_bytes`), korekta po zapisie (`server/blobs.js:58`, `sync.js`, `vault.js`).
-- [ ] Nagłówki w Caddy: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`; CSP w trybie report-only jako punkt startowy.
-- [ ] Logi bez query stringów (`disableRequestLogging` + własny hook) — tokeny weryfikacji nie trafiają do journald.
-- [ ] Hardening unitu systemd i `backup.sh` (`umask 077`, `-mindepth 1`, `chmod 600 .env`).
+- [x] Dev serwuje tylko frontend (nie `server/`, `Sejf/`, `.git`, `.claude`), bind `127.0.0.1` poza produkcją (`server/index.js:41-47`).
+- [x] Aktualizacja zależności: `fastify ≥ 5.12.1`, `@fastify/static ≥ 10.1.4` (path traversal), `npm update`.
+- [x] `Cache-Control: no-store` dla odpowiedzi `/api/*`.
+- [x] Rezerwacja quoty atomowo przed zapisem (`UPDATE … WHERE used_bytes + ? <= quota_bytes`), korekta po zapisie (`server/blobs.js:58`, `sync.js`, `vault.js`).
+- [x] Nagłówki w Caddy: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`; CSP w trybie report-only jako punkt startowy.
+- [x] Logi bez query stringów (`disableRequestLogging` + własny hook) — tokeny weryfikacji nie trafiają do journald.
+- [x] Hardening unitu systemd i `backup.sh` (`umask 077`, `-mindepth 1`, `chmod 600 .env`).
 
 Frontend:
-- [ ] ChatBot: allowlista akcji czysto widokowych wykonywanych automatycznie; reszta przez przycisk „▶" (`js/chatbot.js:184`). Nazwy plików w prompcie przycięte i oczyszczone ze znaków sterujących (`js/app.js` `aiStructureSummary`).
-- [ ] Błąd układu `saved`: po wczytaniu zapisanej mapy „rozwiń wszystko" / „pokaż różnice" nie może przechodzić przez force i niszczyć pozycji (`js/layouts.js:966`).
-- [ ] `manifest.webmanifest`: `id: "./"` (dziś `"/"` zderza się z innymi aplikacjami na `raczkovic.github.io`).
-- [ ] Przycisk „Konto" ukryty, gdy `/api/health` nie odpowiada (GitHub Pages bez backendu).
-- [ ] Jedno źródło wersji: `CM.VERSION` używane przez „O aplikacji"; usunięcie martwego `preconnect` do Google Fonts.
+- [x] ChatBot: allowlista akcji czysto widokowych wykonywanych automatycznie; reszta przez przycisk „▶" (`js/chatbot.js:184`). Nazwy plików w prompcie przycięte i oczyszczone ze znaków sterujących (`js/app.js` `aiStructureSummary`).
+- [x] Błąd układu `saved`: po wczytaniu zapisanej mapy „rozwiń wszystko" / „pokaż różnice" nie może przechodzić przez force i niszczyć pozycji (`js/layouts.js:966`).
+- [x] `manifest.webmanifest`: `id: "./"` (dziś `"/"` zderza się z innymi aplikacjami na `raczkovic.github.io`).
+- [x] Przycisk „Konto" ukryty, gdy `/api/health` nie odpowiada (GitHub Pages bez backendu).
+- [x] Jedno źródło wersji: `CM.VERSION` używane przez „O aplikacji"; usunięcie martwego `preconnect` do Google Fonts.
 
 Publikacja:
-- [ ] README od nowa: zrzut ekranu, badge, „Start w 30 s", link do demo, lista funkcji zgodna z kodem, mapa modułów, sekcja prywatności (co opuszcza urządzenie).
-- [ ] GitHub Pages przez workflow (`.github/workflows/deploy-pages.yml`), homepage w repo, topics.
-- [ ] `CHANGELOG.md`, `SECURITY.md`, tag `v1.0.0` + Release.
+- [x] README od nowa: zrzut ekranu, badge, „Start w 30 s", link do demo, lista funkcji zgodna z kodem, mapa modułów, sekcja prywatności (co opuszcza urządzenie).
+- [x] GitHub Pages przez workflow (`.github/workflows/deploy-pages.yml`), homepage w repo, topics.
+- [x] `CHANGELOG.md`, `SECURITY.md`, tag `v1.0.0` + Release.
 
 ## Faza 1 — fundamenty (żeby dało się bezpiecznie zmieniać)
 

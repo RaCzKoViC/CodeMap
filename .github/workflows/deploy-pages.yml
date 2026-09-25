@@ -1,0 +1,44 @@
+# Publikuje frontend CodeMap na GitHub Pages (https://raczkovic.github.io/CodeMap/).
+# Aplikacja jest statyczna i bez kroku budowania: kopiujemy tylko pliki frontendu
+# (bez server/, deploy/, docs/, tools/), więc żaden plik backendu nie trafia do publikacji.
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sprawdź składnię JS
+        run: for f in js/*.js sw.js; do node --check "$f"; done
+
+      - name: Złóż katalog publikacji (tylko frontend)
+        run: |
+          mkdir -p _site
+          cp index.html manifest.webmanifest sw.js icon-192.png icon-512.png icon-maskable-512.png LICENSE _site/
+          cp -r js css _site/
+          ls -R _site | head -50
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,49 @@
+# Historia zmian
+
+Format: [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/), wersjonowanie [SemVer](https://semver.org/lang/pl/).
+Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji).
+
+## [1.0.0] — 2026-09-25
+
+Pierwsze publiczne wydanie open source (MIT). Faza 0 planu rozwoju ([docs/ROADMAP.md](docs/ROADMAP.md)).
+
+### Bezpieczeństwo
+- Backend dev serwuje wyłącznie pliki frontendu (allowlista, `dotfiles: deny`) i nasłuchuje tylko na
+  `127.0.0.1` — wcześniej cały katalog repozytorium (w tym `server/.env`, baza SQLite, logi, Sejf)
+  był dostępny przez HTTP na wszystkich interfejsach.
+- Atomowa rezerwacja quoty przed zapisem: równoległe uploady nie mogą razem przekroczyć limitu.
+- `Cache-Control: no-store` dla `/api/*`; log żądań bez query stringa (tokeny weryfikacji/resetu).
+- Zależności backendu: fastify 5.12.5, @fastify/static 10.1.4 (`npm audit`: 0 podatności).
+- Caddy: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`,
+  CSP w trybie report-only; hardening unitu systemd; backupy z `umask 077` i bezpieczną rotacją.
+- ChatBot: allowlista akcji wykonywanych automatycznie (tylko zmiany widoku); wczytywanie, kasowanie,
+  zapis, eksport, schowek, MindMap, płatne AI, instalacja wymagają kliknięcia. Nazwy z repozytorium
+  w prompcie przycięte i oczyszczone ze znaków sterujących.
+
+### Poprawki
+- Mapa wczytana z pliku zachowuje pozycje przy „rozwiń/zwiń wszystko" i „pokaż różnice"
+  (relayout przechodził przez układ force i niszczył zapisane położenia).
+- Przycisk „Konto" ukryty, gdy nie ma backendu (GitHub Pages, sam `serve.py`).
+- `manifest.id` względne — bezkonfliktowa instalacja PWA obok innych aplikacji na tym samym originie.
+
+### Publikacja
+- Licencja MIT, README od nowa (zrzut, start w 30 s, sekcja prywatności, mapa modułów), SECURITY.md,
+  workflow GitHub Pages, jedno źródło wersji `CM.VERSION`.
+- Historia repozytorium przepisana przed upublicznieniem (usunięty dawny log serwera z tokenem).
+
+## Wcześniej (rozwój zamknięty, 2026-06 → 2026-07)
+
+Skrót ważniejszych kamieni milowych sprzed wersjonowania:
+- Rdzeń: mapa plików i zależności na canvasie, 13 układów, fizyka w Web Workerze, auto-LOD dla dużych
+  repozytoriów, migawki i historia z diffem na mapie, porównywanie schematów, widok wpływu, cykle, hotspoty.
+- Wczytywanie: folder/pliki/drop/wklej, ZIP/TAR/GZ, PDF, GitHub/GitLab/Bitbucket z gałęziami i porównaniem.
+- Inspect: 15 reguł antywzorców z health score i raportem Markdown.
+- AI: Mistral (4 sloty kluczy), WebLLM w Web Workerze (WebGPU), Ollama; ChatBot sterujący aplikacją,
+  Runner (sandbox HTML/JS/PHP-wasm), błyskawiczne komendy bez modelu.
+- MindMap: 16 szablonów kart, 34 typy diagramów, warstwa rysowania klasy Excalidraw, oś czasu.
+- Dysk i Sejf: OPFS z AES-GCM-256 + PBKDF2, galeria, Ulubione; File System Access.
+- Backend: Fastify + SQLite, argon2id, weryfikacja e-mail, synchronizacja map/migawek/ustawień,
+  Sejf w chmurze jako szyfrogram; pliki wdrożeniowe Hetzner (Caddy, systemd, backup).
+- PWA: service worker z precache, dwujęzyczność PL/EN, samouczek, motywy.
+
+[1.0.0]: https://github.com/RaCzKoViC/CodeMap/releases/tag/v1.0.0

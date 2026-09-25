@@ -1,67 +1,90 @@
 # CodeMap — Kartografia Kodu 🗺️
 
-Potężne, w pełni lokalne narzędzie do wizualizacji struktury kodu w stylu map i siatek **Maltego**.
-Wczytujesz pliki, foldery albo repozytorium GitHub, a CodeMap buduje interaktywną, profesjonalnie
-połączoną mapę plików i ich zależności — po której możesz się swobodnie poruszać, obracać ją
-i analizować zaawansowane parametry każdego elementu.
+[![Licencja MIT](https://img.shields.io/badge/licencja-MIT-22d3ee.svg)](LICENSE)
+[![Wydanie](https://img.shields.io/github/v/release/RaCzKoViC/CodeMap?label=wydanie&color=22d3ee)](https://github.com/RaCzKoViC/CodeMap/releases)
+[![GitHub Pages](https://github.com/RaCzKoViC/CodeMap/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/RaCzKoViC/CodeMap/actions/workflows/deploy-pages.yml)
+[![Bez build-stepu](https://img.shields.io/badge/build--step-brak-8b5cf6.svg)](#-architektura)
+
+> **English summary.** CodeMap is a local-first, Maltego-style code cartography tool: load a folder,
+> an archive or a GitHub/GitLab/Bitbucket repository and get an interactive map of files, dependencies
+> and metrics — with 13 layouts, static analysis (15 anti-pattern rules), snapshots and diffs, a MindMap
+> mode with a drawing layer, and optional AI assistants that can run **entirely in your browser**
+> (WebLLM) or on your machine (Ollama). Pure JavaScript, no build step, PWA, MIT. UI in Polish and English.
+
+**Demo online:** https://raczkovic.github.io/CodeMap/#demo
+
+![CodeMap — mapa projektu demonstracyjnego](docs/screenshot-demo.png)
 
 ---
 
-## 🚀 Uruchomienie
+## 🚀 Start w 30 sekund
 
-**Najprościej:** otwórz `index.html` w przeglądarce (Chrome / Edge / Firefox) — dwuklik wystarczy.
-
-**Zalecane (pełna obsługa migawek przez IndexedDB, brak ograniczeń `file://`):**
-uruchom mały serwer lokalny w katalogu projektu i wejdź na `http://localhost:8777`:
-
-```powershell
-python -m http.server 8777 --directory D:\Projekty\CodeMap
+```bash
+git clone https://github.com/RaCzKoViC/CodeMap.git
+cd CodeMap
+python serve.py            # → http://localhost:8777
 ```
 
-> Chcesz od razu zobaczyć działanie? Otwórz `index.html#demo` lub kliknij **„✨ Zobacz demo"**.
+Bez Pythona wystarczy dowolny serwer statyczny (`npx serve .`) albo dwuklik na `index.html`
+(tryb `file://` ma ograniczenia: brak service workera i migawek w IndexedDB).
+Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 
 ---
 
-## ✨ Możliwości
+## ✨ Co potrafi
 
-### Wczytywanie (obsługa ponad 150 formatów)
-- **📁 Folder** — wybór całego katalogu z urządzenia (z pełną strukturą).
-- **📄 Pliki** — pojedyncze pliki.
-- **🌐 Źródło** — repozytorium **GitHub** po adresie URL (publiczne lub prywatne z tokenem),
-  można też wskazać konkretny podkatalog (`.../tree/main/src`).
-- **Przeciągnij i upuść** folder lub pliki bezpośrednio na mapę.
-- Rozpoznawane: kod (JS/TS, Python, C/C++, C#, Go, Rust, Java, Kotlin, PHP, Ruby, Swift, …),
-  web (HTML/CSS/SCSS/Vue/Svelte), dane (JSON/YAML/XML/CSV/SQL), dokumenty, obrazy, media,
-  archiwa, binaria i wiele innych.
+### Wczytywanie (150+ formatów)
+- **Folder / pliki / przeciągnij-upuść / wklej** (`Ctrl+V`) — pełna struktura katalogów.
+- **Archiwa** ZIP, TAR, TGZ, GZ — rozpakowywane w przeglądarce (`DecompressionStream`).
+- **PDF** — mapa z zakładek i stron.
+- **Repozytoria** GitHub, GitLab, Bitbucket po adresie URL (publiczne lub z tokenem), wybór gałęzi/tagu,
+  podkatalogu, **porównanie dwóch gałęzi** po sygnaturze drzewa, eksport mapy do Gist.
 
-### Mapa i nawigacja
-- **Swobodne przemieszczanie** (przeciąganie tła) i **płynny zoom** (kółko myszy, do kursora).
-- **Dowolny obrót mapy** — `Shift`+przeciąganie, prawy przycisk, pokrętło w rogu, przyciski lub `Q`/`E`.
-- **Pseudo-3D / perspektywa** (`T` lub przycisk ◳).
-- **Minimapa** z prostokątem widoku (klik = przeskok).
-- Profesjonalne, czytelne połączenia: **struktura** (zawieranie), **importy/zależności**
-  (z grotami kierunku) oraz **referencje** do zasobów.
+### Analiza
+- Metryki per plik: linie, kod, komentarze, złożoność, funkcje, TODO/FIXME, rozmiar, data.
+- Parsowanie importów dla 12 rodzin języków (JS/TS, Python, C/C++, Go, Java, C#, PHP, Ruby, Rust, CSS,
+  HTML, Markdown), aliasy z `tsconfig`/`jsconfig`, zależności zewnętrzne jako osobne węzły.
+- Symbole (funkcje, klasy, typy) z własną złożonością w panelu szczegółów.
+- Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
 
-### Inteligentna analiza
-- Automatyczne **parsowanie importów** i budowa grafu zależności między plikami
-  (rozpoznaje `import`/`require`/`#include`/`use`/`@import`/`<script src>` itd.).
-- **Zależności zewnętrzne** (pakiety npm/pip/…) jako osobne węzły.
-- Zaawansowane metryki: linie, linie kodu, komentarze %, złożoność, liczba definicji,
-  TODO/FIXME, rozmiar, data modyfikacji, skład folderu wg typu, najwięksi „mieszkańcy" itd.
+### Mapa
+- **13 układów**: upakowane koła, drzewo strukturalne, radialny, treemap, icicle, sunburst, siła (force),
+  warstwowy, moduły, diagram łukowy, galaktyka, mgławica, pierścienie.
+- Fizyka układów siłowych w **Web Workerze** — UI nie zamiera na dużych repozytoriach (auto-LOD, budżet węzłów).
+- Pan, zoom do kursora, **obrót**, pseudo-3D, minimapa, radar okolicy, tryb lotu `WASD`, widok wpływu,
+  podgląd kodu po najechaniu, menu kontekstowe, paleta poleceń `Ctrl+K`, wyszukiwarka `/`.
+- Eksport **PNG** (2×/4×) i **SVG**, link do bieżącego widoku (`#v=`).
 
-### Widok i ustawienia
-- 5 układów: **drzewo**, **radialny**, **siła** (graf zależności), **siatka**, **klastry wg typu**.
-- Filtry: foldery / pliki / zależności zewnętrzne, typy połączeń, włączanie/wyłączanie typów plików.
-- Zwijanie i rozwijanie folderów (dwuklik na folderze) z agregacją połączeń.
-- Wyszukiwarka plików/ścieżek (klawisz `/`), podświetlanie sąsiadów, menu kontekstowe (PPM).
+### Śledzenie rozwoju
+- **Migawki** (IndexedDB) i **historia**: raport dodane / zmienione / usunięte, Δ linii i rozmiaru,
+  różnice naniesione na mapę (zielony / żółty / czerwony).
+- **Zapis / odczyt** całej mapy z pozycjami (`.codemap.json`), porównywanie kilku schematów obok siebie,
+  hotspoty (rozmiar × zależności × złożoność).
 
-### Zapis i śledzenie rozwoju
-- **💾 Zapisz / 📂 Otwórz** — eksport i import całej mapy do pliku `.codemap.json` (z pozycjami).
-- **📌 Migawka** — zapis stanu projektu (lokalnie, w przeglądarce).
-- **🕓 Historia** — porównywanie dwóch migawek lub migawki ze stanem bieżącym:
-  raport **dodane / zmienione / usunięte** pliki, Δ linii i Δ rozmiaru, oraz
-  naniesienie różnic bezpośrednio na mapę (zielony = nowy, żółty = zmiana, czerwony = usunięty).
-- Eksport/import całej historii migawek do pliku.
+### Inspect — analiza statyczna
+15 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
+głębokie zagnieżdżenie, minifikaty…) z progami statystycznymi, **health score** i raportem Markdown.
+
+### AI — opcjonalnie, z zachowaniem prywatności
+- **WebLLM** — modele uruchamiane w przeglądarce (WebGPU), wagi w cache, bez wysyłania czegokolwiek.
+- **Ollama** — lokalny serwer modeli na Twoim komputerze.
+- **Mistral API** — z własnym kluczem (do 4 slotów, round-robin).
+- **ChatBot** steruje aplikacją (ok. 50 akcji: układ, filtry, motyw, wyszukiwanie, migawki…). Akcje spoza
+  zbioru „tylko widok" wymagają kliknięcia — model nie może sam wczytać, skasować ani wyeksportować.
+- **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
+- Do modeli trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików.
+
+### MindMap
+Drugi tryb pracy: 16 szablonów kart, **34 typy diagramów**, warstwa rysowania z 9 narzędziami
+(styl odręczny), undo/redo, import/eksport Markdown, oś czasu migawek.
+
+### Dysk i Sejf
+- **Sejf** — magazyn w OPFS szyfrowany hasłem (AES-GCM-256, PBKDF2), galeria zdjęć, album „Ulubione".
+- **Dysk** — prawdziwy folder na komputerze przez File System Access API (uchwyt trwały).
+
+### Interfejs
+Polski i angielski, motyw ciemny/jasny, 8 presetów kolorystycznych, suwaki wyglądu „liquid glass",
+interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainstalowania.
 
 ---
 
@@ -72,52 +95,93 @@ python -m http.server 8777 --directory D:\Projekty\CodeMap
 | `F` | dopasuj widok | | `Q` / `E` | obróć w lewo / prawo |
 | `+` / `-` | przybliż / oddal | | `R` | wyzeruj obrót |
 | `/` | wyszukiwanie | | `T` | perspektywa (pseudo-3D) |
-| `Esc` | odznacz / zamknij menu | | strzałki | przesuń widok |
+| `Ctrl+K` | paleta poleceń | | `Alt+S` | ściągawka skrótów |
+| `Esc` | odznacz / zamknij | | `WASD` + `Spacja` | tryb lotu |
 
-Mysz: przeciąganie tła = przesuwanie • kółko = zoom • przeciąganie węzła = przesuń element •
+Mysz: przeciąganie tła = przesuwanie • kółko = zoom • `Shift`+przeciąganie lub PPM = obrót •
 dwuklik na folderze = zwiń/rozwiń • PPM = menu kontekstowe.
 
 ---
 
-## 🧱 Architektura (czysty JavaScript, bez zależności i bez kroku budowania)
+## 🔒 Prywatność — co opuszcza Twoje urządzenie
+
+Domyślnie **nic**. Analiza, mapa, migawki, Sejf i historia żyją w przeglądarce. Sieć jest używana tylko
+na Twoje wyraźne żądanie:
+
+| Kiedy | Dokąd | Co |
+|---|---|---|
+| wczytanie repozytorium | api.github.com / gitlab.com / api.bitbucket.org | adres repo, opcjonalny token (tylko w pamięci karty) |
+| Mistral | api.mistral.ai | Twój klucz i struktura projektu (nazwy, liczby) |
+| WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
+| Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
+| Ollama | 127.0.0.1:11434 | lokalnie |
+| konto (opcjonalne) | Twój własny serwer | mapy, migawki, ustawienia; Sejf **tylko jako szyfrogram** |
+
+Klucze API są przechowywane w `localStorage` przeglądarki i nigdy nie są synchronizowane z serwerem.
+Szczegóły i sposób zgłaszania podatności: [SECURITY.md](SECURITY.md).
+
+---
+
+## 🧱 Architektura
+
+Czysty JavaScript, bez zależności i bez kroku budowania. Moduły to globalne obiekty `CM.*`
+ładowane w kolejności z `index.html`.
 
 ```
-index.html              # struktura UI
-css/styles.css          # motyw (ciemny, „cyber-cartography")
-js/util.js              # narzędzia: kamera (pan/zoom/obrót/tilt), hash, formatowanie
-js/languages.js         # rejestr 150+ formatów plików (kolory, kategorie)
-js/analysis.js          # metryki kodu + parsowanie i rozwiązywanie zależności
-js/graph.js             # model danych: hierarchia, agregaty, zwijanie, (de)serializacja, diff
-js/layouts.js           # algorytmy układu: force, tree, radial, grid, cluster
-js/renderer.js          # render na <canvas> + interakcje (pan/zoom/obrót/wybór/hover)
-js/loaders.js           # wczytywanie: pliki / foldery / drag-drop / GitHub API
-js/storage.js           # migawki (IndexedDB), zapis/odczyt mapy, nanoszenie różnic
-js/ui.js                # panele: szczegóły, filtry, historia, diff, podpowiedzi, menu
-js/app.js               # spięcie całości + tryb demo
+index.html                 # struktura UI
+css/styles.css             # motyw „cyber-cartography" (ciemny / jasny)
+js/util.js                 # kamera (pan/zoom/obrót/tilt), narzędzia, CM.VERSION
+js/icons.js  js/i18n.js    # ikony SVG, tłumaczenia PL/EN
+js/languages.js            # rejestr 150+ formatów
+js/analysis.js             # metryki, parsowanie importów, rozwiązywanie zależności
+js/graph.js                # model: hierarchia, agregaty, zwijanie, cykle, wpływ, (de)serializacja, diff
+js/layouts.js              # 13 układów (+ fizyka), js/sim-worker.js — Web Worker
+js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa
+js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral
+js/storage.js              # migawki i sesja (IndexedDB)
+js/ui.js                   # panele szczegółów, filtry, historia, diff
+js/settings.js             # ustawienia, samouczek, instrukcja
+js/inspect.js              # analiza statyczna (15 reguł, health score)
+js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
+js/mindmap.js  js/mmdraw.js  # tryb MindMap + warstwa rysowania
+js/drive.js                # Dysk (File System Access) i Sejf (OPFS + AES-GCM)
+js/auth.js  js/sync.js     # konto i synchronizacja (tylko z backendem)
+js/app.js                  # spięcie całości, tryb demo, most dla ChatBota
+sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
 ```
 
-Wszystko działa po stronie klienta — **żadne dane nie opuszczają Twojego urządzenia**
-(jedyne połączenie sieciowe to opcjonalne pobieranie repozytorium z GitHub na Twoje żądanie).
+Plan rozwoju i znane długi techniczne: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
 ## ☁️ Konto i synchronizacja (opcjonalny backend)
 
-CodeMap ma opcjonalny serwer (katalog `server/` — Node.js + Fastify + SQLite), który dodaje
-**rejestrację z weryfikacją e-mail** i **synchronizację między urządzeniami**: mapy, migawki
-(z pełną treścią), ustawienia oraz Sejf/Ulubione — te ostatnie **wyłącznie jako szyfrogram**
-(AES-GCM po stronie klienta; serwer nigdy nie widzi haseł ani treści plików). Klucze API
-(np. Mistral) nigdy nie są wysyłane na serwer. Bez logowania aplikacja działa w 100% lokalnie,
-dokładnie jak dotychczas.
+Katalog `server/` zawiera mały serwer (Node.js ≥ 20.6, Fastify, SQLite) dodający konta z weryfikacją
+e-mail i synchronizację map, migawek, ustawień oraz Sejfu — ten ostatni **wyłącznie jako szyfrogram**
+(AES-GCM po stronie klienta; serwer nigdy nie widzi haseł ani treści). Bez logowania aplikacja działa
+w 100 % lokalnie. Bez backendu przycisk „Konto" jest ukryty.
 
-**Dev (Windows):**
 ```powershell
-cd server; copy .env.example .env; npm install; npm start   # → http://localhost:8787
+cd server; copy .env.example .env; npm install; npm start   # → http://localhost:8787 (frontend + API)
 ```
-Maile weryfikacyjne w trybie dev drukują się w konsoli serwera (`EMAIL_MODE=console`).
 
-**Produkcja (Hetzner VPS):** pełna instrukcja krok po kroku w [`deploy/setup-vps.md`](deploy/setup-vps.md);
-wgrywanie: `.\tools\deploy.ps1 -Server deploy@twoja-domena`.
+Maile w trybie dev drukują się w konsoli (`EMAIL_MODE=console`). Serwer dev nasłuchuje tylko na
+`127.0.0.1` i serwuje wyłącznie pliki frontendu. Produkcja (Caddy + systemd + backup):
+[`deploy/setup-vps.md`](deploy/setup-vps.md), wgrywanie `.\tools\deploy.ps1 -Server deploy@twoja-domena`.
+
+---
+
+## 🤝 Współpraca
+
+Zgłoszenia błędów i pomysły: [Issues](https://github.com/RaCzKoViC/CodeMap/issues).
+Zasady, które utrzymują projekt prostym:
+
+- brak kroku budowania i zależności npm po stronie frontendu — nowe biblioteki tylko ładowane na żądanie;
+- każdy tekst w UI przez `CM.i18n.t()` z tłumaczeniem PL **i** EN;
+- zmiana plików `js/` lub `css/` = bump `?v=` w `index.html` i `CACHE` w `sw.js`;
+- `index.html` edytuj narzędziem zachowującym UTF-8.
+
+Historia zmian: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -125,4 +189,7 @@ wgrywanie: `.\tools\deploy.ps1 -Server deploy@twoja-domena`.
 
 CodeMap jest **open source** na licencji [MIT](LICENSE) — możesz go używać, kopiować, modyfikować
 i rozpowszechniać (także komercyjnie), pod warunkiem zachowania informacji o prawach autorskich.
-Repozytorium: https://github.com/RaCzKoViC/CodeMap
+
+Biblioteki ładowane na żądanie: [WebLLM](https://github.com/mlc-ai/web-llm) (Apache-2.0),
+[rough.js](https://github.com/rough-stuff/rough) (MIT), [php-wasm](https://github.com/seanmorris/php-wasm) (Apache-2.0).
+Backend: Fastify, better-sqlite3, argon2 (MIT).
