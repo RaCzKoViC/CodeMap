@@ -962,7 +962,12 @@ CM.ChatBot = (function(){
         finally{ off(); updateSub(); }
       } else if(useOllama()){
         streamOpts.maxTokens=900;   // native speed — roomy but bounded
-        if(structured){ streamOpts.format=ACT_SCHEMA; streamOpts.temperature=0.3; streamOpts.repeatPenalty=1.15; if(quick) streamOpts.think=false; }   // JSON + (opcjonalnie) rozumowanie: Ollama oddaje thinking osobno, UI pokazuje je na zywo
+        if(structured){ streamOpts.temperature=0.3; streamOpts.repeatPenalty=1.15;
+          // Gramatyka JSON (format) + rozumowanie = w Ollamie ~1 tok/s (167 s vs 15 s w sondzie): model myslacy
+          // bez trybu szybkiego dostaje sam prompt (JSON i tak wychodzi, ratuje parseStructured); gramatyka
+          // zostaje dla modeli niemyslacych i dla trybu szybkiego (think:false, ~8 s).
+          if(quick||!modelThinks()) streamOpts.format=ACT_SCHEMA;
+          if(quick) streamOpts.think=false; }
         else if(quick) streamOpts.think=false;   // szybka odpowiedź: Ollama pomija rozumowanie (qwen3, deepseek-r1 w nowszych wersjach)
         try{ acc=await CM.Ollama.chat(messages, streamOpts); }
         catch(e){ if(structured && e && e.name!=='AbortError' && /schema|grammar|json|format/i.test(String(e.message||''))){ localJsonOk=false; }
