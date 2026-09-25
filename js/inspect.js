@@ -33,6 +33,8 @@ CM.Inspect = (function(){
     'r.risky':'Ryzykowne API (bezpieczeństwo)','r.risky.d':'Użycia eval / innerHTML= / document.write — potencjalne wektory XSS. (Heurystyka na pierwszych 4000 znakach.)',
     'r.debug':'Pozostałości debugowania','r.debug.d':'Liczne console.log / debugger w kodzie produkcyjnym. (Heurystyka na pierwszych 4000 znakach.)',
     'r.minified':'Pliki zminifikowane / vendored','r.minified.d':'Wyglądają na zbudowane/obce artefakty — zwykle warto je wykluczyć z analizy.',
+    'r.archviolation':'Naruszenia reguł architektury','r.archviolation.d':'Importy zakazane przez `.codemap.rules.json` w repozytorium (warstwy, `forbid`, `noCycles`).',
+    'r.archrules':'Plik reguł architektury nie dał się wczytać','r.archrules.d':'`.codemap.rules.json` istnieje, ale nie jest poprawnym JSON-em o oczekiwanym kształcie — reguły nie były sprawdzane.',
   },
   en:{
     'title':'Static analysis',
@@ -58,6 +60,8 @@ CM.Inspect = (function(){
     'r.risky':'Risky APIs (security)','r.risky.d':'Uses of eval / innerHTML= / document.write — potential XSS vectors. (Heuristic over the first 4000 chars.)',
     'r.debug':'Debug leftovers','r.debug.d':'Multiple console.log / debugger in production code. (Heuristic over the first 4000 chars.)',
     'r.minified':'Minified / vendored files','r.minified.d':'Look like built/third-party artifacts — usually worth excluding from analysis.',
+    'r.archviolation':'Architecture rule violations','r.archviolation.d':'Imports forbidden by `.codemap.rules.json` in the repository (layers, `forbid`, `noCycles`).',
+    'r.archrules':'Architecture rules file could not be loaded','r.archrules.d':'`.codemap.rules.json` exists but is not valid JSON of the expected shape — rules were not checked.',
   }};
   function t(k,sub){ const l=I.getLang(); const d=STR[l]||STR.pl; let s=(d&&k in d)?d[k]:(STR.pl[k]||k); if(sub) for(const p in sub) s=s.replace('{'+p+'}',sub[p]); return s; }
 
@@ -150,10 +154,29 @@ CM.Inspect = (function(){
       if(res.components&&res.components.length>LIMIT){ const f=F.get('cycles'); if(f) f.count=res.components.length; }
     }catch(e){}
 
+    // ---- reguły architektury: .codemap.rules.json w projekcie (CM.Rules); brak pliku = reguła milczy ----
+    if(CM.Rules){ try{
+      const rn=CM.Rules.findRulesNode(graph);
+      if(rn && rn.preview){
+        let rules=null;
+        try{ rules=CM.Rules.parse(rn.preview); }catch(err){ add(F,'archrules','info',rn, String(err&&err.message||err)); }
+        if(rules){
+          await tick();
+          const v=CM.Rules.evaluate(graph, rules);
+          for(const x of v.slice(0,LIMIT)){
+            const n=graph.nodes.get(x.from); if(!n) continue;
+            const tn=graph.nodes.get(x.to);
+            add(F,'archviolation','high',n, '→ '+(tn?tn.name:x.to)+' · '+x.rule+(x.why?' — '+x.why:''));
+          }
+          if(v.length>LIMIT){ const f=F.get('archviolation'); if(f) f.count=v.length; }
+        }
+      }
+    }catch(e){} }
+
     // ---- health score: 100 minus severity-weighted density ----
     let penalty=0; for(const f of F.values()) penalty+=SEV_W[f.sev]*f.count;
     const score=Math.max(0, Math.round(100 - 100*penalty/(penalty + 3*N)));
-    const order=['cycles','god','unstable','fanout','huge','complex','risky','orphan','emptycatch','debug','todo','deep','crowded','dup','minified'];
+    const order=['archviolation','cycles','god','unstable','fanout','huge','complex','risky','orphan','emptycatch','debug','todo','deep','crowded','dup','minified','archrules'];
     const findings=[...F.values()].sort((a,b)=>order.indexOf(a.rule)-order.indexOf(b.rule));
     return {findings, score, files:files.length, ms:Math.round(performance.now()-t0)};
   }
