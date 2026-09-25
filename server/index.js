@@ -36,7 +36,10 @@ await app.register(fastifyRateLimit, { global: true, max: 300, timeWindow: '1 mi
 app.addHook('onRequest', (req, reply, done) => {
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.url.startsWith('/api/')) {
     const origin = req.headers.origin;
-    if (origin && origin !== CFG.appOrigin) return reply.code(403).send({ error: 'origin' });
+    // dev: aplikacja bywa otwierana jako localhost, 127.0.0.1 albo z innego portu (serve.py + API) —
+    // każdy lokalny origin jest nasz. Prod: wyłącznie APP_ORIGIN.
+    const localDev = !CFG.prod && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin || '');
+    if (origin && origin !== CFG.appOrigin && !localDev) return reply.code(403).send({ error: 'origin' });
   }
   done();
 });

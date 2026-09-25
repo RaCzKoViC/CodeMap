@@ -47,6 +47,11 @@ const q = {
 };
 
 const MAIL_PER_HOUR = 3;           // maile na adres na godzinę (verify + reset + "konto istnieje")
+// EMAIL_MODE=console (dev / self-hosting bez poczty): link ląduje na stdout serwera, czego użytkownik
+// w przeglądarce nie widzi — zwracamy go też w odpowiedzi API, żeby rejestracja i reset dało się
+// domknąć z UI. W trybie resend link NIGDY nie wraca w odpowiedzi (zdradzałby token każdemu, kto
+// zna adres e-mail).
+const DEV_LINKS = CFG.emailMode !== 'resend';
 const LOCK_AFTER = 5;              // nieudane logowania, po których zaczyna się blokada
 const LOCK_MAX_MS = 15 * 60 * 1000;
 
@@ -154,6 +159,7 @@ export async function registerAuth(app) {
     const { lastInsertRowid: id } = q.insertUser.run(email, hash, normLang(lang), CFG.defaultQuota, now());
     const token = issueEmailToken(id, 'verify', VERIFY_TTL);
     if (mailAllowed(email, 'verify')) mailLater(() => sendVerifyMail(email, normLang(lang), token), req.log);
+    if (DEV_LINKS) return { ok: true, devVerifyLink: `${CFG.appOrigin}/api/auth/verify?token=${token}` };
     return { ok: true };
   });
 
@@ -170,9 +176,10 @@ export async function registerAuth(app) {
   app.post('/api/auth/resend-verification', { config: { rateLimit: { max: 3, timeWindow: '1 hour' } } }, async (req) => {
     const { email } = req.body || {};
     const user = validEmail(email) ? q.userByEmail.get(email) : null;
-    if (user && !user.verified_at && mailAllowed(user.email, 'verify')) {
+    if (user && !user.verified_at && (DEV_LINKS || mailAllowed(user.email, 'verify'))) {
       const token = issueEmailToken(user.id, 'verify', VERIFY_TTL);
       mailLater(() => sendVerifyMail(user.email, user.lang, token), req.log);
+      if (DEV_LINKS) return { ok: true, devVerifyLink: `${CFG.appOrigin}/api/auth/verify?token=${token}` };
     }
     return { ok: true };
   });
@@ -203,9 +210,10 @@ export async function registerAuth(app) {
   app.post('/api/auth/request-reset', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req) => {
     const { email } = req.body || {};
     const user = validEmail(email) ? q.userByEmail.get(email) : null;
-    if (user && mailAllowed(user.email, 'reset')) {
+    if (user && (DEV_LINKS || mailAllowed(user.email, 'reset'))) {
       const token = issueEmailToken(user.id, 'reset', RESET_TTL);
       mailLater(() => sendResetMail(user.email, user.lang, token), req.log);
+      if (DEV_LINKS) return { ok: true, devResetLink: `${CFG.appOrigin}/?reset=${token}` };
     }
     return { ok: true };
   });

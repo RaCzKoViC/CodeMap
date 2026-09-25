@@ -2016,3 +2016,23 @@ body.light .auth-quota{background:rgba(0,0,0,.10)}
 .tb-btn.busy{opacity:.55;pointer-events:none}
 .tb-btn.danger{color:var(--danger);border-color:rgba(248,113,113,.4)}
 .tb-btn.danger:hover{background:rgba(248,113,113,.15)}
+
+/* ---- Ustawienia → AI: karty kluczy API (dostawca, test, zapis, model) ---- */
+.set-ai-keys{max-width:680px}
+.set-ai-keycard{border:1px solid var(--glass-border);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:rgba(255,255,255,.03)}
+.set-ai-keycard.dirty{border-color:var(--accent)}
+.set-ai-keycard .set-ai-keyrow{max-width:none;margin-bottom:6px}
+.set-ai-keyadd{max-width:680px;margin-top:8px}
+.set-ai-prov{flex-shrink:0;min-width:92px;text-align:center;font-size:11px;font-weight:800;letter-spacing:.02em;padding:6px 8px;border-radius:999px;
+  background:rgba(255,255,255,.08);color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.set-ai-prov.ok{background:rgba(52,211,153,.18);color:#34d399}
+.set-ai-prov.err{background:rgba(248,113,113,.18);color:#f87171}
+.set-ai-keybtn{flex-shrink:0;padding:6px 10px;font-size:12px;white-space:nowrap}
+.set-ai-keybtn.danger{color:#f87171}
+.set-ai-keymodel .set-ai-keyidx{width:auto;padding:0 4px;text-transform:uppercase;font-size:11px}
+.set-ai-keystat{font-size:12px;color:var(--text-dim);margin-top:2px;word-break:break-word}
+.set-ai-keystat.ok{color:#34d399}
+.set-ai-keystat.err{color:#f87171}
+.auth-dev{margin:8px 0;padding:10px;border:1px dashed var(--accent);border-radius:10px}
+body.light .set-ai-keycard{background:rgba(20,30,45,.04)}
+body.light .set-ai-prov{background:rgba(20,30,45,.08)}

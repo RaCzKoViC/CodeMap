@@ -48,6 +48,8 @@ CM.Ollama = (function(){
       stream:!!opts.onToken,
       options:Object.assign({ temperature:opts.temperature==null?0.6:opts.temperature },
                             opts.maxTokens?{num_predict:opts.maxTokens}:{}) };
+    if(opts.format) body.format=opts.format;          // 'json' albo schemat JSON (Ollama ≥ 0.5) — wymusza strukturę
+    if(opts.think===false) body.think=false;          // modele myślące (qwen3, deepseek-r1): bez rozumowania (Ollama ≥ 0.9)
     let r;
     try{
       r=await fetch(base()+'/api/chat',{ method:'POST', headers:{'Content-Type':'application/json'},
@@ -60,16 +62,23 @@ CM.Ollama = (function(){
       throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
     if(!opts.onToken){
       const j=await r.json();
-      return (j.message&&j.message.content)||'';
+      const th=(j.message&&j.message.thinking)||'';
+      return (th?('<think>'+th+'</think>'):'')+((j.message&&j.message.content)||'');
     }
     // NDJSON stream: {message:{content}, done:false} … {done:true}
     const reader=r.body.getReader(); const dec=new TextDecoder();
-    let buf='', full='';
+    let buf='', full='', inThink=false;
+    // nowsze Ollamy oddzielają rozumowanie (message.thinking) od treści — składamy je w <think>…</think>,
+    // które UI czatu już rozumie (podgląd „Myślę…" na żywo, zwijany panel po odpowiedzi)
     const take=(line)=>{ line=line.trim(); if(!line) return false;
       let j; try{ j=JSON.parse(line); }catch(e){ return false; }
       if(j.error) throw new Error('Ollama: '+j.error);
-      const d=(j.message&&j.message.content)||'';
+      const th=(j.message&&j.message.thinking)||'';
+      if(th){ let d=th; if(!inThink){ d='<think>'+d; inThink=true; } full+=d; opts.onToken(d, full); }
+      let d=(j.message&&j.message.content)||'';
+      if(d && inThink){ d='</think>'+d; inThink=false; }
       if(d){ full+=d; opts.onToken(d, full); }
+      if(j.done && inThink){ full+='</think>'; inThink=false; opts.onToken('</think>', full); }
       return !!j.done; };
     try{
       for(;;){

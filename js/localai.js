@@ -231,6 +231,7 @@ CM.LocalAI = (function(){
     let full='';
     const params={messages, temperature:opts.temperature==null?0.6:opts.temperature};
     if(opts.maxTokens) params.max_tokens=opts.maxTokens;
+    if(opts.responseFormat) params.response_format=opts.responseFormat;   // {type:'json_object', schema} — gramatyka WebLLM
     _genActive=true; _curSig=opts.signal||null;
     const engineGone=new Promise(res=>{ _engineGoneRes=res; });
     try{

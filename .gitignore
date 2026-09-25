@@ -17,3 +17,6 @@ Desktop.ini
 # root devDependencies (eslint)
 node_modules/
 _site/
+
+# worktree agentow (subagent isolation)
+.claude/worktrees/

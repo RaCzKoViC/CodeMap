@@ -15,7 +15,7 @@ CM.ChatBot = (function(){
     'placeholder':'Napisz wiadomość lub zleć akcję w aplikacji…','send':'Wyślij','stop':'Zatrzymaj',
     'welcome':'Cześć! Jestem **ChatBot** — wbudowany asystent CodeMap. Znam stan Twojej aplikacji i mogę w niej działać. Poproś np. *„wczytaj demo"*, *„zmień układ na force"*, *„pokaż hotspoty"* albo zadaj dowolne pytanie.',
     'aborted':'(przerwano)','errPrefix':'⚠ ',
-    'noKey':'Brak klucza Mistral API w **drugim slocie**. Dodaj go w Ustawieniach → AI (slot #2) — albo przełącz się tam na **model lokalny** (bez klucza).','goSettings':'Otwórz Ustawienia → AI',
+    'noKey':'Brak działającego klucza API. Dodaj i przetestuj klucz w Ustawieniach → AI — albo przełącz się tam na **model lokalny** lub **Ollamę** (bez klucza).','goSettings':'Otwórz Ustawienia → AI',
     'noWebGPU':'Wybrany jest **lokalny model AI**, ale ta przeglądarka nie obsługuje WebGPU (wymagany Chrome/Edge 113+). Przełącz provider w Ustawieniach → AI albo zaktualizuj przeglądarkę.',
     'subLocal':'Asystent CodeMap · lokalny','notDownloaded':'nie pobrany','modelSel':'Przełącz lokalny model (pobrane w Ustawieniach → AI)',
     'subOllama':'Asystent CodeMap · Ollama','modelSelOllama':'Przełącz model Ollamy','ollamaOffline':'Ollama offline — uruchom serwer',
@@ -36,7 +36,7 @@ CM.ChatBot = (function(){
     'placeholder':'Write a message or command an action in the app…','send':'Send','stop':'Stop',
     'welcome':"Hi! I'm **ChatBot** — the built-in CodeMap assistant. I know your app's state and can act in it. Try *“load demo”*, *“switch layout to force”*, *“show hotspots”*, or ask me anything.",
     'aborted':'(stopped)','errPrefix':'⚠ ',
-    'noKey':'No Mistral API key in the **second slot**. Add it in Settings → AI (slot #2) — or switch to the **local model** there (no key needed).','goSettings':'Open Settings → AI',
+    'noKey':'No working API key. Add and test a key in Settings → AI — or switch to the **local model** or **Ollama** there (no key needed).','goSettings':'Open Settings → AI',
     'noWebGPU':'The **local AI model** is selected, but this browser has no WebGPU (Chrome/Edge 113+ required). Switch the provider in Settings → AI or update your browser.',
     'subLocal':'CodeMap assistant · local','notDownloaded':'not downloaded','modelSel':'Switch local model (download in Settings → AI)',
     'subOllama':'CodeMap assistant · Ollama','modelSelOllama':'Switch the Ollama model','ollamaOffline':'Ollama offline — start the server',
@@ -53,12 +53,9 @@ CM.ChatBot = (function(){
   }};
   function t(k){ const l=I.getLang(); const d=STR[l]||STR.pl; return (d&&k in d)?d[k]:(STR.pl[k]||k); }
 
-  /* ---------------- key (second slot) + model ---------------- */
-  function chatKey(){
-    const s=U.mistralKeySlots();   // slot #2 jest dla ChatBota; w razie braku — pierwszy niepusty
-    return s[1]||s.find(Boolean)||'';
-  }
-  function aiModel(){ return localStorage.getItem('codemap_mistral_model')||'mistral-small-latest'; }
+  /* ---------------- dostawca chmurowy: CM.AI (klucze z wykrytym dostawcą i modelem) ---------------- */
+  function cloudEntry(){ return (CM.AI&&CM.AI.primary())||null; }
+  function useCloud(){ return !useLocal()&&!useOllama(); }
   // local on-device provider (WebLLM) — no key needed; selected in Settings → AI
   function useLocal(){ return !!(CM.LocalAI && CM.LocalAI.provider()==='local'); }
   // native Ollama server — the FASTEST local option (no browser GPU/CPU involved)
@@ -184,9 +181,10 @@ CM.ChatBot = (function(){
     'collapseAll','toggleImpact','toggleMinimap','setFilter','setMetric','toggleLang','openSettings','openHistory',
     'openCompare','detectCycles','hotspots','inspect','runInspection','setTheme','setPreset','setAccent','setBackground',
     'setGlass','setSpacing','setNodeScale','setFontScale','renderOption','togglePanel','help','listActions']);
-  function buildSystemPrompt(compact){
+  function buildSystemPrompt(compact, json){
     const lang=I.getLang()==='en'?'English':'Polish';
     const st=appState();
+    const JSON_RULE='Answer ONLY with one JSON object: {"reply":"<1-3 short plain sentences in '+lang+'>","actions":[{"action":"<name>","args":{...}}]}. "actions" is [] unless the user COMMANDS an app change. No markdown, no code fences, no JSON inside reply.';
     if(compact){
       // SMALL LOCAL MODELS: a long prompt means slow prefill on WebGPU and a confused model that
       // parrots JSON. Keep it tight: short catalog (signatures only), state WITHOUT the structure
@@ -198,7 +196,7 @@ CM.ChatBot = (function(){
       const cat=ACTION_CATALOG.map(a=>a.split(' — ')[0]);
       return [
         'You are ChatBot inside CodeMap (a code-map web app). Reply in '+lang+', 1-3 short plain-text sentences.',
-        'ONLY when the user commands an app change, append a fenced block: ```action\n{"action":"<name>","args":{...}}\n```. Greetings/questions: text only, never JSON.',
+        json?JSON_RULE:'ONLY when the user commands an app change, append a fenced block: ```action\n{"action":"<name>","args":{...}}\n```. Greetings/questions: text only, never JSON.',
         'Actions: '+cat.join('|'),
         'State: '+JSON.stringify(slim)
       ].join('\n');
@@ -206,7 +204,8 @@ CM.ChatBot = (function(){
     return [
       'You are ChatBot, the built-in AI assistant of CodeMap — a local, no-build code-cartography web app (pure JavaScript + HTML5 canvas, namespace CM.*).',
       'CodeMap visualises a codebase as an interactive Maltego-style map (files, folders, dependencies) with metrics, 13 layouts, filters, snapshots & diffs, a MindMap mode, a Drive & Vault (OPFS encrypted local storage + File System Access), GitHub/GitLab/Bitbucket loading, PNG/SVG export, full PL/EN UI and light/dark themes. You know the app deeply and help the user operate it.',
-      'You can PERFORM actions in the app. When the user asks you to DO something, output a fenced code block whose info string is exactly `action` containing a JSON object: {"action":"<name>","args":{ ... }}. Write one short natural sentence before it. You may emit several action blocks. Only act when the user asks you to act — otherwise just answer.',
+      json?('You can PERFORM actions in the app. '+JSON_RULE+' You may list several actions. Only act when the user asks you to act — otherwise just answer with an empty actions list.')
+          :'You can PERFORM actions in the app. When the user asks you to DO something, output a fenced code block whose info string is exactly `action` containing a JSON object: {"action":"<name>","args":{ ... }}. Write one short natural sentence before it. You may emit several action blocks. Only act when the user asks you to act — otherwise just answer.',
       'Available actions:\n- '+ACTION_CATALOG.join('\n- '),
       'Live application state (JSON, reflects the app right now):\n'+JSON.stringify(st),
       'Be concise, friendly and practical. Prefer doing what is asked over explaining how. Use light Markdown (**bold**, `code`, ```fences```). Answer in '+lang+'.'
@@ -262,6 +261,22 @@ CM.ChatBot = (function(){
       '<summary>'+(th.open?'<span class="cb-think-dot"></span>':'🧠 ')+esc(t(th.open?'thinking':'thoughts'))+'</summary>'+
       '<div class="cb-think-b">'+esc(th.think)+'</div></details>';
   }
+  // ---- tryb STRUKTURALNY dla modeli lokalnych (WebLLM, Ollama): odpowiedź to JSON {reply, actions}
+  // WYMUSZONY schematem (Ollama `format`, WebLLM response_format z gramatyką). Małe modele nie potrafią
+  // niezawodnie domknąć bloku ```action``` w prozie, ale gramatyka nie pozwala im wyjść poza schemat —
+  // każda odpowiedź parsuje się, a akcje trafiają do tej samej allowlisty co dotąd.
+  const ACT_SCHEMA={type:'object',properties:{reply:{type:'string'},actions:{type:'array',items:{type:'object',
+    properties:{action:{type:'string'},args:{type:'object'}},required:['action','args']}}},required:['reply','actions']};
+  let localJsonOk=true;   // wyłączany na sesję, gdy silnik odrzuci gramatykę (starszy WebLLM/Ollama)
+  // podgląd na żywo: wartość "reply" z NIEDOMKNIĘTEGO jeszcze JSON-a (strumień)
+  function jsonReplyPrefix(s){ const m=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(String(s)); if(!m) return '';
+    let raw=m[1]; if(/(^|[^\\])(\\\\)*\\$/.test(raw)) raw=raw.slice(0,-1);
+    try{ return JSON.parse('"'+raw+'"'); }catch(e){ return raw.replace(/\\n/g,'\n').replace(/\\"/g,'"'); } }
+  function parseStructured(s){ s=stripThink(String(s)).trim(); let o=null;
+    try{ o=JSON.parse(s); }catch(e){ const m=s.match(/\{[\s\S]*\}/); if(m){ try{ o=JSON.parse(m[0]); }catch(_){} } }
+    if(!o||typeof o!=='object'||typeof o.reply!=='string') return null;
+    const actions=Array.isArray(o.actions)?o.actions.filter(a=>a&&typeof a.action==='string').map(a=>({action:a.action, args:(a.args&&typeof a.args==='object')?a.args:{}})):[];
+    return {reply:o.reply.trim(), actions}; }
   function extractActions(text){ const out=[]; const re=/```action\s*([\s\S]*?)```/g; let m;
     while((m=re.exec(text))){ try{ const o=JSON.parse(m[1].trim()); if(o&&o.action) out.push(o); }catch(e){} } return out; }
   function stripActions(text){ return String(text).replace(/```action\s*[\s\S]*?```/g,'').replace(/\n{3,}/g,'\n\n').trim(); }
@@ -576,13 +591,13 @@ CM.ChatBot = (function(){
   }
   async function runAssistant(){
     const conv=activeConv(); if(!conv) return;
-    const key=chatKey();
+    const entry=useCloud()?cloudEntry():null;
     if(useLocal() && !CM.LocalAI.hasWebGPU()){
       conv.messages.push({id:uid(), role:'assistant', content:t('noWebGPU'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages();
       const last=msgsEl.querySelector('.cb-row-assistant:last-child .cb-bwrap');
       if(last) last.appendChild(el('button',{class:'cb-inline-go',text:t('goSettings'),onclick:()=>{ if(CM.Settings) CM.Settings.open('ai'); }}));
       return; }
-    if(!useLocal() && !useOllama() && !key){ conv.messages.push({id:uid(), role:'assistant', content:t('noKey'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages();
+    if(useCloud() && !entry){ conv.messages.push({id:uid(), role:'assistant', content:t('noKey'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages();
       const last=msgsEl.querySelector('.cb-row-assistant:last-child .cb-bwrap');
       if(last) last.appendChild(el('button',{class:'cb-inline-go',text:t('goSettings'),onclick:()=>{ if(CM.Settings) CM.Settings.open('ai'); }}));
       return; }
@@ -599,6 +614,9 @@ CM.ChatBot = (function(){
 
     const local=useLocal();
     const think=local&&CM.LocalAI.isThinking&&CM.LocalAI.isThinking();
+    // JSON wymuszony gramatyką dla dostawców lokalnych (poza modelami myślącymi WebLLM, które
+    // potrzebują swobodnego strumienia <think>); Ollama dostaje think:false (qwen3 itp.)
+    const structured=localJsonOk && ((local&&!think) || useOllama());
     let hist=conv.messages.filter(m=>m.role!=='system'&&!m.noKey);
     if(local && hist.length>8) hist=hist.slice(-8);   // cap prefill for small on-device models
     // few-shot for small local models: one chat turn + one action turn teach the format far better
@@ -608,9 +626,9 @@ CM.ChatBot = (function(){
     const pl=I.getLang()!=='en';
     const FEWSHOT=(local&&!think)?[
       {role:'user',content:pl?'cześć':'hi'},
-      {role:'assistant',content:pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?'},
+      {role:'assistant',content:structured?JSON.stringify({reply:pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?',actions:[]}):(pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?')},
       {role:'user',content:pl?'włącz jasny motyw':'switch to the light theme'},
-      {role:'assistant',content:(pl?'Już się robi!':'On it!')+'\n```action\n{"action":"setTheme","args":{"theme":"light"}}\n```'},
+      {role:'assistant',content:structured?JSON.stringify({reply:pl?'Już się robi!':'On it!',actions:[{action:'setTheme',args:{theme:'light'}}]}):((pl?'Już się robi!':'On it!')+'\n```action\n{"action":"setTheme","args":{"theme":"light"}}\n```')},
     ]:[];
     const mapped=hist.map(m=>({role:m.role, content:m.role==='assistant'?stripActions(stripThink(m.content)):m.content}));
     let messages;
@@ -620,7 +638,7 @@ CM.ChatBot = (function(){
       if(fi>=0) messages[fi]={role:'user',content:buildSystemPrompt(true)+'\n\n'+messages[fi].content};
       else messages.unshift({role:'user',content:buildSystemPrompt(true)});
     } else {
-      messages=[{role:'system',content:buildSystemPrompt(local)}].concat(FEWSHOT).concat(mapped);
+      messages=[{role:'system',content:buildSystemPrompt(local, structured)}].concat(FEWSHOT).concat(mapped);
     }
 
     let acc='', liveRow=null, liveInner=null, chipsEl=null;
@@ -696,8 +714,11 @@ CM.ChatBot = (function(){
       const paint=()=>{ _paintT=null; if(_runDone) return; _lastPaint=performance.now(); if(!acc) return; ensureLive();
         const near=(msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight)<70;
         const th=splitThink(acc);                                   // live thought preview (reasoning models)
-        for(const a of extractActions(th.rest)) execLive(a, true, false);  // model output → untrusted
-        liveInner.innerHTML=thinkHTML(th,false)+fmt(stripActions(th.rest))+'<span class="cb-caret"></span>';
+        if(structured){ liveInner.innerHTML=thinkHTML(th,false)+fmt(jsonReplyPrefix(th.rest))+'<span class="cb-caret"></span>'; }
+        else {
+          for(const a of extractActions(th.rest)) execLive(a, true, false);  // model output → untrusted
+          liveInner.innerHTML=thinkHTML(th,false)+fmt(stripActions(th.rest))+'<span class="cb-caret"></span>';
+        }
         if(near) scrollBottom(); };
       const streamOpts={ temperature:think?0.6:0.5, signal:abortCtl.signal,
         onToken:(d,full)=>{ acc=full;
@@ -711,14 +732,25 @@ CM.ChatBot = (function(){
         // engine download/load progress lives in the stage label (dots keep animating)
         const off=CM.LocalAI.onProgress(p=>{ if(p&&p.text) setStage(p.text+(p.pct?(' '+p.pct+'%'):'')); });
         setStage(CM.LocalAI.status()!=='ready'?t('stLoading'):'');
-        try{ acc=await CM.LocalAI.chat(messages, streamOpts); } finally{ off(); updateSub(); }
+        if(structured) streamOpts.responseFormat={type:'json_object', schema:JSON.stringify(ACT_SCHEMA)};
+        try{ acc=await CM.LocalAI.chat(messages, streamOpts); }
+        catch(e){ if(structured && e && e.name!=='AbortError' && /schema|grammar|json|format/i.test(String(e.message||''))){ localJsonOk=false; }
+          throw e; }
+        finally{ off(); updateSub(); }
       } else if(useOllama()){
         streamOpts.maxTokens=900;   // native speed — roomy but bounded
-        acc=await CM.Ollama.chat(messages, streamOpts);
+        if(structured){ streamOpts.format=ACT_SCHEMA; streamOpts.think=false; }
+        try{ acc=await CM.Ollama.chat(messages, streamOpts); }
+        catch(e){ if(structured && e && e.name!=='AbortError' && /schema|grammar|json|format/i.test(String(e.message||''))){ localJsonOk=false; }
+          throw e; }
       } else {
-        await CM.Loaders.mistralStream(messages, Object.assign({key, model:aiModel()}, streamOpts));
+        await CM.AI.chat(messages, Object.assign({entry}, streamOpts));
       }
       _runDone=true;
+      if(structured){
+        const o=parseStructured(acc);
+        if(o){ acc=o.reply; for(const a of o.actions) execLive(a, false, false); }   // model output → untrusted (allowlista)
+      }
       if(_paintT){ clearTimeout(_paintT); _paintT=null; }
       if(typing.parentNode) typing.remove();
       // final sweep (covers blocks that closed between last paint and stream end)
@@ -758,20 +790,20 @@ CM.ChatBot = (function(){
     if(conv.titled) return;
     const users=conv.messages.filter(m=>m.role==='user'); const asst=conv.messages.find(m=>m.role==='assistant');
     if(!users.length || !asst) return;
-    let title=''; const key=chatKey();
+    let title=''; const entry=useCloud()?cloudEntry():null;
     // LOCAL provider: never spend a SECOND on-device generation on a title — on iGPUs it kept the
     // GPU busy long after the visible answer ("the app still does something"), froze the UI and
     // delayed the next question. Local titles come from the first user message instead.
     // Ollama is a privacy choice too — if the user picked a local provider, never ship the first
     // exchange off to the Mistral cloud just to name the thread.
-    if(key && !useLocal() && !useOllama()){
+    if(entry){
       try{
         const lang=I.getLang()==='en'?'English':'Polish';
         const msgs=[
           {role:'system',content:'Generate a very short conversation title: 2 to 5 words, no quotes, no trailing punctuation, in '+lang+'. Reply with ONLY the title.'},
           {role:'user',content:'User: '+users[0].content.slice(0,400)+'\nAssistant: '+stripActions(stripThink(asst.content)).slice(0,400)}
         ];
-        const r=await CM.Loaders.mistralChat(msgs, {key, model:aiModel(), temperature:0.3});
+        const r=await CM.AI.chat(msgs, {entry, temperature:0.3, maxTokens:40});
         title=(r||'').trim().split('\n')[0].replace(/^["'#*\s]+|["'.*\s]+$/g,'').slice(0,48);
       }catch(e){}
     }

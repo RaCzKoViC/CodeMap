@@ -23,12 +23,16 @@ CM.Settings = (function(){
     'sc.mouse':'mysz','sc.dblclick':'dwuklik',
     'ai.head':'Asystent AI (Mistral)','ai.desc':'Opcjonalnie. Po podaniu własnego klucza Mistral API aplikacja może przeanalizować STRUKTURĘ projektu (foldery, liczby i rozmiary plików, języki) i zaproponować logiczny podział na moduły/warstwy oraz wskazać „zapachy" struktury.',
     'ai.key':'Klucz Mistral API (przechowywany lokalnie)','ai.model':'Model',
-    'ai.keys':'Klucze Mistral API (do 4 — używane przez całą aplikację)',
-    'ai.keysHint':'Możesz dodać do 4 kluczy. Aplikacja korzysta z nich z rotacją (równoważenie zapytań) i automatycznie przełącza się na kolejny przy błędnym kluczu lub przekroczonym limicie. Klucze są przechowywane wyłącznie lokalnie w Twojej przeglądarce.',
-    'ai.keyPh':'Klucz API…','ai.keyShow':'Pokaż / ukryj klucz','ai.keysCount':'Aktywne klucze: ',
+    'ai.keys':'Klucze API (chmura: Mistral, OpenAI, Anthropic Claude, Google Gemini, Groq, OpenRouter, DeepSeek, xAI, Together)',
+    'ai.keysHint':'Wklej klucz — dostawca zostanie rozpoznany po formacie klucza i potwierdzony testem (pobranie listy modeli). Klucze zostają w tej przeglądarce i trafiają wyłącznie do API danego dostawcy. Aplikacja używa działających kluczy rotacyjnie, a przy limicie lub błędzie przełącza się na następny.',
+    'ai.keyAdd':'Dodaj klucz','ai.keyTest':'Testuj','ai.keySave':'Zapisz','ai.keyDelete':'Usuń klucz','ai.keyDeleteConfirm':'Usunąć ten klucz?',
+    'ai.keySaved':'Klucz zapisany.','ai.keyDeleted':'Klucz usunięty.','ai.keyEmpty':'Wklej klucz.','ai.keyExists':'Ten klucz już jest na liście.',
+    'ai.keyTesting':'Sprawdzam klucz…','ai.keyOk':'działa','ai.keyModels':'modeli: ','ai.keyUnknownProv':'dostawca nierozpoznany po formacie — kliknij Testuj',
+    'ai.keyDetected':'(wykryty po formacie klucza — kliknij Testuj, aby potwierdzić)','ai.keyModel':'Model','ai.keyNone':'Brak kluczy. Dodaj pierwszy poniżej — albo wybierz wyżej model lokalny lub Ollamę (bez klucza).',
+    'ai.keyPh':'Klucz API…','ai.keyShow':'Pokaż / ukryj klucz','ai.keysCount':'Działające klucze: ',
     'ai.votes':'Oceny odpowiedzi ChatBota','ai.votesHint':'Suma łapek ze wszystkich rozmów — nie zeruje się.','ai.votesUp':'pomocne','ai.votesDown':'niepomocne',
     'ai.provider':'Dostawca AI','ai.providerHint':'„Model lokalny" = prawdziwy, darmowy LLM działający w 100% na Twoim urządzeniu (WebGPU). Bez klucza, bez wysyłania danych — wagi pobierane są raz i trzymane w pamięci przeglądarki.',
-    'ai.provMistral':'Mistral API (chmura, wymaga klucza)','ai.provLocal':'Model lokalny (w przeglądarce, za darmo)',
+    'ai.provMistral':'Klucze API — chmura (Mistral, OpenAI, Claude, Gemini, Groq…)','ai.provLocal':'Model lokalny (w przeglądarce, za darmo)',
     'ai.provOllama':'Ollama (natywny lokalny serwer — błyskawiczny)',
     'ai.ollamaDesc':'Najszybsza lokalna opcja: modele uruchamia zainstalowana Ollama (ollama.com) — pełna moc komputera, zero obciążania przeglądarki i karty graficznej zakładki. Wymaga działającej aplikacji Ollama.',
     'ai.ollamaCheck':'Sprawdź / odśwież modele','ai.ollamaModel':'Model Ollamy','ai.ollamaOnline':'✓ Ollama online — modele: ',
@@ -124,12 +128,16 @@ CM.Settings = (function(){
     'sc.mouse':'mouse','sc.dblclick':'double-click',
     'ai.head':'AI assistant (Mistral)','ai.desc':'Optional. With your own Mistral API key, the app can analyze the project STRUCTURE (folders, file counts and sizes, languages) and propose a logical grouping into modules/layers plus flag structural smells.',
     'ai.key':'Mistral API key (stored locally)','ai.model':'Model',
-    'ai.keys':'Mistral API keys (up to 4 — used across the whole app)',
-    'ai.keysHint':'You can add up to 4 keys. The app uses them with round-robin load spreading and automatically falls back to the next one on an invalid key or rate limit. Keys are stored only locally in your browser.',
-    'ai.keyPh':'API key…','ai.keyShow':'Show / hide key','ai.keysCount':'Active keys: ',
+    'ai.keys':'API keys (cloud: Mistral, OpenAI, Anthropic Claude, Google Gemini, Groq, OpenRouter, DeepSeek, xAI, Together)',
+    'ai.keysHint':'Paste a key — the provider is recognised from the key format and confirmed by a test (fetching its model list). Keys stay in this browser and go only to that provider\'s API. The app rotates through working keys and falls over to the next one on rate limits or errors.',
+    'ai.keyAdd':'Add key','ai.keyTest':'Test','ai.keySave':'Save','ai.keyDelete':'Delete key','ai.keyDeleteConfirm':'Delete this key?',
+    'ai.keySaved':'Key saved.','ai.keyDeleted':'Key deleted.','ai.keyEmpty':'Paste a key.','ai.keyExists':'This key is already on the list.',
+    'ai.keyTesting':'Checking the key…','ai.keyOk':'works','ai.keyModels':'models: ','ai.keyUnknownProv':'provider not recognised from the format — click Test',
+    'ai.keyDetected':'(detected from the key format — click Test to confirm)','ai.keyModel':'Model','ai.keyNone':'No keys yet. Add one below — or pick the local model or Ollama above (no key needed).',
+    'ai.keyPh':'API key…','ai.keyShow':'Show / hide key','ai.keysCount':'Working keys: ',
     'ai.votes':'ChatBot answer ratings','ai.votesHint':'Total thumbs across all conversations — never resets.','ai.votesUp':'helpful','ai.votesDown':'unhelpful',
     'ai.provider':'AI provider','ai.providerHint':'"Local model" = a real, free LLM running 100% on your device (WebGPU). No key, no data leaves your machine — weights are downloaded once and kept in the browser cache.',
-    'ai.provMistral':'Mistral API (cloud, needs a key)','ai.provLocal':'Local model (in-browser, free)',
+    'ai.provMistral':'API keys — cloud (Mistral, OpenAI, Claude, Gemini, Groq…)','ai.provLocal':'Local model (in-browser, free)',
     'ai.provOllama':'Ollama (native local server — blazing fast)',
     'ai.ollamaDesc':'The fastest local option: models run in your installed Ollama (ollama.com) — full machine power, zero load on the browser tab or its GPU. Requires the Ollama app running.',
     'ai.ollamaCheck':'Check / refresh models','ai.ollamaModel':'Ollama model','ai.ollamaOnline':'✓ Ollama online — models: ',
@@ -575,34 +583,73 @@ CM.Settings = (function(){
       renderLocal(); renderOllama();
       c.appendChild(el('div',{class:'set-sep'}));
     }
-    // ---- up to 4 Mistral API keys (stored as JSON array; key #1 mirrored to the legacy single-key slot) ----
+    // ---- klucze API: dowolna liczba; dostawca wykrywany po formacie i potwierdzany testem (CM.AI) ----
     c.appendChild(el('div',{class:'set-label',text:t('ai.keys')}));
     c.appendChild(el('p',{class:'set-desc',text:t('ai.keysHint')}));
-    let keys=U.mistralKeySlots();   // 4 sloty pozycyjne + migracja dawnego pojedynczego klucza — jedno źródło w util.js
-    const countEl=el('div',{class:'set-ai-keycount'});
-    function refreshCount(){ const n=keys.map(k=>(k||'').trim()).filter(Boolean).length; countEl.textContent=t('ai.keysCount')+n+' / 4'; }
-    function persist(){
-      const slots=keys.map(k=>(k||'').trim());   // length-4, POSITION-PRESERVING (slot #2 = index 1; ChatBot uses it)
-      try{ localStorage.setItem('codemap_mistral_keys', JSON.stringify(slots)); }catch(e){}
-      try{ localStorage.setItem('codemap_mistral_key', slots.filter(Boolean)[0]||''); }catch(e){}   // back-compat primary
-      refreshCount();
+    const AI=CM.AI;
+    const keysBox=el('div',{class:'set-ai-keys'}); c.appendChild(keysBox);
+    const countEl=el('div',{class:'set-ai-keycount'}); c.appendChild(countEl);
+    const addRow=el('div',{class:'set-ai-keyrow set-ai-keyadd'});
+    const addInp=el('input',{class:'set-ai-input set-ai-keyinp',type:'password',placeholder:t('ai.keyPh'),autocomplete:'off',spellcheck:'false'});
+    const addBtn=el('button',{class:'tb-btn primary set-ai-keybtn',type:'button',html:ic.svg('plus',{size:14})+' '+t('ai.keyAdd')});
+    addRow.appendChild(addInp); addRow.appendChild(addBtn); c.appendChild(addRow);
+    async function runTest(id, row){
+      const st=row.querySelector('.set-ai-keystat'); if(st){ st.className='set-ai-keystat'; st.textContent=t('ai.keyTesting'); }
+      row.querySelectorAll('button').forEach(b=>b.disabled=true);
+      try{ await AI.test(id); }
+      catch(err){ AI.update(id,{status:{ok:false,at:Date.now(),error:(err&&err.message)||String(err)}}); }
+      renderKeys();
     }
-    for(let i=0;i<4;i++){
-      const row=el('div',{class:'set-ai-keyrow'});
-      const idx=el('span',{class:'set-ai-keyidx',text:'#'+(i+1)});
-      const inp=el('input',{class:'set-ai-input set-ai-keyinp',type:'password',placeholder:t('ai.keyPh'),value:keys[i]||''});
-      inp.oninput=()=>{ keys[i]=inp.value; persist(); };
-      const eye=el('button',{class:'set-ai-keyeye',type:'button',title:t('ai.keyShow'),html:ic.svg('eye',{size:14}),
-        onclick:()=>{ inp.type = inp.type==='password'?'text':'password'; }});
-      row.appendChild(idx); row.appendChild(inp); row.appendChild(eye);
-      c.appendChild(row);
+    function renderKeys(){
+      if(!AI){ keysBox.textContent='CM.AI?'; return; }
+      keysBox.innerHTML='';
+      const list=AI.keys();
+      if(!list.length) keysBox.appendChild(el('p',{class:'set-desc',text:t('ai.keyNone')}));
+      for(const e of list){
+        const card=el('div',{class:'set-ai-keycard'});
+        const top=el('div',{class:'set-ai-keyrow'});
+        const badge=el('span',{class:'set-ai-prov'+(e.status?(e.status.ok?' ok':' err'):''),text:e.provider?AI.providerName(e.provider):'?',title:e.provider||''});
+        const inp=el('input',{class:'set-ai-input set-ai-keyinp',type:'password',value:e.key,autocomplete:'off',spellcheck:'false'});
+        const eye=el('button',{class:'set-ai-keyeye',type:'button',title:t('ai.keyShow'),html:ic.svg('eye',{size:14}),onclick:()=>{ inp.type=inp.type==='password'?'text':'password'; }});
+        const testBtn=el('button',{class:'tb-btn primary set-ai-keybtn',type:'button',html:ic.svg('refresh',{size:14})+' '+t('ai.keyTest')});
+        const saveBtn=el('button',{class:'tb-btn set-ai-keybtn',type:'button',text:t('ai.keySave')}); saveBtn.disabled=true;
+        const delBtn=el('button',{class:'tb-btn set-ai-keybtn danger',type:'button',html:ic.svg('trash',{size:14}),title:t('ai.keyDelete')});
+        const commit=()=>{ const k=inp.value.trim(); if(!k){ U.toast(t('ai.keyEmpty'),'error'); return false; }
+          if(AI.keys().some(x=>x.id!==e.id&&x.key===k)){ U.toast(t('ai.keyExists'),'error'); return false; }
+          if(k!==e.key) AI.update(e.id,{key:k, provider:AI.detect(k)[0]||null, status:null, models:null, model:null});
+          return true; };
+        inp.oninput=()=>{ const dirty=inp.value.trim()!==e.key; saveBtn.disabled=!dirty; card.classList.toggle('dirty',dirty); };
+        inp.onkeydown=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); if(commit()){ U.toast(t('ai.keySaved'),'success'); renderKeys(); } } };
+        saveBtn.onclick=()=>{ if(commit()){ U.toast(t('ai.keySaved'),'success'); renderKeys(); } };
+        testBtn.onclick=()=>{ if(!commit()) return; runTest(e.id, card); };
+        delBtn.onclick=()=>{ if(!confirm(t('ai.keyDeleteConfirm'))) return; AI.remove(e.id); U.toast(t('ai.keyDeleted')); renderKeys(); };
+        top.appendChild(badge); top.appendChild(inp); top.appendChild(eye); top.appendChild(testBtn); top.appendChild(saveBtn); top.appendChild(delBtn);
+        card.appendChild(top);
+        // model per klucz: lista z testu (datalist) albo wolny wpis
+        const mrow=el('div',{class:'set-ai-keyrow set-ai-keymodel'});
+        mrow.appendChild(el('span',{class:'set-ai-keyidx',text:t('ai.keyModel')}));
+        const dlId='ai-models-'+e.id; const dl=el('datalist',{id:dlId});
+        (e.models||[]).forEach(mn=>dl.appendChild(el('option',{value:mn})));
+        const minp=el('input',{class:'set-ai-input set-ai-keyinp',list:dlId,value:AI.modelFor(e),placeholder:t('ai.keyModel'),spellcheck:'false',autocomplete:'off'});
+        minp.onchange=()=>{ AI.update(e.id,{model:minp.value.trim()||null}); };
+        mrow.appendChild(minp); mrow.appendChild(dl); card.appendChild(mrow);
+        const st=el('div',{class:'set-ai-keystat'+(e.status?(e.status.ok?' ok':' err'):'')});
+        st.textContent = !e.status ? (e.provider ? (AI.providerName(e.provider)+' '+t('ai.keyDetected')) : t('ai.keyUnknownProv'))
+          : e.status.ok ? ('✓ '+AI.providerName(e.provider)+' — '+t('ai.keyOk')+' · '+t('ai.keyModels')+(e.status.count||0)+' · '+(e.status.ms||0)+' ms')
+          : ('✗ '+(e.status.error||''));
+        card.appendChild(st);
+        keysBox.appendChild(card);
+      }
+      const ok=list.filter(e=>e.status&&e.status.ok).length;
+      countEl.textContent=t('ai.keysCount')+ok+' / '+list.length;
+      if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh();
     }
-    refreshCount(); c.appendChild(countEl);
-    c.appendChild(el('div',{class:'set-label',text:t('ai.model')}));
-    const sel=el('select',{class:'set-ai-input'}); const cur=localStorage.getItem('codemap_mistral_model')||'mistral-small-latest';
-    [['mistral-small-latest','Mistral Small'],['mistral-large-latest','Mistral Large'],['open-mistral-nemo','Mistral Nemo']].forEach(([v,n])=>{ const o=el('option',{value:v,text:n}); if(v===cur)o.selected=true; sel.appendChild(o); });
-    sel.onchange=()=>{ try{ localStorage.setItem('codemap_mistral_model', sel.value); }catch(e){} };
-    c.appendChild(sel);
+    addBtn.onclick=()=>{ if(!AI) return; const k=addInp.value.trim(); if(!k){ U.toast(t('ai.keyEmpty'),'error'); return; }
+      if(AI.keys().some(x=>x.key===k)){ U.toast(t('ai.keyExists'),'error'); return; }
+      const e=AI.add(k); addInp.value=''; renderKeys();
+      const cards=keysBox.querySelectorAll('.set-ai-keycard'); const card=cards[cards.length-1]; if(card) runTest(e.id, card); };
+    addInp.onkeydown=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); addBtn.onclick(); } };
+    renderKeys();
     c.appendChild(el('p',{class:'set-desc set-mt',text:t('ai.privacy')}));
     // AI never runs automatically — only the manual, advisory "Analyze structure" below + the per-element
     // "Ask AI" box in the Details panel. AI does not touch the file layout or auto-adjust the view.

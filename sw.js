@@ -5,7 +5,7 @@ const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
 const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js','js/languages.js',
   'js/analysis.js','js/graph.js','js/layouts.js','js/renderer.js','js/loaders.js','js/storage.js',
-  'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js','js/app.js','js/sim-worker.js'];
+  'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js','js/app.js','js/sim-worker.js'];
 
 self.addEventListener('install', (e)=>{
   e.waitUntil((async()=>{

@@ -29,6 +29,8 @@ CM.Auth = (function(){
     'acct.delete':'Usuń konto','acct.deleteConfirm':'Usunąć konto i WSZYSTKIE dane na serwerze? Tej operacji nie można cofnąć. Wpisz hasło, aby potwierdzić.',
     'acct.deleted':'Konto usunięte.',
     'btn.title':'Konto',
+    'devVerify':'Serwer nie wysyła e-maili (tryb dev) — potwierdź konto tym linkiem','devVerifyGo':'Potwierdź konto teraz',
+    'devReset':'Serwer nie wysyła e-maili (tryb dev) — otwórz formularz nowego hasła','devResetGo':'Ustaw nowe hasło teraz',
   },
   en:{
     'title.login':'Log in','title.register':'Sign up','title.reset':'Password reset','title.newpass':'New password',
@@ -55,6 +57,8 @@ CM.Auth = (function(){
     'acct.delete':'Delete account','acct.deleteConfirm':'Delete the account and ALL server data? This cannot be undone. Enter your password to confirm.',
     'acct.deleted':'Account deleted.',
     'btn.title':'Account',
+    'devVerify':'The server does not send e-mails (dev mode) — confirm the account with this link','devVerifyGo':'Confirm the account now',
+    'devReset':'The server does not send e-mails (dev mode) — open the new-password form','devResetGo':'Set a new password now',
   }};
   function t(k){ const d=STR[I.getLang()]||STR.pl; return (k in d)?d[k]:(STR.pl[k]||k); }
 
@@ -129,7 +133,7 @@ CM.Auth = (function(){
         if(pass.length<10) return formErr(box,t('errPassword'));
         if(pass!==$('#auth-pass2').value) return formErr(box,t('errPassMismatch'));
         busy(go,true);
-        try{ await api('/api/auth/register',{method:'POST',json:{email,password:pass,lang:I.getLang()}}); renderView('registered',{email}); }
+        try{ const r=await api('/api/auth/register',{method:'POST',json:{email,password:pass,lang:I.getLang()}}); renderView('registered',{email, devLink:r&&r.devVerifyLink}); }
         catch(e){ formErr(box,errMsg(e)); }
         finally{ busy(go,false); }
       };
@@ -139,10 +143,16 @@ CM.Auth = (function(){
     else if(view==='registered'){
       head.textContent=t('title.register');
       box.appendChild(el('p',{class:'auth-info',text:t('registered')}));
+      const devBox=el('div',{class:'auth-dev'+(extra&&extra.devLink?'':' hidden')});
+      const showDev=(link)=>{ devBox.innerHTML=''; devBox.classList.remove('hidden');
+        devBox.appendChild(el('p',{class:'muted small',text:t('devVerify')}));
+        devBox.appendChild(el('button',{class:'tb-btn primary',text:t('devVerifyGo'),onclick:()=>{ location.href=link; }})); };
+      if(extra&&extra.devLink) showDev(extra.devLink);
+      box.appendChild(devBox);
       box.appendChild(el('p',{class:'muted small',text:t('resendHint')}));
       const re=el('button',{class:'tb-btn',text:t('resend')});
       re.onclick=async ()=>{ busy(re,true);
-        try{ await api('/api/auth/resend-verification',{method:'POST',json:{email:extra?.email||''}}); U.toast(t('resent')); }
+        try{ const r=await api('/api/auth/resend-verification',{method:'POST',json:{email:extra?.email||''}}); U.toast(t('resent')); if(r&&r.devVerifyLink) showDev(r.devVerifyLink); }
         catch(e){ formErr(box,errMsg(e)); }
         finally{ busy(re,false); } };
       box.appendChild(re);
@@ -153,7 +163,9 @@ CM.Auth = (function(){
       box.appendChild(field('email','email','auth-email'));
       const go=el('button',{class:'tb-btn primary auth-main',text:t('resetGo')});
       go.onclick=async ()=>{ busy(go,true);
-        try{ await api('/api/auth/request-reset',{method:'POST',json:{email:$('#auth-email').value.trim()}}); U.toast(t('resetSent')); close(); }
+        try{ const r=await api('/api/auth/request-reset',{method:'POST',json:{email:$('#auth-email').value.trim()}});
+          if(r&&r.devResetLink){ U.toast(t('devReset'),'info',6000); const tok=(r.devResetLink.split('reset=')[1]||''); renderView('reset-confirm',{token:tok}); }
+          else { U.toast(t('resetSent')); close(); } }
         catch(e){ formErr(box,errMsg(e)); }
         finally{ busy(go,false); } };
       box.appendChild(go);
