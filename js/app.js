@@ -1,80 +1,13 @@
-/* ===================== app.js — application bootstrap & wiring ===================== */
+/* ===================== app.js — bootstrap ===================== */
+// Cienki rozruch: start aplikacji (CM.App.boot w DOMContentLoaded, jak dotąd) i window.CMApp — publiczne API
+// używane przez chatbot.js, drive.js, inspect.js i tools/smoke.mjs (te same klucze co przed podziałem).
+// Cała logika żyje w modułach CM.App: app-core.js, chrome.js, repo-hosts.js, compare.js, navigation.js, ai-bridge.js.
+// (etap przejściowy: część segmentów jeszcze tutaj, do wydzielenia w kolejnych krokach)
 (function(){
+  const A=CM.App;
   const U=CM.util, $=U.$, el=U.el, I=CM.i18n;
   const Graph=CM.Graph.Graph, Layouts=CM.Layouts, Loaders=CM.Loaders, Storage=CM.Storage, UI=CM.UI;
-
-  let graph=new Graph();
-  let renderer;
-  const state={
-    layout:'pack',
-    vis:{nodes:[],edges:[]},
-    sim:null,
-    counts:{nodes:0,edges:0},
-    lastDiff:null,
-    spacing:3,
-    displayLayout:'pack',
-    groups:[],           // loaded comparison schemas {gid,name,color}
-    gidSeq:0,
-    cyclesOn:false,
-  };
-  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, langsOff:new Set(), metric:'lines', minMetric:0};
-
-  // ---------------- init ----------------
-  function init(){
-    CM.icons.hydrate();
-    CM.i18n.apply();        // translate static UI to the persisted language (PL / EN)
-    renderer=new CM.Renderer.Renderer($('#map-canvas'));
-    renderer.onSelect = (n)=>select(n);
-    renderer.onHover  = (n,e)=>{ onHover(n,e); };
-    renderer.onToggleCollapse = (n)=>toggleCollapse(n);
-    renderer.onDblFile = (n)=>{ select(n); renderer.centerOn(n); };
-    renderer.onContext = (n,x,y)=>contextMenu(n,x,y);
-    renderer.onEdgeSelect = (edge)=>selectEdge(edge);
-    renderer.onChange = U.throttle(()=>{ updateStatus(); updateRotDial(); renderer.drawMinimap($('#minimap')); positionAuthors(); updateHash(); }, 55);
-    renderer.onSettle = ()=>{
-      // a pending view-restore (shared link) wins over fit-on-settle — otherwise the layout's own
-      // settle would refit and discard the camera the link asked to restore
-      if(state._pendingViewRestore){ const fn=state._pendingViewRestore; state._pendingViewRestore=null; state._fitOnSettle=false; fn(); saveSessionDebounced(); return; }
-      if(state._fitOnSettle){ state._fitOnSettle=false; renderer.fit(); saveSessionDebounced(); } };
-
-    wireToolbar(); wireMenus(); wireFilters(); wireViewControls(); wireSearch(); wireDnD();
-    wireModals(); wireKeyboard(); wireGameNav(); wireMinimap(); wireRotDial();
-    wirePanels(); wireAppearance(); wirePaste(); wireNodeAppearance();
-    wireBrand(); wireCompare(); wireNeighborhood();
-    wireModes(); startClock();
-    wireLayoutMenu();      // custom layout dropdown (styled like the Wczytaj menu)
-    wireCollapsibleSections(); // collapsible sections in the left panel
-    wireSettingsUI();      // gear button + settings overlay handlers
-    wireSettings();        // restore persisted appearance/filters; persist on change
-    restoreSessionPrompt();// offer to reopen the last auto-saved map
-    buildPalette();        // Ctrl/Cmd+K command palette
-    wirePWA();             // service worker + installability
-    // re-translate dynamic chrome whenever the language changes
-    CM.i18n.onChange(()=>{ updateStatus(); refreshProjectLabel();
-      if(graph && graph.nodes && graph.nodes.size){
-        UI.renderDetails(renderer.selected||null, graph, handlers);
-        UI.renderLangFilters(graph, {langsOff:filters.langsOff}, handlers);
-      }
-    });
-    updateStatus(); refreshProjectLabel();
-  }
-
-  // ---------------- hover: quick tooltip + delayed code preview ----------------
-  let _hoverTimer=null;
-  function onHover(n, e){
-    if(_hoverTimer){ clearTimeout(_hoverTimer); _hoverTimer=null; }
-    UI.filePreview(null);                       // drop any open code card
-    const px=e?e.clientX:0, py=e?e.clientY:0;
-    UI.tooltip(n, px, py);
-    $('#st-hover').textContent = n ? (n.path||n.name) : '';
-    const cb=$('#opt-hover-preview');
-    if(n && n.type==='file' && n.preview && (!cb || cb.checked)){
-      _hoverTimer=setTimeout(()=>{
-        _hoverTimer=null;
-        if(renderer.hovered && renderer.hovered.id===n.id){ UI.tooltip(null); UI.filePreview(n, px, py); }
-      }, 430);
-    }
-  }
+  const state=A.state, filters=A.filters, handlers=A.handlers, THEME_PRESETS=A.THEME_PRESETS;   // pola stałe kontekstu (nigdy nie podmieniane)
 
   // ---------------- PWA: offline service worker + install prompt ----------------
   let _installPrompt=null;
@@ -101,7 +34,7 @@
 
   // ---------------- command palette (Ctrl/Cmd+K) ----------------
   function paletteCommands(){
-    const R=renderer; const c=(label,ic,run,hint)=>({label,ic,run,hint:hint||''});
+    const R=A.renderer; const c=(label,ic,run,hint)=>({label,ic,run,hint:hint||''});
     const btn=(id)=>{ const b=$('#'+id); if(b) b.click(); };
     const list=[
       c(I.t('ca.cmdLoadFolder','Wczytaj: folder z urządzenia'),'folder',()=>btn('btn-load-folder')),
@@ -122,8 +55,8 @@
       c(I.t('ca.cmdOpen','Otwórz zapisaną mapę'),'open',()=>btn('btn-open')),
       c(I.t('ca.cmdCompareAdd','Porównaj: dodaj schemat na mapę'),'layers',()=>btn('btn-compare-add')),
       c(I.t('ca.cmdClear','Wyczyść dane'),'trash',()=>btn('btn-clear')),
-      c(I.t('ca.cmdModeCodemap','Tryb: CodeMap (mapa kodu)'),'map',()=>setMode('codemap')),
-      c(I.t('ca.cmdModeMindmap','Tryb: MindMap (mapy myśli)'),'layers',()=>setMode('mindmap')),
+      c(I.t('ca.cmdModeCodemap','Tryb: CodeMap (mapa kodu)'),'map',()=>A.setMode('codemap')),
+      c(I.t('ca.cmdModeMindmap','Tryb: MindMap (mapy myśli)'),'layers',()=>A.setMode('mindmap')),
       c(I.t('ca.cmdThemeLight','Motyw: jasny'),'eye',()=>{ const b=document.querySelector('#theme-row .theme-btn[data-theme="light"]'); b&&b.click(); }),
       c(I.t('ca.cmdThemeDark','Motyw: ciemny'),'cube',()=>{ const b=document.querySelector('#theme-row .theme-btn[data-theme="dark"]'); b&&b.click(); }),
     ];
@@ -163,18 +96,7 @@
 
   // ---------------- persistent settings (theme / appearance / filters) ----------------
   const SETTINGS_KEY='codemap_settings';
-  // named, professionally-curated theme presets: theme + canvas bg + window tint + accent
-  const THEME_PRESETS={
-    depth:    {theme:'dark',  bg:'#070a10', menu:'10,18,34',    accent:'#22d3ee'},
-    graphite: {theme:'dark',  bg:'#10131c', menu:'14,19,28',    accent:'#60a5fa'},
-    ghdark:   {theme:'dark',  bg:'#0d1117', menu:'16,21,30',    accent:'#58a6ff'},
-    forest:   {theme:'dark',  bg:'#05140f', menu:'12,22,20',    accent:'#34d399'},
-    plum:     {theme:'dark',  bg:'#14101f', menu:'20,18,34',    accent:'#a78bfa'},
-    paper:    {theme:'light', bg:'#f4f6fb', menu:'236,239,246', accent:'#2563eb'},
-    parchment:{theme:'light', bg:'#fbf6e9', menu:'245,240,230', accent:'#b45309'},
-    mist:     {theme:'light', bg:'#e7ecf3', menu:'224,231,242', accent:'#0f766e'},
-  };
-  let _applyThemePreset=null;   // bound in wireAppearance (needs renderer + root)
+
   const SETTINGS_INPUTS=['rng-trans','rng-menu','rng-blur','rng-tint','col-accent','col-bg',
     'rng-nscale','rng-spacing','rng-fscale','sel-layout','sel-metric',
     'show-folders','show-files','show-externals','edge-contains','edge-import','edge-reference',
@@ -200,7 +122,7 @@
     if(themeLight){ const b=document.querySelector('#theme-row .theme-btn[data-theme="light"]'); if(b) b.click(); }
     // restore the whole named preset when one was active; otherwise re-apply a raw persisted window
     // tint only if it matches the theme (a dark tint under light — or vice versa — looks broken)
-    if(s._preset && _applyThemePreset && THEME_PRESETS[s._preset]){ _applyThemePreset(s._preset); }
+    if(s._preset && A._applyThemePreset && THEME_PRESETS[s._preset]){ A._applyThemePreset(s._preset); }
     else{
       const tint=s._menuRgb||s._menuTint;   // _menuTint = legacy pre-preset storage
       if(tint && (_lum(tint)>0.5)===themeLight){
@@ -226,40 +148,6 @@
     document.querySelectorAll('#theme-row .theme-btn, #accent-row .acc, #theme-presets .thpre').forEach(b=>b.addEventListener('click', persist));
   }
 
-  // ---------------- auto-saved session (reopen last map) ----------------
-  const saveSessionDebounced=U.debounce(()=>{ if(graph && state.counts.nodes>0){ try{ Storage.saveSession(graph.toJSON()); }catch(e){} } }, 1500);
-  function restoreSessionPrompt(){
-    if(!Storage.loadSession) return;
-    Storage.loadSession().then(s=>{
-      if(!s || !s.map || !(s.map.nodes&&s.map.nodes.length)) return;
-      const btn=$('#empty-restore'); if(!btn) return;
-      btn.classList.remove('hidden');
-      btn.title=I.t('ca.lastMap','Ostatnia mapa')+(s.ts?(' — '+U.relTime(s.ts)):'');
-      btn.onclick=()=>{ try{ loadFromJSON(s.map); }catch(e){ U.toast(I.t('ca.restoreFail','Nie udało się przywrócić mapy.'),'error'); } };
-    }).catch(()=>{});
-  }
-
-  // ---------------- work modes: CodeMap <-> MindMap ----------------
-  let mode='codemap';
-  function setMode(m){
-    mode=m;
-    document.querySelectorAll('#mode-switch .mode-btn').forEach(b=>b.classList.toggle('on', b.dataset.mode===m));
-    document.body.classList.toggle('mode-mindmap', m==='mindmap');
-    if(m==='mindmap'){
-      CM.MindMap.activate();
-      $('#empty-state').classList.add('hidden');
-    } else {
-      CM.MindMap.deactivate();
-      if(state.counts.nodes===0) $('#empty-state').classList.remove('hidden');
-      renderer.kick(); if(state.counts.nodes===0) minimizeMinimap(); else expandMinimap();
-    }
-  }
-  function wireModes(){
-    document.querySelectorAll('#mode-switch .mode-btn').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
-    const pc=$('#pick-codemap'), pm=$('#pick-mindmap');
-    if(pc) pc.onclick=()=>{ setMode('codemap'); };
-    if(pm) pm.onclick=()=>setMode('mindmap');
-  }
   // ---------------- GitHub repo author (floating avatar + top-bar badge) ----------------
   state._authors=[];
   function ghAvatarUrl(o){ return o.avatar || ('https://github.com/'+o.login+'.png?size=120'); }
@@ -275,16 +163,16 @@
       a.onclick=(e)=>{ e.preventDefault(); openAuthorCard(owner); };
       cont.appendChild(a); state._authors.push({gid,el:a}); };
     if(hasGroups){ for(const g of state.groups) addAvatar(g.gid, g.owner); }
-    else addAvatar('base', graph.meta && graph.meta.owner);
+    else addAvatar('base', A.graph.meta && A.graph.meta.owner);
     // small NAME sticker above the centre (single schema; for compared schemas the draggable chip shows the name)
     if(!hasGroups && state.counts.nodes>0){
-      const st=el('div',{class:'schema-sticker',text:graph.meta.name||I.t('ca.project','projekt')});
+      const st=el('div',{class:'schema-sticker',text:A.graph.meta.name||I.t('ca.project','projekt')});
       cont.appendChild(st); state._authors.push({gid:'base', el:st, sticker:true});
     }
     // top-bar: ICON-ONLY mini avatars (one per loaded repo, fits 6+), full nick on hover
     const bar=$('#gh-authors'); bar.innerHTML='';
     const owners = hasGroups ? state.groups.map(g=>g.owner).filter(o=>o&&o.login)
-                             : (graph.meta&&graph.meta.owner&&graph.meta.owner.login ? [graph.meta.owner] : []);
+                             : (A.graph.meta&&A.graph.meta.owner&&A.graph.meta.owner.login ? [A.graph.meta.owner] : []);
     for(const owner of owners){
       const a=el('a',{class:'gh-author-mini',href:owner.url||('https://github.com/'+owner.login),target:'_blank',rel:'noopener','data-nick':owner.login,title:owner.login});
       const img=el('img',{src:ghAvatarUrl(owner),alt:owner.login}); img.onerror=()=>{ img.onerror=null; img.src='https://github.com/'+owner.login+'.png?size=120'; };
@@ -301,14 +189,14 @@
   }
   function positionAuthors(){
     if(!state._authors||!state._authors.length) return;
-    const W=renderer.w, H=renderer.h;
+    const W=A.renderer.w, H=A.renderer.h;
     // avatars are tiny by default and scale with the camera: barely-there dots when zoomed far out,
     // a little bigger as you approach the centre. Never huge.
-    const s=U.clamp(renderer.cam.zoom*0.85, 0.12, 1.2);
+    const s=U.clamp(A.renderer.cam.zoom*0.85, 0.12, 1.2);
     for(const a of state._authors){
       const c=centroidOf(a.gid);
       if(!c){ a.el.style.display='none'; continue; }
-      const sp=renderer.cam.toScreen(c.x,c.y,W,H);
+      const sp=A.renderer.cam.toScreen(c.x,c.y,W,H);
       if(sp.x<-120||sp.x>W+120||sp.y<-120||sp.y>H+120){ a.el.style.display='none'; continue; }
       a.el.style.display=''; a.el.style.left=sp.x+'px'; a.el.style.top=(sp.y + (a.sticker?-58*s:0))+'px';
       a.el.style.setProperty('--av-scale', s.toFixed(3));
@@ -446,14 +334,14 @@
       else if(e.value!==e.defaultValue){ e.value=e.defaultValue; e.dispatchEvent(new Event('input',{bubbles:true})); }
     });
     const ac=document.querySelector('#accent-row .acc[data-acc="#22d3ee"]'); if(ac) ac.click();
-    if(_applyThemePreset) _applyThemePreset('depth');
+    if(A._applyThemePreset) A._applyThemePreset('depth');
   }
   function wireSettingsUI(){
     CM.Settings.wire({
       canInstall:()=>!!_installPrompt,
       installPWA:()=>{ if(state._installApp) state._installApp(); },
       aiHasProject:()=>state.counts.nodes>0,
-      aiAnalyze:()=>aiAnalyze(),
+      aiAnalyze:()=>A.aiAnalyze(),
       ensurePanel:(side,open)=>{ const p=$('#'+side+'-panel'); if(!p) return;
         const collapsed=p.classList.contains('collapsed');
         if(open&&collapsed) togglePanel(side); else if(!open&&!collapsed) togglePanel(side); },
@@ -482,38 +370,12 @@
     if(CM.ChatBot && CM.ChatBot.init) CM.ChatBot.init();
   }
 
-  // edge clicked on the map -> show dependency details + direction
-  function selectEdge(edge){
-    select(null);
-    const s=graph.nodes.get(edge.source), t=graph.nodes.get(edge.target);
-    UI.renderEdgeDetails(edge, s, t, graph, handlers);
-    if($('#right-panel').classList.contains('collapsed')) togglePanel('right');
-  }
-
-  const handlers={
-    focus:(id)=>focusNode(id),
-    toggleCollapse:(n)=>toggleCollapse(n),
-    toggleLang:(k)=>toggleLang(k),
-    biggest:(folder)=>biggestInFolder(folder),
-    pick:(id)=>{ $('#search-input').value=''; focusNode(id); },
-    compare:(a,b)=>doCompare(a,b),
-    compareToCurrent:(s)=>doCompare(s, {label:I.t('ca.currentState','stan bieżący'), ts:Date.now(), signature:graph.signature()}),
-    del:(id)=>Storage.deleteSnapshot(id).then(openHistory),
-    openFile:(node)=>{ UI.renderFileView(node, graph, handlers); openModal('modal-fileview'); },
-    repoUrl:(node)=>nodeRepoUrl(node),
-    openRepoUrl:(node)=>{ const u=nodeRepoUrl(node); if(u) window.open(u,'_blank','noopener'); },
-    repoHostName:()=>repoHostName(),
-    openRepo:()=>{ const m=graph.meta; if(m&&m.html) window.open(m.html,'_blank','noopener'); },
-    aiConfigured:()=>aiConfigured(),   // Ask-AI box appears only when at least one key is set
-    aiAskNode:(node,q)=>aiAskNode(node,q),
-  };
-
   // ---------------- GitHub / GitLab / Bitbucket deep links ----------------
   const HOST_NAMES={github:'GitHub', gitlab:'GitLab', bitbucket:'Bitbucket'};
-  function repoHostName(){ const m=graph.meta; return (m&&HOST_NAMES[m.host])||''; }
+  function repoHostName(){ const m=A.graph.meta; return (m&&HOST_NAMES[m.host])||''; }
   // exact web URL of a file/folder node in its source repository, at the loaded branch
   function nodeRepoUrl(node){
-    const m=graph.meta;
+    const m=A.graph.meta;
     if(!node || !m || !m.html || !m.host) return null;
     if(node.type==='external') return null;
     if(node.gid && node.gid!=='base') return null;          // only the primary loaded repo (not compare schemas)
@@ -528,123 +390,6 @@
     return `${m.html}/${isFile?'blob':'tree'}/${br}/${enc}`; // github
   }
 
-  // ---------------- Web Worker force-sim (off main thread for large graphs) ----------------
-  // Single source of truth for the version: the worker is fetched at the SAME ?v= as app.js itself
-  // (read off our own <script> tag), so bumping index.html bumps the worker too — no drift.
-  const SIM_WORKER_URL=(()=>{
-    const s=document.currentScript || document.querySelector('script[src*="js/app.js"]');
-    const v=s && s.src && (s.src.match(/[?&]v=([\w.-]+)/)||[])[1];
-    return 'js/sim-worker.js'+(v?('?v='+v):'');
-  })();
-  let _workerOK = (typeof window.Worker==='function');
-  // Offload physics to the Web Worker for anything beyond a trivially small map, so the main thread
-  // is never blocked by the force simulation. Tiny graphs (< threshold) settle main-thread in a blink.
-  function useWorker(n){ return _workerOK && n >= (window.__simWorkerMin||120); }
-  // returns a sim-like proxy (running:false so the renderer never ticks it); the worker streams
-  // positions which we write back into the live nodes, then refit on settle. reheat() = user took
-  // over (drag) -> stop the worker and freeze current positions.
-  function startWorkerSim(nodes, edges, simOpts){
-    let worker;
-    try{ worker=new Worker(SIM_WORKER_URL); }catch(e){ _workerOK=false; return null; }
-    const N=nodes.length, idx=new Map(nodes.map((n,i)=>[n.id,i]));
-    const initNodes=nodes.map(n=>({x:n.x||0, y:n.y||0, r:n.r||6, fixed:!!n.fixed}));
-    const initEdges=[];
-    for(const e of edges){ const s=idx.get(e.source), t=idx.get(e.target); if(s==null||t==null) continue;
-      initEdges.push({s, t, c:e.type==='contains'?1:0, w:e.weight||1}); }
-    let dead=false;
-    const cleanup=()=>{ if(dead) return; dead=true; try{ worker.terminate(); }catch(e){} };
-    const writeBack=(p)=>{ for(let i=0;i<N;i++){ nodes[i].x=p[i*2]; nodes[i].y=p[i*2+1]; } };
-    worker.onmessage=(ev)=>{ const d=ev.data;
-      if(d.type==='pos'){ if(!dead){ writeBack(d.pos); renderer.kick(); } }
-      else if(d.type==='settled'){ if(!dead){ writeBack(d.pos); cleanup(); renderer.kick(); renderer.onSettle(); } }
-    };
-    worker.onerror=()=>{ _workerOK=false; cleanup(); };
-    worker.postMessage({type:'init', nodes:initNodes, edges:initEdges, spacing:state.spacing,
-      opts:{alphaMin:simOpts&&simOpts.alphaMin, alphaDecay:simOpts&&simOpts.alphaDecay, velDecay:simOpts&&simOpts.velDecay}});
-    return { running:false, _worker:true, tick(){}, reheat(){ cleanup(); }, stop(){ cleanup(); } };
-  }
-
-  // cosmic palettes per layout (core -> outskirts)
-  const COSMIC_LAYOUTS={
-    nebula:       ['#fffdf0','#ffd27a','#ff7ac0','#7c5cff','#1b1740'],
-    spiralgalaxy: ['#fff7d6','#ffd27a','#5ad1ff','#3b5bdb','#10173a'],
-    cosmicrings:  ['#eafff7','#34d399','#22d3ee','#7c5cff','#2a1840'],
-    solar:        ['#fff7d6','#ffd27a','#ff9b6b','#7c5cff','#10173a'],
-    helix:        ['#e8fff6','#7afcd0','#34d1ff','#5b6bff','#0a1130'],
-    constellation:['#ffffff','#cfe3ff','#8fb6ff','#3a57c8','#070b22'],
-    vortex:       ['#fff0fb','#ffadf0','#c46bff','#5a2bd6','#0c0726'],
-  };
-
-  // ---------------- core view pipeline ----------------
-  // persist: zapis sesji (IndexedDB + ewentualny push do chmury) tylko gdy zmienia się to, co sesja
-  // przechowuje — pozycje/układ/zwinięcia. Filtry, metryka i języki żyją w codemap_settings, więc ich
-  // przełączanie nie serializuje całego grafu (na dużych mapach = dziesiątki MB na każde kliknięcie).
-  function apply({relayout=true, refit=false, persist=relayout}={}){
-    // Halt ANY running simulation (worker OR main-thread) before re-filtering / relaying out.
-    // Critical for performance: a filter/layer toggle must never leave the force physics churning on
-    // the main thread — that is what tanked FPS to a crawl on medium+ graphs and made the panel unusable.
-    if(state.sim){ if(state.sim._worker) state.sim.stop(); else state.sim.running=false; }
-    // Mapa wczytana z pliku ('saved') ma pozycje użytkownika — 'saved' nie jest układem, więc każdy
-    // relayout (rozwiń/zwiń wszystko, pokaż różnice) wpadał w default = force i niszczył je.
-    // Zostajemy przy pozycjach; nowo odsłonięte węzły dostają miejsce przez seedUnplaced.
-    if(relayout && state.layout==='saved' && !state.groups.length) relayout=false;
-    state.vis=graph.getVisible(filters);
-    if(relayout){
-      if(state.groups.length){ relayoutGroups(); }   // keep multiple schemas separated side-by-side
-      else {
-        const res=Layouts.apply(state.layout, graph, state.vis, {spacing:state.spacing});
-        state.sim=res.sim||null;
-        // animated layouts (force/galaxy/modules): settle live (non-blocking) and refit on settle.
-        state._fitOnSettle = !!(res.sim && refit);
-        if(res.sim){
-          const n=state.vis.nodes.length;
-          if(useWorker(n)){
-            // physics runs in a Web Worker (off the main thread) — the renderer never ticks this sim,
-            // it only paints positions the worker streams back. Scales to the largest repositories.
-            const proxy=startWorkerSim(state.vis.nodes, state.vis.edges, res.sim);
-            if(proxy) state.sim=proxy;
-          } else if(n>400){
-            // Worker unavailable on a big graph: settle SYNCHRONOUSLY in one bounded pass, then freeze —
-            // so the render loop never runs physics frame-by-frame on the main thread (no sustained FPS hit).
-            // Tick budget scales inversely with size so even huge graphs can't lock the thread for long.
-            let i=0; const cap=Math.max(60, Math.min(240, Math.round(180000/n)));
-            while(state.sim.running && i++<cap) state.sim.tick();
-            state.sim.running=false; state._fitOnSettle=false;
-            if(refit) requestAnimationFrame(()=>renderer.fit());
-          }
-          // else: tiny graph — the main-thread sim animates live per frame (negligible cost).
-        }
-        for(const n of state.vis.nodes) n._placed=true;
-      }
-    } else {
-      seedUnplaced(state.vis.nodes);    // only newly-revealed nodes get a position; rest stay put
-    }
-    // cosmic colour mode for nebula / galaxy layouts (palette per layout)
-    const pal=COSMIC_LAYOUTS[state.layout];
-    renderer.opts.cosmic=!!pal; if(pal){ renderer.opts.cosmicPalette=pal; renderer._cosmicLUT=null; }
-    renderer.setData(graph, state.vis, state.sim);
-    UI.renderLangFilters(graph, {langsOff:filters.langsOff}, handlers);
-    updateStatus();
-    renderer.drawMinimap($('#minimap'));
-    refreshAuthors();
-    // static layouts fit immediately; animated ones fit once the live simulation settles (onSettle)
-    if(refit && !state._fitOnSettle) requestAnimationFrame(()=>renderer.fit());
-    if(persist) saveSessionDebounced();
-  }
-
-  // seed only nodes that have never been placed (e.g. just-revealed by a filter) near their parent,
-  // so toggling filters never re-scrambles the whole map
-  function seedUnplaced(nodes){
-    const byId=new Map(nodes.map(n=>[n.id,n]));
-    for(const n of nodes){
-      if(n._placed) continue;
-      let px=0, py=0;
-      let p=n.parent!=null?graph.nodes.get(n.parent):null;
-      while(p){ if(byId.has(p.id)&&p._placed){ px=p.x; py=p.y; break; } p=p.parent!=null?graph.nodes.get(p.parent):null; }
-      const ang=(n.id.length*0.7)% (Math.PI*2), rad=46+(n.r||8);
-      n.x=px+Math.cos(ang)*rad; n.y=py+Math.sin(ang)*rad; n.vx=0; n.vy=0; n._placed=true;
-    }
-  }
   // lay each loaded schema out independently with the chosen layout, then line them up side-by-side
   function relayoutGroups(){
     let cursorX=0;
@@ -653,7 +398,7 @@
       if(!sub.length) continue;
       const ids=new Set(sub.map(n=>n.id));
       const subEdges=state.vis.edges.filter(e=>ids.has(e.source)&&ids.has(e.target));
-      const res=Layouts.apply(state.layout, graph, {nodes:sub, edges:subEdges}, {spacing:state.spacing});
+      const res=Layouts.apply(state.layout, A.graph, {nodes:sub, edges:subEdges}, {spacing:state.spacing});
       if(res.sim){ let i=0; while(res.sim.running && i++<220) res.sim.tick(); }   // settle animated layouts synchronously
       const b=graphBounds(sub); const dx=cursorX-b.minX, dy=-((b.minY+b.maxY)/2);
       for(const n of sub){ n.x+=dx; n.y+=dy; n._placed=true; }
@@ -661,47 +406,15 @@
     }
     state.sim=null;
   }
-  function select(node){
-    renderer.setSelected(node);
-    UI.renderDetails(node, graph, handlers);
-    applyImpact();
-    updateHash();
-  }
-
-  // ---- dependency impact view (upstream / downstream) ----
-  let impactOn=false;
-  function applyImpact(){
-    if(impactOn && renderer.selected){ try{ renderer.setImpact(graph.impactSet(renderer.selected.id)); }catch(e){ renderer.setImpact(null); } }
-    else renderer.setImpact(null);
-  }
-  function toggleImpact(){
-    impactOn=!impactOn;
-    const b=$('#vc-impact'); if(b){ b.classList.toggle('active', impactOn); b.setAttribute('aria-pressed', impactOn?'true':'false'); }
-    if(impactOn && !renderer.selected) U.toast(I.t('ca.impactHint','Widok wpływu: zaznacz plik, aby zobaczyć od czego zależy (w dół) i co od niego zależy (w górę).'),'',3200);
-    applyImpact();
-  }
-  function toggleCollapse(node){ node.collapsed=!node.collapsed; apply({relayout:false, persist:true}); if(renderer.selected) UI.renderDetails(renderer.selected, graph, handlers); }
-  function toggleLang(key){ if(filters.langsOff.has(key)) filters.langsOff.delete(key); else filters.langsOff.add(key); apply({relayout:false}); }
-
-  function revealNode(id){
-    const n=graph.nodes.get(id); if(!n) return null;
-    let changed=false, cur=n.parent!=null?graph.nodes.get(n.parent):null;
-    while(cur){ if(cur.collapsed){cur.collapsed=false;changed=true;} cur=cur.parent!=null?graph.nodes.get(cur.parent):null; }
-    if(n.type==='file' && filters.langsOff.has(n.lang)){ filters.langsOff.delete(n.lang); changed=true; }
-    if((n.type==='external'||n.id==='__ext__') && !filters.externals){ filters.externals=true; $('#show-externals').checked=true; changed=true; }
-    if(changed) apply({relayout:false});
-    return n;
-  }
-  function focusNode(id){ const n=revealNode(id); if(!n) return; select(n); renderer.centerOn(n, Math.max(renderer.cam.zoom,1.1)); }
 
   // ---- shareable view: encode src + layout + camera + selection into the URL hash ----
-  let _hashT=0, _restoring=false;
+  let _hashT=0; A._restoring=false;   // _restoring czyta też resetProjectState (app-core.js)
   function serializeView(){
-    if(_restoring || !graph || !graph.nodes || graph.nodes.size===0) return '';
-    const c=renderer.cam, m=graph.meta||{};
+    if(A._restoring || !A.graph || !A.graph.nodes || A.graph.nodes.size===0) return '';
+    const c=A.renderer.cam, m=A.graph.meta||{};
     const o={ v:1, ly:state.layout, cam:[+c.x.toFixed(1),+c.y.toFixed(1),+c.zoom.toFixed(4),+c.rot.toFixed(4),+c.tilt.toFixed(3)] };
     if(m.html && /^(github|gitlab|bitbucket)$/.test(m.kind||'')){ o.src=m.html; if(m.branch) o.b=m.branch; }
-    if(renderer.selected) o.sel=renderer.selected.id;
+    if(A.renderer.selected) o.sel=A.renderer.selected.id;
     return '#v='+encodeURIComponent(JSON.stringify(o));
   }
   function updateHash(){ clearTimeout(_hashT); _hashT=setTimeout(()=>{
@@ -723,22 +436,22 @@
     // here (dispatching 'change' would trigger a second fit-on-settle that clobbers the restored camera)
     const applyCam=()=>{
       try{
-        if(o.sel){ revealNode(o.sel); }
-        if(o.cam && renderer.cam){ const c=renderer.cam, a=o.cam; c.x=a[0]; c.y=a[1]; c.zoom=a[2]; c.rot=a[3]||0; c.tilt=a[4]||0; c._k=''; }
-        if(o.sel){ const n=graph.nodes.get(o.sel); if(n){ renderer.setSelected(n); UI.renderDetails(n, graph, handlers); applyImpact(); } }
-        renderer.onChange(); renderer.kick();
+        if(o.sel){ A.revealNode(o.sel); }
+        if(o.cam && A.renderer.cam){ const c=A.renderer.cam, a=o.cam; c.x=a[0]; c.y=a[1]; c.zoom=a[2]; c.rot=a[3]||0; c.tilt=a[4]||0; c._k=''; }
+        if(o.sel){ const n=A.graph.nodes.get(o.sel); if(n){ A.renderer.setSelected(n); UI.renderDetails(n, A.graph, handlers); A.applyImpact(); } }
+        A.renderer.onChange(); A.renderer.kick();
       }catch(e){}
     };
     if(o.src){
-      _restoring=true;
+      A._restoring=true;
       // set the target layout first — ingest reads #sel-layout for its own (single) layout + refit pass
       if(o.ly){ const s=$('#sel-layout'); if(s && Array.from(s.options).some(op=>op.value===o.ly)){ s.value=o.ly;
         const lbl=$('#layout-menu-label'), opt=s.querySelector('option[value="'+o.ly+'"]'); if(lbl&&opt) lbl.textContent=opt.textContent; } }
       // restore the camera when the layout SETTLES (onSettle) instead of on a fixed timer that lost the race
       state._pendingViewRestore=applyCam;
-      try{ await ingest((p,s)=>Loaders.fromRepoURL(o.src, {branch:o.b, fetchContent:true}, p, s), I.t('ca.connectingToRepo','Łączenie z repozytorium…')); }
+      try{ await A.ingest((p,s)=>Loaders.fromRepoURL(o.src, {branch:o.b, fetchContent:true}, p, s), I.t('ca.connectingToRepo','Łączenie z repozytorium…')); }
       catch(e){}
-      _restoring=false;
+      A._restoring=false;
       // fallback for static layouts (no physics settle → onSettle may not fire): apply if still pending
       setTimeout(()=>{ if(state._pendingViewRestore===applyCam){ state._pendingViewRestore=null; state._fitOnSettle=false; applyCam(); } }, 600);
       return true;
@@ -746,130 +459,15 @@
     return false;   // local project: cannot reload from a link, only the view params are carried
   }
 
-  function biggestInFolder(folder){
-    const out=[];
-    const walk=(f)=>{ for(const cid of (f.children||[])){ const c=graph.nodes.get(cid); if(!c)continue; if(c.type==='file')out.push(c); else walk(c); } };
-    walk(folder); out.sort((a,b)=>(b.metrics?b.metrics.lines:b.size)-(a.metrics?a.metrics.lines:a.size)); return out;
-  }
-
-  // ---------------- ingest ----------------
-  const tick=()=>new Promise(r=>setTimeout(r,16));
-  function showLoading(t){ $('#loading-text').textContent=t||I.t('loading.text','Wczytywanie…'); $('#progress-bar').style.width='0';
-    const p=$('#loading-pct'); if(p) p.textContent='0%'; const c=$('#loading-count'); if(c) c.textContent='';
-    if(!$('#loading-cancel')){
-      const b=el('button',{id:'loading-cancel',type:'button',text:I.t('ca.cancelLoad','Anuluj')});
-      b.onclick=()=>{ _ingestGen++; hideLoading(); U.toast(I.t('ca.loadCancelled','Anulowano wczytywanie.')); };
-      $('#loading').appendChild(b);
-    } else $('#loading-cancel').textContent=I.t('ca.cancelLoad','Anuluj');
-    $('#loading').classList.remove('hidden'); }
-  function setLoadingText(t){ $('#loading-text').textContent=t; }
-  function setProgress(d,t){ const pct=t?Math.round(d/t*100):0; $('#progress-bar').style.width=pct+'%';
-    const p=$('#loading-pct'); if(p) p.textContent=pct+'%';
-    const c=$('#loading-count'); if(c) c.textContent=t?(U.fmtNum(d)+' / '+U.fmtNum(t)+I.t('ca.filesSuffix',' plików')):''; }
-  function hideLoading(){ $('#loading').classList.add('hidden'); }
-  function hideEmpty(){ $('#empty-state').classList.add('hidden'); positionMinimap(); }
-
-  // Every project-scoped bit of state that must NOT leak from one loaded project into the next.
-  // Shared by ingest / loadFromJSON / clearAll.
-  function resetProjectState(){
-    if(state.sim){ if(state.sim._worker) state.sim.stop(); else state.sim.running=false; }
-    state.sim=null;
-    state.groups=[]; state.gidSeq=0; renderer.setGroups([]);
-    state.cyclesOn=false; renderer.setCycles(null);
-    renderer.diffMode=false; state.lastDiff=null;
-    renderer.selected=null; renderer.hovered=null; renderer.highlight=null;
-    UI.tooltip(null); UI.filePreview(null);
-    filters.langsOff.clear(); filters.minMetric=0; const mr=$('#rng-minmetric'); if(mr){ mr.value=0; } updateMetricLabel();
-    // a shared-view hash describes the PREVIOUS project — drop it (but not while restoring from it)
-    if(!_restoring && location.hash.startsWith('#v=')){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
-  }
-
-  // generation token: a newer load (or Cancel) invalidates every still-running older ingest,
-  // so a slow fetch can never clobber the project the user loaded afterwards
-  let _ingestGen=0;
-  async function ingest(factory, statusText){
-    const gen=++_ingestGen;
-    showLoading(statusText);
-    try{
-      await tick();
-      const {files, meta}=await factory(setProgress, setLoadingText);
-      if(gen!==_ingestGen) return;   // superseded / cancelled — discard silently
-      if(!files || !files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return; }
-      setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
-      if(gen!==_ingestGen) return;
-      resetProjectState();
-      graph=new Graph(); graph.build(files, meta);
-      state.layout=$('#sel-layout').value; state.displayLayout=state.layout;
-      if(graph.nodes.size>1400) graph.collapseToBudget(2600);   // adaptive: works for deep AND wide-flat repos
-      // BIG repos: declutter automatically — no edges, tiny nodes, huge spacing
-      autoTuneView();
-      countsInit();
-      refreshMetricRange();
-      hideEmpty();
-      expandMinimap();   // file structure now on the map → reveal the minimap
-      select(null);
-      apply({refit:true});
-      if(meta.html && /^(github|gitlab|bitbucket)$/.test(meta.kind||'')) pushRecentRepo(meta);
-      U.toast(I.t('ca.loadedPre','Wczytano <b>')+U.fmtNum(files.length)+I.t('ca.loadedMid','</b> plików — „')+meta.name+I.t('ca.loadedPost','".'),'success');
-      // (AI no longer runs automatically on load — view tuning is purely the local heuristic autoTuneView())
-      if(meta.warnings && meta.warnings.length) U.toast(I.t('ca.skippedArchivesPre','Pominięto nieobsługiwane archiwa (RAR/7z itp.): ')+meta.warnings.join(', ')+I.t('ca.skippedArchivesPost','. Rozpakuj je lub użyj ZIP / TAR.'),'',6500);
-    }catch(e){ if(gen!==_ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
-    if(gen===_ingestGen) hideLoading();
-  }
-
-  // big repo -> auto-declutter: turn off all edge types + externals, tiny nodes, huge spacing
-  // professional auto-tuning: every loaded project gets node sizes + spacing scaled smoothly to its
-  // scale (file count) so it reads well whether it's 12 files or 12 000. File sizes are already encoded
-  // in each node's radius (graph.computeAggregates), so this only sets the global scale + spread.
-  function autoTuneView(){
-    const N = graph.nodes.size || 1;
-    // smooth curves (no hard threshold): small projects → bold & tight, huge → small & spread out
-    const scale   = U.clamp(11 / Math.pow(N + 6, 0.42), 0.42, 2.6);   // node-size multiplier (slider 42–260%)
-    const spacing = U.clamp(0.5 * Math.pow(N, 0.45), 2, 25);          // spread multiplier (slider 200–2500%)
-    renderer.opts.nodeScale = scale; state.spacing = spacing;
-    const ns=$('#rng-nscale'); if(ns){ ns.value=Math.round(scale*100); $('#val-nscale').textContent=Math.round(scale*100)+'%'; }
-    const sp=$('#rng-spacing'); if(sp){ sp.value=Math.round(spacing*100); $('#val-spacing').textContent=Math.round(spacing*100)+'%'; }
-    // very large graphs: declutter (drop edges + externals) so the structure stays legible
-    if(N > 1200){
-      filters.contains=false; filters.import=false; filters.reference=false; filters.externals=false;
-      const set=(id,v)=>{ const e=$('#'+id); if(e) e.checked=v; };
-      set('edge-contains',false); set('edge-import',false); set('edge-reference',false); set('show-externals',false);
-      U.toast(I.t('ca.bigRepo','Duże repozytorium — automatycznie odchudzono widok (bez połączeń, małe figury, duży rozrzut).'),'',4200);
-    }
-  }
-
-  function countsInit(){
-    let nodes=0, imp=0;
-    for(const n of graph.nodes.values()){ if(n.type==='file'||n.type==='folder') nodes++; }
-    for(const e of graph.edges){ if(e.type==='import'||e.type==='reference') imp++; }
-    state.counts={nodes, edges:imp};
-    refreshProjectLabel();
-  }
-  function updateStatus(){
-    const I=CM.i18n;
-    $('#st-nodes').textContent=U.fmtNum(state.counts.nodes)+' '+I.t('st.u.nodes');
-    $('#st-edges').textContent=U.fmtNum(state.counts.edges)+' '+I.t('st.u.edges');
-    $('#st-visible').textContent=U.fmtNum(state.vis.nodes.length)+' '+I.t('st.u.visible');
-    $('#st-zoom').textContent=Math.round(renderer.cam.zoom*100)+'%';
-  }
-  // project label: name when loaded, translated "no project" otherwise (kept out of data-i18n
-  // so a language switch never clobbers the loaded project's name)
-  function refreshProjectLabel(){
-    const has = graph && graph.meta && graph.meta.name && state.counts.nodes>0;
-    const name = has ? graph.meta.name : '';
-    $('#st-project').textContent = has ? name : CM.i18n.t('st.noproject');
-    const tb=$('#tb-project-name');                       // toolbar badge next to the Projekt menu
-    if(tb){ tb.textContent=name; tb.title=has?((graph.meta.source||name)):''; tb.classList.toggle('hidden', !has); }
-  }
   function updateRotDial(){
     // needle always points toward the centre of the schema on screen
-    const c=renderer.centroidScreen();
+    const c=A.renderer.centroidScreen();
     let head;
-    if(c){ const dx=c.x-renderer.w/2, dy=c.y-renderer.h/2;
-      head = (Math.abs(dx)<0.5&&Math.abs(dy)<0.5) ? -renderer.cam.rot*180/Math.PI : Math.atan2(dx,-dy)*180/Math.PI; }
+    if(c){ const dx=c.x-A.renderer.w/2, dy=c.y-A.renderer.h/2;
+      head = (Math.abs(dx)<0.5&&Math.abs(dy)<0.5) ? -A.renderer.cam.rot*180/Math.PI : Math.atan2(dx,-dy)*180/Math.PI; }
     else head=0;
     $('#rot-needle').style.transform=`rotate(${head}deg)`;
-    let deg=Math.round(renderer.cam.rot*180/Math.PI)%360; if(deg<0)deg+=360;
+    let deg=Math.round(A.renderer.cam.rot*180/Math.PI)%360; if(deg<0)deg+=360;
     $('#rot-label').textContent=deg+'°';
   }
 
@@ -878,42 +476,42 @@
     $('#btn-load-folder').onclick=()=>$('#input-folder').click();
     $('#empty-folder').onclick=()=>$('#input-folder').click();
     $('#btn-load-files').onclick=()=>$('#input-files').click();
-    $('#btn-load-github').onclick=()=>{ renderRecentRepos(); refreshGhRate(); openModal('modal-github'); };
-    $('#empty-github').onclick=()=>{ renderRecentRepos(); refreshGhRate(); openModal('modal-github'); };
-    $('#empty-demo').onclick=()=>loadDemo();
+    $('#btn-load-github').onclick=()=>{ A.renderRecentRepos(); A.refreshGhRate(); openModal('modal-github'); };
+    $('#empty-github').onclick=()=>{ A.renderRecentRepos(); A.refreshGhRate(); openModal('modal-github'); };
+    $('#empty-demo').onclick=()=>A.loadDemo();
     $('#empty-close').onclick=()=>{ $('#empty-state').classList.add('hidden'); positionMinimap(); };
     // capture the FileList into an array BEFORE clearing the input — resetting value='' empties
     // e.target.files synchronously, and ingest() only reads them after an async tick.
-    $('#input-folder').onchange=(e)=>{ const files=Array.from(e.target.files); e.target.value=''; if(files.length) ingest((p)=>Loaders.fromFileList(files,p),I.t('ca.readingFolder','Czytanie folderu…')); };
-    $('#input-files').onchange=(e)=>{ const files=Array.from(e.target.files); e.target.value=''; if(files.length) ingest((p)=>Loaders.fromFileList(files,p),I.t('ca.readingFiles','Czytanie plików…')); };
+    $('#input-folder').onchange=(e)=>{ const files=Array.from(e.target.files); e.target.value=''; if(files.length) A.ingest((p)=>Loaders.fromFileList(files,p),I.t('ca.readingFolder','Czytanie folderu…')); };
+    $('#input-files').onchange=(e)=>{ const files=Array.from(e.target.files); e.target.value=''; if(files.length) A.ingest((p)=>Loaders.fromFileList(files,p),I.t('ca.readingFiles','Czytanie plików…')); };
 
-    $('#sel-layout').onchange=(e)=>{ state.layout=e.target.value; state.displayLayout=e.target.value; apply({relayout:true, refit:true}); };
+    $('#sel-layout').onchange=(e)=>{ state.layout=e.target.value; state.displayLayout=e.target.value; A.apply({relayout:true, refit:true}); };
 
     $('#btn-snapshot').onclick=async()=>{
-      if(!graph.nodes.size||state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; }
-      const label=prompt(I.t('ca.snapshotName','Nazwa migawki:'), graph.meta.name+' — '+U.fmtDate(Date.now()));
+      if(!A.graph.nodes.size||state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; }
+      const label=prompt(I.t('ca.snapshotName','Nazwa migawki:'), A.graph.meta.name+' — '+U.fmtDate(Date.now()));
       if(label===null) return;
-      await Storage.addSnapshot(graph, label||undefined);
+      await Storage.addSnapshot(A.graph, label||undefined);
       U.toast(I.t('ca.snapshotSaved','📌 Migawka zapisana. Rozwój możesz śledzić w „Historia".'),'success');
     };
-    $('#btn-history').onclick=openHistory;
-    $('#btn-save').onclick=()=>{ if(state.counts.nodes===0){U.toast(I.t('ca.noMapToSave','Brak mapy do zapisania.'),'error');return;} Storage.saveMap(graph); U.toast(I.t('ca.mapExported','💾 Mapa wyeksportowana.'),'success'); };
+    $('#btn-history').onclick=A.openHistory;
+    $('#btn-save').onclick=()=>{ if(state.counts.nodes===0){U.toast(I.t('ca.noMapToSave','Brak mapy do zapisania.'),'error');return;} Storage.saveMap(A.graph); U.toast(I.t('ca.mapExported','💾 Mapa wyeksportowana.'),'success'); };
     $('#btn-export-img').onclick=(e)=>{
       e.stopPropagation();
       if(state.counts.nodes===0){ U.toast(I.t('ca.noMapToExport','Brak mapy do eksportu.'),'error'); return; }
       const r=e.currentTarget.getBoundingClientRect();
       UI.ctxMenu([
-        {ic:'image',label:I.t('ca.pngExport','PNG (2×)'),action:()=>exportImage('png',2)},
-        {ic:'image',label:I.t('ca.pngExportHi','PNG (wysoka rozdz. 4×)'),action:()=>exportImage('png',4)},
-        {ic:'download',label:I.t('ca.svgExport','SVG (wektor)'),action:()=>exportImage('svg')},
+        {ic:'image',label:I.t('ca.pngExport','PNG (2×)'),action:()=>A.exportImage('png',2)},
+        {ic:'image',label:I.t('ca.pngExportHi','PNG (wysoka rozdz. 4×)'),action:()=>A.exportImage('png',4)},
+        {ic:'download',label:I.t('ca.svgExport','SVG (wektor)'),action:()=>A.exportImage('svg')},
       ], r.left, r.bottom+4);
     };
     $('#btn-open').onclick=()=>$('#input-open').click();
     $('#input-open').onchange=async(e)=>{ const f=e.target.files[0]; if(!f)return;
-      try{ const obj=await Storage.openMap(f); loadFromJSON(obj); }catch(err){ U.toast(err.message,'error'); } e.target.value=''; };
+      try{ const obj=await Storage.openMap(f); A.loadFromJSON(obj); }catch(err){ U.toast(err.message,'error'); } e.target.value=''; };
     $('#btn-clear').onclick=()=>{
       if(state.counts.nodes>0 && !confirm(I.t('ca.clearConfirm','Wyczyścić załadowaną mapę? (migawki i zapisane pliki pozostaną)'))) return;
-      clearAll();
+      A.clearAll();
     };
     $('#btn-newwin').onclick=()=>{
       const w=window.open(location.origin+location.pathname, '_blank');
@@ -930,9 +528,9 @@
     else { rail.style.right=(collapsed?0:PW.right-1)+'px'; rail.textContent=collapsed?'‹':'›'; }
   }
   function updateInsets(){
-    renderer.inset.l = $('#left-panel').classList.contains('collapsed')?0:PW.left;
-    renderer.inset.r = $('#right-panel').classList.contains('collapsed')?0:PW.right;
-    renderer.kick();
+    A.renderer.inset.l = $('#left-panel').classList.contains('collapsed')?0:PW.left;
+    A.renderer.inset.r = $('#right-panel').classList.contains('collapsed')?0:PW.right;
+    A.renderer.kick();
     // Minimap: on the welcome screen it centres in the gap between the card and the right panel;
     // with a project loaded it docks bottom-right, clear of the open panel. (see positionMinimap)
     const rightOpen = !$('#right-panel').classList.contains('collapsed');
@@ -986,7 +584,7 @@
     wrap.style.left=Math.round(leftVp-hr.left)+'px'; wrap.style.top=Math.round(topVp-hr.top)+'px';
   }
   // The minimap stays minimized until a file structure is on the map; it expands on load, re-minimizes on clear.
-  function expandMinimap(){ const w=$('#minimap-wrap'); if(!w) return; w.classList.remove('mm-collapsed'); positionMinimap(); renderer.drawMinimap($('#minimap')); }
+  function expandMinimap(){ const w=$('#minimap-wrap'); if(!w) return; w.classList.remove('mm-collapsed'); positionMinimap(); A.renderer.drawMinimap($('#minimap')); }
   function minimizeMinimap(){ const w=$('#minimap-wrap'); if(!w) return; w.classList.add('mm-collapsed'); positionMinimap(); }
   function togglePanel(side){
     $('#'+side+'-panel').classList.toggle('collapsed');
@@ -1014,21 +612,6 @@
     });
   }
 
-  function clearAll(){
-    graph=new Graph();
-    resetProjectState();
-    state.vis={nodes:[],edges:[]}; state.counts={nodes:0,edges:0};
-    renderer.setData(graph, state.vis, null);
-    refreshAuthors();
-    UI.renderDetails(null, graph, handlers);
-    UI.renderLangFilters(graph, {langsOff:filters.langsOff}, handlers);
-    $('#empty-state').classList.remove('hidden'); minimizeMinimap();   // no structure → minimize again
-    refreshProjectLabel();
-    $('#search-input').value=''; UI.renderSearch([], handlers);
-    updateStatus(); renderer.drawMinimap($('#minimap'));
-    U.toast(I.t('ca.cleared','🧹 Wyczyszczono dane.'),'success');
-  }
-
   // ---------------- appearance (liquid glass) ----------------
   function wireAppearance(){
     const root=document.documentElement.style;
@@ -1039,7 +622,7 @@
     const applyTint=()=>{ const v=+tint.value; $('#val-tint').textContent=v+'%'; root.setProperty('--glass-sat', (0.5 + v/100*1.5).toFixed(2)); };
     trans.oninput=applyTrans; menu.oninput=applyMenu; blur.oninput=applyBlur; tint.oninput=applyTint;
     applyTrans(); applyMenu(); applyBlur(); applyTint();
-    const setAccent=(c)=>{ root.setProperty('--accent', c); renderer.clearCssCache(); renderer.kick(); };
+    const setAccent=(c)=>{ root.setProperty('--accent', c); A.renderer.clearCssCache(); A.renderer.kick(); };
     document.querySelectorAll('#accent-row .acc').forEach(b=>b.onclick=()=>{
       setAccent(b.dataset.acc); $('#col-accent').value=b.dataset.acc;
       document.querySelectorAll('#accent-row .acc').forEach(x=>x.classList.toggle('active', x===b));
@@ -1047,10 +630,10 @@
     $('#col-accent').oninput=(e)=>{ setAccent(e.target.value); document.querySelectorAll('#accent-row .acc').forEach(x=>x.classList.remove('active')); };
     // ---- background ----
     const colBg=$('#col-bg');
-    const applyBg=(hex)=>{ root.setProperty('--bg', hex); renderer.clearCssCache(); renderer.kick(); };
+    const applyBg=(hex)=>{ root.setProperty('--bg', hex); A.renderer.clearCssCache(); A.renderer.kick(); };
     colBg.oninput=()=>{ applyBg(colBg.value); document.querySelectorAll('#theme-presets .thpre').forEach(x=>x.classList.remove('active')); };
     // ---- curated theme presets: one click applies a coherent professional set ----
-    _applyThemePreset=(key)=>{
+    A._applyThemePreset=(key)=>{
       const p=THEME_PRESETS[key]; if(!p) return false;
       const tb=document.querySelector('#theme-row .theme-btn[data-theme="'+p.theme+'"]'); if(tb) tb.click();  // base surfaces + body.light
       root.setProperty('--bg', p.bg); root.setProperty('--menu-rgb', p.menu); root.setProperty('--glass-rgb', p.menu);
@@ -1059,10 +642,10 @@
       setAccent(p.accent);
       document.querySelectorAll('#accent-row .acc').forEach(x=>x.classList.toggle('active', x.dataset.acc===p.accent));
       document.querySelectorAll('#theme-presets .thpre').forEach(x=>x.classList.toggle('active', x.dataset.pre===key));
-      renderer.clearCssCache(); renderer.kick();
+      A.renderer.clearCssCache(); A.renderer.kick();
       return true;
     };
-    document.querySelectorAll('#theme-presets .thpre').forEach(b=>b.onclick=()=>_applyThemePreset(b.dataset.pre));
+    document.querySelectorAll('#theme-presets .thpre').forEach(b=>b.onclick=()=>A._applyThemePreset(b.dataset.pre));
     // ---- light / dark theme ----
     document.querySelectorAll('#theme-row .theme-btn').forEach(b=>b.onclick=()=>{
       const light=b.dataset.theme==='light';
@@ -1078,10 +661,10 @@
       for(const k in TV) root.setProperty(k, TV[k]);
       colBg.value = light ? '#eef1f6' : '#070a10';
       document.querySelectorAll('#theme-presets .thpre').forEach(x=>x.classList.remove('active'));
-      renderer.clearCssCache(); renderer.kick();
+      A.renderer.clearCssCache(); A.renderer.kick();
     });
     // map render options
-    const optBind=(id,key)=>{ const el=$('#'+id); el.onchange=()=>{ renderer.opts[key]=el.checked; renderer.kick(); }; renderer.opts[key]=el.checked; };
+    const optBind=(id,key)=>{ const el=$('#'+id); el.onchange=()=>{ A.renderer.opts[key]=el.checked; A.renderer.kick(); }; A.renderer.opts[key]=el.checked; };
     optBind('opt-grid','showGrid'); optBind('opt-curved','curvedImports');
     optBind('opt-lockall','lockAll');
   }
@@ -1090,18 +673,18 @@
   function wireNodeAppearance(){
     const rng=$('#rng-nscale');
     if(!rng) return;
-    renderer.opts.nodeScale=(+rng.value)/100;   // honour the default (2.5×) figure size at startup
+    A.renderer.opts.nodeScale=(+rng.value)/100;   // honour the default (2.5×) figure size at startup
     rng.oninput=()=>{
       const v=+rng.value;
       $('#val-nscale').textContent=v+'%';
-      renderer.opts.nodeScale=v/100;
-      renderer.kick();
+      A.renderer.opts.nodeScale=v/100;
+      A.renderer.kick();
     };
     const sp=$('#rng-spacing');
     if(sp) sp.oninput=()=>{ const v=+sp.value; $('#val-spacing').textContent=v+'%'; state.spacing=v/100;
-      if(state.layout!=='saved'){ apply({relayout:true}); } };
+      if(state.layout!=='saved'){ A.apply({relayout:true}); } };
     const fs=$('#rng-fscale');
-    if(fs) fs.oninput=()=>{ const v=+fs.value; $('#val-fscale').textContent=v+'%'; renderer.opts.labelScale=v/100; renderer.kick(); };
+    if(fs) fs.oninput=()=>{ const v=+fs.value; $('#val-fscale').textContent=v+'%'; A.renderer.opts.labelScale=v/100; A.renderer.kick(); };
   }
 
   // ---------------- clipboard paste (grab/paste files & images) ----------------
@@ -1115,7 +698,7 @@
       else if(cd.items){ for(const it of cd.items){ if(it.kind==='file'){ const f=it.getAsFile(); if(f) files.push(f); } } }
       if(files.length){
         e.preventDefault();
-        ingest((p)=>Loaders.fromFileList(files,p),I.t('ca.pastingPre','Wklejanie ')+files.length+I.t('ca.pastingPost',' plików…'));
+        A.ingest((p)=>Loaders.fromFileList(files,p),I.t('ca.pastingPre','Wklejanie ')+files.length+I.t('ca.pastingPost',' plików…'));
       } else {
         const txt=cd.getData('text');
         if(txt && /github\.com|^[\w.-]+\/[\w.-]+$/.test(txt.trim())){
@@ -1125,46 +708,27 @@
     });
   }
 
-  const MAP_FORMAT_VERSION=2;   // = Graph.toJSON().version; starsze wczytujemy (format zgodny wstecz), nowsze odrzucamy
-  function loadFromJSON(obj){
-    if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return; }
-    if((Number(obj.version)||1)>MAP_FORMAT_VERSION){ U.toast(I.t('ca.mapTooNew','Ten plik pochodzi z nowszej wersji CodeMap — zaktualizuj aplikację.'),'error',6000); return; }
-    resetProjectState();
-    graph=Graph.fromJSON(obj);
-    for(const n of graph.nodes.values()){ if(Number.isFinite(n.x)&&Number.isFinite(n.y)) n._placed=true; }
-    countsInit(); refreshMetricRange(); hideEmpty(); expandMinimap();
-    select(null);
-    state.layout='saved';
-    // use stored positions, no relayout
-    state.vis=graph.getVisible(filters);
-    renderer.setData(graph, state.vis, null);
-    UI.renderLangFilters(graph, {langsOff:filters.langsOff}, handlers);
-    updateStatus(); renderer.drawMinimap($('#minimap'));
-    requestAnimationFrame(()=>renderer.fit());
-    U.toast(I.t('ca.mapLoaded','📂 Mapa wczytana z pliku.'),'success');
-  }
-
   // ---------------- filters ----------------
   function wireFilters(){
     // toggling a filter keeps existing node positions (relayout:false) so the map never re-scrambles
-    const bind=(id,key)=>{ $('#'+id).onchange=(e)=>{ filters[key]=e.target.checked; apply({relayout:false}); }; };
+    const bind=(id,key)=>{ $('#'+id).onchange=(e)=>{ filters[key]=e.target.checked; A.apply({relayout:false}); }; };
     bind('show-folders','folders'); bind('show-files','files'); bind('show-externals','externals');
     bind('edge-contains','contains'); bind('edge-import','import'); bind('edge-reference','reference');
     $('#lang-toggle-all').onclick=()=>{
-      const stats=Array.from(graph.langStats.keys());
+      const stats=Array.from(A.graph.langStats.keys());
       if(filters.langsOff.size){ filters.langsOff.clear(); } else { stats.forEach(k=>filters.langsOff.add(k)); }
-      apply({relayout:false});
+      A.apply({relayout:false});
     };
     // complexity / size filter
-    $('#sel-metric').onchange=(e)=>{ filters.metric=e.target.value; filters.minMetric=0; refreshMetricRange(); apply({relayout:false}); };
-    $('#rng-minmetric').oninput=(e)=>{ filters.minMetric=+e.target.value; updateMetricLabel(); apply({relayout:false}); };
+    $('#sel-metric').onchange=(e)=>{ filters.metric=e.target.value; filters.minMetric=0; refreshMetricRange(); A.apply({relayout:false}); };
+    $('#rng-minmetric').oninput=(e)=>{ filters.minMetric=+e.target.value; updateMetricLabel(); A.apply({relayout:false}); };
   }
 
   // recompute the slider's max from the current data + metric, reset threshold to 0
   function refreshMetricRange(){
     const m=filters.metric, rng=$('#rng-minmetric'); if(!rng) return;
     let max=0;
-    if(graph&&graph.nodes) for(const n of graph.nodes.values()){
+    if(A.graph&&A.graph.nodes) for(const n of A.graph.nodes.values()){
       if(n.type!=='file') continue;
       const v = m==='size' ? (n.size||0) : (n.metrics ? (n.metrics[m]||0) : 0);
       if(v>max) max=v;
@@ -1180,14 +744,14 @@
 
   // ---------------- view controls ----------------
   function wireViewControls(){
-    $('#vc-zoom-in').onclick=()=>renderer.zoomBy(1.3);
-    $('#vc-zoom-out').onclick=()=>renderer.zoomBy(1/1.3);
-    $('#vc-fit').onclick=()=>renderer.fit();
-    $('#vc-rot-left').onclick=()=>renderer.rotateBy(-Math.PI/12);
-    $('#vc-rot-right').onclick=()=>renderer.rotateBy(Math.PI/12);
-    $('#vc-rot-reset').onclick=()=>renderer.resetRotation();
-    $('#vc-3d').onclick=()=>renderer.setTilt(renderer.cam.tilt>0.05?0:0.62);
-    { const vi=$('#vc-impact'); if(vi) vi.onclick=()=>toggleImpact(); }
+    $('#vc-zoom-in').onclick=()=>A.renderer.zoomBy(1.3);
+    $('#vc-zoom-out').onclick=()=>A.renderer.zoomBy(1/1.3);
+    $('#vc-fit').onclick=()=>A.renderer.fit();
+    $('#vc-rot-left').onclick=()=>A.renderer.rotateBy(-Math.PI/12);
+    $('#vc-rot-right').onclick=()=>A.renderer.rotateBy(Math.PI/12);
+    $('#vc-rot-reset').onclick=()=>A.renderer.resetRotation();
+    $('#vc-3d').onclick=()=>A.renderer.setTilt(A.renderer.cam.tilt>0.05?0:0.62);
+    { const vi=$('#vc-impact'); if(vi) vi.onclick=()=>A.toggleImpact(); }
     // Collapse toggle — when collapsed, the button parks just to the RIGHT of the search box;
     // when expanded, the bar opens back in its current (top-centre) spot.
     const vc=$('#view-controls'), btn=$('#vc-collapse');
@@ -1213,9 +777,9 @@
       for(; i<q.length && j<L; j++){ if(q[i]===s[j]){ score += (j===prev+1?3:1) + (j===0||s[j-1]==='/'||s[j-1]==='.'||s[j-1]==='-'||s[j-1]==='_'?4:0); prev=j; i++; } }
       return i===q.length ? score - (L-q.length)*0.04 : -1; };
     const run=U.debounce(()=>{
-      const q=inp.value.trim().toLowerCase(); if(!q){ UI.renderSearch([], handlers); renderer.setHighlight(null); return; }
+      const q=inp.value.trim().toLowerCase(); if(!q){ UI.renderSearch([], handlers); A.renderer.setHighlight(null); return; }
       const scored=[]; const all=[];
-      for(const n of graph.nodes.values()){
+      for(const n of A.graph.nodes.values()){
         if(n.id==='__root__'||n.id==='__ext__') continue;
         const name=n.name.toLowerCase(), path=(n.path||'').toLowerCase();
         let sc=-1;
@@ -1228,10 +792,10 @@
       }
       scored.sort((a,b)=> b.sc-a.sc || a.n.name.length-b.n.name.length);
       UI.renderSearch(scored.slice(0,60).map(o=>o.n), handlers);
-      renderer.setHighlight(all.length?new Set(all):null);   // light up matches on the map
+      A.renderer.setHighlight(all.length?new Set(all):null);   // light up matches on the map
     },140);
     inp.oninput=run;
-    inp.onkeydown=(e)=>{ if(e.key==='Enter'){ const first=$('#search-results .sr-item'); if(first) first.click(); } if(e.key==='Escape'){ inp.value=''; UI.renderSearch([],handlers); renderer.setHighlight(null); inp.blur(); } };
+    inp.onkeydown=(e)=>{ if(e.key==='Enter'){ const first=$('#search-results .sr-item'); if(first) first.click(); } if(e.key==='Escape'){ inp.value=''; UI.renderSearch([],handlers); A.renderer.setHighlight(null); inp.blur(); } };
     document.addEventListener('click',(e)=>{ if(!e.target.closest('.search-wrap')) $('#search-results').classList.add('hidden'); });
   }
 
@@ -1253,13 +817,14 @@
       const items=Array.from(dt.items||[]).filter(i=>i.kind==='file');
       const entries=items.map(i=> i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
       const files=Array.from(dt.files||[]);
-      ingest((p)=>Loaders.fromDrop(entries, files, p),I.t('ca.readingDropped','Czytanie upuszczonych plików…'));
+      A.ingest((p)=>Loaders.fromDrop(entries, files, p),I.t('ca.readingDropped','Czytanie upuszczonych plików…'));
     });
   }
 
   // ---------------- modals ----------------
   function openModal(id){ $('#'+id).classList.remove('hidden'); }
   function closeModal(m){ m.classList.add('hidden'); }
+
   // ---------------- recently loaded repositories (quick re-load chips in the GitHub modal) ----------------
   const RECENT_KEY='codemap_recent_repos';
   function recentRepos(){ try{ return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); }catch(e){ return []; } }
@@ -1310,30 +875,30 @@
     if(!url){ U.toast(I.t('ca.enterAddress','Podaj adres.'),'error'); return; }
     if(!refA || !refB){ U.toast(I.t('ca.cmpPick','Podaj obie gałęzie/tagi do porównania.'),'error'); return; }
     if(token) state._ghToken=token;
-    closeModal($('#modal-github'));
-    const gen=++_ingestGen;   // share the ingest generation token: Cancel or a newer load supersedes this
-    showLoading(I.t('ca.cmpLoading','Porównywanie ')+refA+' → '+refB+'…');
+    A.closeModal($('#modal-github'));
+    const gen=++A._ingestGen;   // share the ingest generation token: Cancel or a newer load supersedes this
+    A.showLoading(I.t('ca.cmpLoading','Porównywanie ')+refA+' → '+refB+'…');
     try{
-      await tick();
-      const sigA=await Loaders.fetchTreeSig(url, refA, token); if(gen!==_ingestGen) return;
-      const sigB=await Loaders.fetchTreeSig(url, refB, token); if(gen!==_ingestGen) return;
-      setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+sigB.fileCount+I.t('ca.buildingMapPost',' plików)…')); await tick();
-      const {files, meta}=await Loaders.fromRepoURL(url, {branch:refB, token, fetchContent:true}, setProgress, setLoadingText);
-      if(gen!==_ingestGen) return;
-      resetProjectState();   // clear stale groups/cycles/selection/diff from a previous project before rebuilding
-      graph=new Graph(); graph.build(files, meta);
+      await A.tick();
+      const sigA=await Loaders.fetchTreeSig(url, refA, token); if(gen!==A._ingestGen) return;
+      const sigB=await Loaders.fetchTreeSig(url, refB, token); if(gen!==A._ingestGen) return;
+      A.setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+sigB.fileCount+I.t('ca.buildingMapPost',' plików)…')); await A.tick();
+      const {files, meta}=await Loaders.fromRepoURL(url, {branch:refB, token, fetchContent:true}, A.setProgress, A.setLoadingText);
+      if(gen!==A._ingestGen) return;
+      A.resetProjectState();   // clear stale groups/cycles/selection/diff from a previous project before rebuilding
+      A.graph=new Graph(); A.graph.build(files, meta);
       filters.langsOff.clear();
       state.layout=$('#sel-layout').value; state.displayLayout=state.layout;
-      autoTuneView();
-      refreshMetricRange(); hideEmpty(); expandMinimap();
+      A.autoTuneView();
+      A.refreshMetricRange(); A.hideEmpty(); A.expandMinimap();
       const diff=CM.Graph.diffSignatures(sigA, sigB); state.lastDiff=diff;
-      Storage.applyDiffToGraph(graph, diff); renderer.diffMode=true;
-      select(null); countsInit(); apply({refit:true});
+      Storage.applyDiffToGraph(A.graph, diff); A.renderer.diffMode=true;
+      A.select(null); A.countsInit(); A.apply({refit:true});
       if(meta.html && /^(github|gitlab|bitbucket)$/.test(meta.kind||'')) pushRecentRepo(meta);
-      UI.renderDiff(diff, {label:refA, signature:sigA}, {label:refB, signature:sigB}); openModal('modal-diff');
+      UI.renderDiff(diff, {label:refA, signature:sigA}, {label:refB, signature:sigB}); A.openModal('modal-diff');
       U.toast(I.t('ca.cmpDone','Porównano ')+refA+' ↔ '+refB+'  (+'+diff.added.length+' / −'+diff.removed.length+' / ~'+diff.modified.length+')','success',6000);
-    }catch(e){ if(gen!==_ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
-    if(gen===_ingestGen) hideLoading();
+    }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
+    if(gen===A._ingestGen) A.hideLoading();
   }
 
   // ---------------- export the current map as a GitHub Gist ----------------
@@ -1345,8 +910,8 @@
     state._ghToken=token;
     U.toast(I.t('ca.gistUploading','Wysyłanie Gist…'),'',2000);
     try{
-      const content=JSON.stringify(graph.toJSON());
-      const res=await Loaders.createGist(content, 'CodeMap — '+(graph.meta.name||'mapa'), token, false);
+      const content=JSON.stringify(A.graph.toJSON());
+      const res=await Loaders.createGist(content, 'CodeMap — '+(A.graph.meta.name||'mapa'), token, false);
       try{ navigator.clipboard&&navigator.clipboard.writeText(res.url); }catch(e){}
       U.toast(I.t('ca.gistDone','✅ Gist utworzony (URL skopiowany).'),'success',6000);
       window.open(res.url,'_blank','noopener');
@@ -1359,7 +924,7 @@
   // udawać instrukcji ani domykać bloku w prompcie (prompt injection przez treść repo).
   const _pn=(s)=>String(s||'').replace(/[\u0000-\u001f\u007f`]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
   function aiStructureSummary(){
-    const g=graph, langCount={}, folderMap=new Map();
+    const g=A.graph, langCount={}, folderMap=new Map();
     let totalSize=0, fileCount=0, folderCount=0, externals=0, maxDepth=0, maxFileKB=0, hasTests=false;
     for(const n of g.nodes.values()){
       if(n.type==='folder'){ folderCount++; continue; }
@@ -1450,11 +1015,11 @@
     const localAI=CM.LocalAI&&CM.LocalAI.provider()==='local';   // 2048-token window → tighter context
     const kidsCap=localAI?30:80, depsCap=localAI?15:40;
     if(node.type==='folder'){
-      const kids=[]; for(const n of graph.nodes.values()){ if(n.parent===node.id){ kids.push((n.type==='folder'?'📁 ':'')+n.name); if(kids.length>=kidsCap) break; } }
+      const kids=[]; for(const n of A.graph.nodes.values()){ if(n.parent===node.id){ kids.push((n.type==='folder'?'📁 ':'')+n.name); if(kids.length>=kidsCap) break; } }
       ctx.contains=kids;
     } else {
       ctx.lang=(node.langInfo&&node.langInfo.name)||node.lang||null; ctx.sizeKB=Math.round((node.size||0)/1024);
-      const deps=[]; for(const e of graph.edges){ if(e.source===node.id&&(e.type==='import'||e.type==='reference')){ const t=graph.nodes.get(e.target); if(t){ deps.push(t.name); if(deps.length>=depsCap) break; } } }
+      const deps=[]; for(const e of A.graph.edges){ if(e.source===node.id&&(e.type==='import'||e.type==='reference')){ const t=A.graph.nodes.get(e.target); if(t){ deps.push(t.name); if(deps.length>=depsCap) break; } } }
       if(deps.length) ctx.dependsOn=deps;
     }
     const sys='You help a developer understand a SPECIFIC part of a codebase. You receive ONLY structural metadata (the selected element plus brief project context) — never source code. Answer concisely and practically about THIS element; if the structure is insufficient, say what you can infer. Answer in '+lang+'.';
@@ -1464,7 +1029,6 @@
 
   // (AI-driven file-LAYOUT was removed by design — node arrangement is purely geometric/deterministic.
   //  The optional, separate "AI view-tuning" below only picks which elements/sizes to show, never positions.)
-
 
   function wireModals(){
     document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.closest('.modal-backdrop')));
@@ -1478,7 +1042,7 @@
       closeModal($('#modal-github'));
       const opts={branch:$('#gh-branch').value.trim()||undefined, token, fetchContent:$('#gh-fetch-content').checked};
       const host=Loaders.repoHost(url), nice={github:'GitHub',gitlab:'GitLab',bitbucket:'Bitbucket'}[host];
-      ingest((p,s)=>Loaders.fromRepoURL(url, opts, p, s),I.t('ca.connectingToPre','Łączenie z ')+nice+I.t('ca.connectingToPost','…'));
+      A.ingest((p,s)=>Loaders.fromRepoURL(url, opts, p, s),I.t('ca.connectingToPre','Łączenie z ')+nice+I.t('ca.connectingToPost','…'));
     };
     $('#gh-url').onkeydown=(e)=>{ if(e.key==='Enter') $('#gh-go').click(); };
     // branch/tag picker: fetch refs into the shared datalist + show API rate limit
@@ -1487,99 +1051,99 @@
       const btn=$('#gh-load-refs'); btn.disabled=true;
       const refs=await Loaders.fetchRefs(url, $('#gh-token').value.trim()||undefined);
       btn.disabled=false;
-      fillRefList(refs); refreshGhRate();
+      A.fillRefList(refs); A.refreshGhRate();
       const n=(refs.branches||[]).length+(refs.tags||[]).length;
       U.toast(n? (I.t('ca.refsLoadedPre','Wczytano ')+n+I.t('ca.refsLoadedPost',' gałęzi/tagów.')) : I.t('ca.refsNone','Nie pobrano gałęzi (sprawdź adres / token).'), n?'success':'error');
     };
     $('#gh-cmp-go').onclick=()=>{
       const url=$('#gh-url').value.trim(); const a=$('#gh-cmp-a').value.trim(), b=$('#gh-cmp-b').value.trim();
-      compareBranches(url, a, b, $('#gh-token').value.trim()||undefined);
+      A.compareBranches(url, a, b, $('#gh-token').value.trim()||undefined);
     };
-    $('#btn-gist').onclick=()=>exportGist();
-    { const cl=$('#btn-copylink'); if(cl) cl.onclick=()=>copyViewLink(); }
+    $('#btn-gist').onclick=()=>A.exportGist();
+    { const cl=$('#btn-copylink'); if(cl) cl.onclick=()=>A.copyViewLink(); }
     $('#hist-export').onclick=async()=>{ const all=await Storage.allSnapshots(); U.download('codemap-historia.json', JSON.stringify(all)); U.toast(I.t('ca.historyExported','Historia wyeksportowana.'),'success'); };
     $('#hist-import').onclick=()=>$('#input-import-hist').click();
-    $('#input-import-hist').onchange=async(e)=>{ const f=e.target.files[0]; if(!f)return; try{ const arr=JSON.parse(await f.text()); await Storage.importSnapshots(arr); U.toast(I.t('ca.importedSnapshotsPre','Zaimportowano ')+arr.length+I.t('ca.importedSnapshotsPost',' migawek.'),'success'); openHistory(); }catch(err){ U.toast(I.t('ca.importError','Błąd importu.'),'error'); } e.target.value=''; };
-    $('#diff-apply').onclick=()=>{ if(state.lastDiff){ Storage.applyDiffToGraph(graph, state.lastDiff); renderer.diffMode=true; countsInit(); apply({}); closeModal($('#modal-diff')); U.toast(I.t('ca.diffApplied','Różnice naniesione na mapę (zielony=nowy, żółty=zmiana, czerwony=usunięty).'),'success',5000); } };
+    $('#input-import-hist').onchange=async(e)=>{ const f=e.target.files[0]; if(!f)return; try{ const arr=JSON.parse(await f.text()); await Storage.importSnapshots(arr); U.toast(I.t('ca.importedSnapshotsPre','Zaimportowano ')+arr.length+I.t('ca.importedSnapshotsPost',' migawek.'),'success'); A.openHistory(); }catch(err){ U.toast(I.t('ca.importError','Błąd importu.'),'error'); } e.target.value=''; };
+    $('#diff-apply').onclick=()=>{ if(state.lastDiff){ Storage.applyDiffToGraph(A.graph, state.lastDiff); A.renderer.diffMode=true; A.countsInit(); A.apply({}); closeModal($('#modal-diff')); U.toast(I.t('ca.diffApplied','Różnice naniesione na mapę (zielony=nowy, żółty=zmiana, czerwony=usunięty).'),'success',5000); } };
   }
 
   async function openHistory(){
-    openModal('modal-history');
-    const key=graph.meta.source||graph.meta.name;
+    A.openModal('modal-history');
+    const key=A.graph.meta.source||A.graph.meta.name;
     const snaps=await Storage.listSnapshots(state.counts.nodes? key : undefined);
-    UI.renderHistory(snaps.length?snaps:await Storage.allSnapshots(), graph, handlers);
+    UI.renderHistory(snaps.length?snaps:await Storage.allSnapshots(), A.graph, handlers);
   }
   function doCompare(a,b){
     const diff=CM.Graph.diffSignatures(a.signature, b.signature);
     state.lastDiff=diff;
-    closeModal($('#modal-history'));
+    A.closeModal($('#modal-history'));
     UI.renderDiff(diff, a, b);
-    openModal('modal-diff');
+    A.openModal('modal-diff');
   }
 
   // ---------------- context menu ----------------
   function contextMenu(node, x, y){
     const items=[];
     if(node){
-      items.push({ic:'crosshair',label:I.t('ca.ctxCenter','Wyśrodkuj widok'),action:()=>focusNode(node.id)});
-      items.push({ic:'eye',label:I.t('ca.ctxHighlightNeighbors','Podświetl sąsiadów'),action:()=>{ select(node); }});
+      items.push({ic:'crosshair',label:I.t('ca.ctxCenter','Wyśrodkuj widok'),action:()=>A.focusNode(node.id)});
+      items.push({ic:'eye',label:I.t('ca.ctxHighlightNeighbors','Podświetl sąsiadów'),action:()=>{ A.select(node); }});
       items.push({ic:'search',label:I.t('ca.ctxIsolate','Izoluj: pokaż tylko powiązane'),action:()=>isolateNode(node)});
       if(node.type==='folder'&&node.children&&node.children.length){
         items.push({sep:true});
-        items.push({ic:node.collapsed?'expand':'collapse',label:node.collapsed?I.t('ca.ctxExpandFolder','Rozwiń folder'):I.t('ca.ctxCollapseFolder','Zwiń folder'),action:()=>toggleCollapse(node)});
-        items.push({ic:'expand',label:I.t('ca.ctxExpandBelow','Rozwiń wszystko poniżej'),action:()=>{ expandBelow(node); apply({}); }});
-        items.push({ic:'collapse',label:I.t('ca.ctxCollapseBelow','Zwiń wszystko poniżej'),action:()=>{ collapseBelow(node); apply({}); }});
+        items.push({ic:node.collapsed?'expand':'collapse',label:node.collapsed?I.t('ca.ctxExpandFolder','Rozwiń folder'):I.t('ca.ctxCollapseFolder','Zwiń folder'),action:()=>A.toggleCollapse(node)});
+        items.push({ic:'expand',label:I.t('ca.ctxExpandBelow','Rozwiń wszystko poniżej'),action:()=>{ expandBelow(node); A.apply({}); }});
+        items.push({ic:'collapse',label:I.t('ca.ctxCollapseBelow','Zwiń wszystko poniżej'),action:()=>{ collapseBelow(node); A.apply({}); }});
       }
       items.push({sep:true});
-      if(nodeRepoUrl(node)) items.push({ic:'globe',label:I.t('ca.openOnHost','Otwórz na ')+repoHostName(),action:()=>handlers.openRepoUrl(node)});
+      if(A.nodeRepoUrl(node)) items.push({ic:'globe',label:I.t('ca.openOnHost','Otwórz na ')+A.repoHostName(),action:()=>handlers.openRepoUrl(node)});
       if(node.path) items.push({ic:'copy',label:I.t('ca.ctxCopyPath','Kopiuj ścieżkę'),action:()=>{ navigator.clipboard?.writeText(node.path); U.toast(I.t('ca.copiedPath','Skopiowano ścieżkę.')); }});
       if(node.name) items.push({ic:'file',label:I.t('ca.ctxCopyName','Kopiuj nazwę pliku'),action:()=>{ navigator.clipboard?.writeText(node.name); U.toast(I.t('ca.copiedName','Skopiowano nazwę.')); }});
       items.push({ic:'pin',label:node.pinned?I.t('ca.ctxUnpin','Odepnij pozycję'):I.t('ca.ctxPin','Przypnij pozycję'),action:()=>{ node.pinned=!node.pinned; node.fixed=node.pinned||node.locked; }});
-      items.push({ic:'box',label:node.locked?I.t('ca.ctxUnlock','Odblokuj figurę'):I.t('ca.ctxLock','Zablokuj figurę (bez ruchu)'),action:()=>{ node.locked=!node.locked; node.fixed=node.locked||node.pinned; renderer.kick(); }});
+      items.push({ic:'box',label:node.locked?I.t('ca.ctxUnlock','Odblokuj figurę'):I.t('ca.ctxLock','Zablokuj figurę (bez ruchu)'),action:()=>{ node.locked=!node.locked; node.fixed=node.locked||node.pinned; A.renderer.kick(); }});
       if(node.type==='file'){
         const out=(node.importsOut||[]).length, inc=(node.importsIn||[]).length;
         if(out+inc>0){
           items.push({sep:true});
-          items.push({ic:'arrowRight',label:I.t('ca.ctxDepsOut','Pokaż zależności wychodzące (')+out+')',action:()=>{ select(node); renderer.setHighlight(new Set([node.id,...(node.importsOut||[])])); }});
-          items.push({ic:'arrowLeft',label:I.t('ca.ctxDepsIn','Pokaż zależności przychodzące (')+inc+')',action:()=>{ select(node); renderer.setHighlight(new Set([node.id,...(node.importsIn||[])])); }});
+          items.push({ic:'arrowRight',label:I.t('ca.ctxDepsOut','Pokaż zależności wychodzące (')+out+')',action:()=>{ A.select(node); A.renderer.setHighlight(new Set([node.id,...(node.importsOut||[])])); }});
+          items.push({ic:'arrowLeft',label:I.t('ca.ctxDepsIn','Pokaż zależności przychodzące (')+inc+')',action:()=>{ A.select(node); A.renderer.setHighlight(new Set([node.id,...(node.importsIn||[])])); }});
         }
       }
       items.push({sep:true});
-      items.push({ic:'eye',label:I.t('ca.ctxShowAll','Pokaż wszystko'),action:()=>{ renderer.setHighlight(null); select(null); }});
+      items.push({ic:'eye',label:I.t('ca.ctxShowAll','Pokaż wszystko'),action:()=>{ A.renderer.setHighlight(null); A.select(null); }});
     } else {
-      items.push({ic:'fit',label:I.t('ca.ctxFit','Dopasuj widok (F)'),action:()=>renderer.fit()});
-      items.push({ic:'target',label:I.t('ca.ctxResetRot','Resetuj obrót (R)'),action:()=>renderer.resetRotation()});
-      items.push({ic:'crosshair',label:I.t('ca.ctxGraphCenter','Centrum grafu'),action:()=>{ renderer.cam.x=0; renderer.cam.y=0; renderer.onChange(); renderer.kick(); }});
+      items.push({ic:'fit',label:I.t('ca.ctxFit','Dopasuj widok (F)'),action:()=>A.renderer.fit()});
+      items.push({ic:'target',label:I.t('ca.ctxResetRot','Resetuj obrót (R)'),action:()=>A.renderer.resetRotation()});
+      items.push({ic:'crosshair',label:I.t('ca.ctxGraphCenter','Centrum grafu'),action:()=>{ A.renderer.cam.x=0; A.renderer.cam.y=0; A.renderer.onChange(); A.renderer.kick(); }});
       items.push({sep:true});
-      items.push({ic:'expand',label:I.t('ca.ctxExpandAll','Rozwiń wszystko'),action:()=>{ graph.expandAll(); apply({}); }});
-      items.push({ic:'collapse',label:I.t('ca.ctxCollapseL2','Zwiń do poziomu 2'),action:()=>{ graph.collapseAll(2); apply({}); }});
-      items.push({ic:'collapse',label:I.t('ca.ctxCollapseL1','Zwiń do poziomu 1'),action:()=>{ graph.collapseAll(1); apply({}); }});
+      items.push({ic:'expand',label:I.t('ca.ctxExpandAll','Rozwiń wszystko'),action:()=>{ A.graph.expandAll(); A.apply({}); }});
+      items.push({ic:'collapse',label:I.t('ca.ctxCollapseL2','Zwiń do poziomu 2'),action:()=>{ A.graph.collapseAll(2); A.apply({}); }});
+      items.push({ic:'collapse',label:I.t('ca.ctxCollapseL1','Zwiń do poziomu 1'),action:()=>{ A.graph.collapseAll(1); A.apply({}); }});
       items.push({sep:true});
-      items.push({ic:'grid',label:I.t('ca.ctxToggleGrid','Przełącz siatkę tła'),action:()=>{ renderer.opts.showGrid=!renderer.opts.showGrid; $('#opt-grid').checked=renderer.opts.showGrid; renderer.kick(); }});
-      items.push({ic:'cube',label:I.t('ca.ctxToggle3d','Przełącz perspektywę 3D'),action:()=>renderer.setTilt(renderer.cam.tilt>0.05?0:0.62)});
+      items.push({ic:'grid',label:I.t('ca.ctxToggleGrid','Przełącz siatkę tła'),action:()=>{ A.renderer.opts.showGrid=!A.renderer.opts.showGrid; $('#opt-grid').checked=A.renderer.opts.showGrid; A.renderer.kick(); }});
+      items.push({ic:'cube',label:I.t('ca.ctxToggle3d','Przełącz perspektywę 3D'),action:()=>A.renderer.setTilt(A.renderer.cam.tilt>0.05?0:0.62)});
       items.push({sep:true});
       items.push({ic:'bookmark',label:I.t('ca.ctxSnapshot','Zapisz migawkę'),action:()=>$('#btn-snapshot').click()});
       items.push({ic:'save',label:I.t('ca.ctxSaveMap','Zapisz mapę do pliku'),action:()=>$('#btn-save').click()});
-      if(renderer.diffMode) items.push({ic:'x',label:I.t('ca.ctxDisableDiff','Wyłącz tryb różnic'),action:()=>{ renderer.diffMode=false; for(const n of graph.nodes.values())delete n.diff; apply({}); }});
+      if(A.renderer.diffMode) items.push({ic:'x',label:I.t('ca.ctxDisableDiff','Wyłącz tryb różnic'),action:()=>{ A.renderer.diffMode=false; for(const n of A.graph.nodes.values())delete n.diff; A.apply({}); }});
       items.push({sep:true});
       items.push({ic:'settings',label:CM.i18n.t('ctx.settings'),action:()=>CM.Settings.open()});
     }
     UI.ctxMenu(items, x, y);
   }
-  function expandBelow(folder){ const walk=(f)=>{ if(f.type==='folder'){f.collapsed=false; for(const c of (f.children||[]))walk(graph.nodes.get(c)); } }; walk(folder); }
-  function collapseBelow(folder){ const walk=(f)=>{ if(f.type==='folder'){ for(const c of (f.children||[])){ const ch=graph.nodes.get(c); if(ch&&ch.type==='folder'){ch.collapsed=true; walk(ch);} } } }; walk(folder); }
-  function isolateNode(node){ if(!node)return; const {out,inc}=graph.neighbors(node.id); renderer.setHighlight(new Set([node.id,...out,...inc])); }
+  function expandBelow(folder){ const walk=(f)=>{ if(f.type==='folder'){f.collapsed=false; for(const c of (f.children||[]))walk(A.graph.nodes.get(c)); } }; walk(folder); }
+  function collapseBelow(folder){ const walk=(f)=>{ if(f.type==='folder'){ for(const c of (f.children||[])){ const ch=A.graph.nodes.get(c); if(ch&&ch.type==='folder'){ch.collapsed=true; walk(ch);} } } }; walk(folder); }
+  function isolateNode(node){ if(!node)return; const {out,inc}=A.graph.neighbors(node.id); A.renderer.setHighlight(new Set([node.id,...out,...inc])); }
   async function exportImage(kind, scale){
-    const base=((graph.meta&&graph.meta.name)||'codemap').replace(/[^\w.\-]+/g,'_')||'codemap';
+    const base=((A.graph.meta&&A.graph.meta.name)||'codemap').replace(/[^\w.\-]+/g,'_')||'codemap';
     try{
       if(kind==='svg'){
-        const svg=renderer.exportSVG();
+        const svg=A.renderer.exportSVG();
         if(!svg){ U.toast(I.t('ca.noMapToExport','Brak mapy do eksportu.'),'error'); return; }
         U.download(base+'.svg', svg, 'image/svg+xml');
         U.toast(I.t('ca.exportedSvg','⬡ Mapa wyeksportowana jako SVG.'),'success');
       } else {
         U.toast(I.t('ca.renderingImage','Renderowanie obrazu…'),'',1500);
-        const blob=await renderer.exportPNG({scale});
+        const blob=await A.renderer.exportPNG({scale});
         if(!blob){ U.toast(I.t('ca.exportFailed','Eksport nie powiódł się.'),'error'); return; }
         const url=URL.createObjectURL(blob);
         const a=U.el('a',{href:url,download:base+'.png'});
@@ -1628,16 +1192,16 @@
   }
   function tagBaseGroup(){
     if(state.groups.length) return;
-    for(const n of graph.nodes.values()) if(n.gid==null) n.gid='base';
-    state.groups.push({gid:'base', name:graph.meta.name||I.t('ca.schema1','schemat 1'), color:GROUP_COLORS[0], owner:graph.meta&&graph.meta.owner});
+    for(const n of A.graph.nodes.values()) if(n.gid==null) n.gid='base';
+    state.groups.push({gid:'base', name:A.graph.meta.name||I.t('ca.schema1','schemat 1'), color:GROUP_COLORS[0], owner:A.graph.meta&&A.graph.meta.owner});
   }
   function mergeGraph(obj){
     if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return; }
-    if(state.counts.nodes===0){ loadFromJSON(obj); return; }
+    if(state.counts.nodes===0){ A.loadFromJSON(obj); return; }
     mergeGraphInstance(Graph.fromJSON(obj), obj.meta&&obj.meta.name);
   }
   function mergeGraphInstance(g2, name){
-    if(state.counts.nodes===0){ loadFromJSON(g2.toJSON()); return; }
+    if(state.counts.nodes===0){ A.loadFromJSON(g2.toJSON()); return; }
     tagBaseGroup();
     const gid='g'+(++state.gidSeq);
     const color=GROUP_COLORS[state.groups.length%GROUP_COLORS.length];
@@ -1648,87 +1212,87 @@
       c.children=(n.children||[]).map(pref);
       c.x=(n.x||0); c.y=(n.y||0); c.vx=0; c.vy=0; c.gid=gid; c._placed=false;
       c.importsIn=[]; c.importsOut=[];
-      graph.nodes.set(c.id, c);
+      A.graph.nodes.set(c.id, c);
     }
     // merge language stats so left-panel tools cover ALL loaded schemas
     for(const [k,s] of g2.langStats){
-      if(!graph.langStats.has(k)) graph.langStats.set(k, {key:k, info:s.info, count:0, bytes:0, lines:0, on:true});
-      const d=graph.langStats.get(k); d.count+=s.count; d.bytes+=s.bytes||0; d.lines+=s.lines||0;
+      if(!A.graph.langStats.has(k)) A.graph.langStats.set(k, {key:k, info:s.info, count:0, bytes:0, lines:0, on:true});
+      const d=A.graph.langStats.get(k); d.count+=s.count; d.bytes+=s.bytes||0; d.lines+=s.lines||0;
     }
     for(const e of g2.edges){
       const sid=pref(e.source), tid=pref(e.target);
-      if(!graph.nodes.has(sid)||!graph.nodes.has(tid)) continue;
-      graph.edges.push({id:gid+'e'+graph.edges.length, source:sid, target:tid, type:e.type});
+      if(!A.graph.nodes.has(sid)||!A.graph.nodes.has(tid)) continue;
+      A.graph.edges.push({id:gid+'e'+A.graph.edges.length, source:sid, target:tid, type:e.type});
       // recompute import degrees for the merged schema (was left at 0 → context menu / hotspots / details
       // showed "zależności wychodzące (0)" for every merged node). Only its OWN new edges, no double count.
-      if(e.type==='import'||e.type==='reference'){ const s=graph.nodes.get(sid), t=graph.nodes.get(tid); s.importsOut.push(tid); t.importsIn.push(sid); }
+      if(e.type==='import'||e.type==='reference'){ const s=A.graph.nodes.get(sid), t=A.graph.nodes.get(tid); s.importsOut.push(tid); t.importsIn.push(sid); }
     }
     const gname=name||g2.meta.name||(I.t('ca.schemaN','schemat ')+(state.groups.length+1));
     state.groups.push({gid, name:gname, color, owner:g2.meta&&g2.meta.owner});
-    renderer.setGroups(state.groups);
-    countsInit();
+    A.renderer.setGroups(state.groups);
+    A.countsInit();
     // the new schema adopts the SAME layout as the one already on the map, lined up beside it
     state.layout=state.displayLayout||'force';
-    apply({relayout:true, refit:true});
+    A.apply({relayout:true, refit:true});
     U.toast(I.t('ca.schemaAddedPre','Dodano schemat „')+gname+I.t('ca.schemaAddedMid','" w układzie „')+state.layout+I.t('ca.schemaAddedPost','". Przeciągnij jego etykietę, aby go przesunąć.'),'success',5200);
   }
   // build a standalone graph from a source (files/GitHub) and merge it for comparison
   async function addCompareSource(factory, status){
     if(state.counts.nodes===0){ U.toast(I.t('ca.loadMainFirst','Najpierw wczytaj główny projekt.'),'error'); return; }
-    const gen=++_ingestGen;   // additive merge, but Cancel / a newer load must still abort it (no resetProjectState — that would wipe the base)
-    showLoading(status);
+    const gen=++A._ingestGen;   // additive merge, but Cancel / a newer load must still abort it (no resetProjectState — that would wipe the base)
+    A.showLoading(status);
     try{
-      const {files, meta}=await factory(setProgress, setLoadingText);
-      if(gen!==_ingestGen) return;
-      if(!files||!files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return; }
-      setLoadingText(I.t('ca.buildingCompareSchema','Budowanie schematu porównawczego…')); await tick();
-      if(gen!==_ingestGen) return;
+      const {files, meta}=await factory(A.setProgress, A.setLoadingText);
+      if(gen!==A._ingestGen) return;
+      if(!files||!files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); A.hideLoading(); return; }
+      A.setLoadingText(I.t('ca.buildingCompareSchema','Budowanie schematu porównawczego…')); await A.tick();
+      if(gen!==A._ingestGen) return;
       const g2=new Graph(); g2.build(files, meta);
       const f2={folders:true,files:true,externals:false,contains:true,import:true,reference:true,langsOff:new Set()};
       const vis2=g2.getVisible(f2);
       Layouts.apply('force', g2, vis2, {spacing:state.spacing});
       mergeGraphInstance(g2, meta.name);
-    }catch(e){ if(gen!==_ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6000); }
-    if(gen===_ingestGen) hideLoading();
+    }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6000); }
+    if(gen===A._ingestGen) A.hideLoading();
   }
   function clearCompare(){
     if(state.groups.length<=0){ U.toast(I.t('ca.noCompareSchemas','Brak schematów porównawczych.'),'error'); return; }
-    for(const [id,n] of Array.from(graph.nodes.entries())){ if(n.gid && n.gid!=='base'){ graph.nodes.delete(id); } }
-    graph.edges=graph.edges.filter(e=>{ return graph.nodes.has(e.source)&&graph.nodes.has(e.target); });
-    for(const n of graph.nodes.values()) delete n.gid;
-    state.groups=[]; renderer.setGroups([]);
-    state.vis=graph.getVisible(filters); renderer.setData(graph, state.vis, null);
-    countsInit(); updateStatus(); requestAnimationFrame(()=>renderer.fit());
+    for(const [id,n] of Array.from(A.graph.nodes.entries())){ if(n.gid && n.gid!=='base'){ A.graph.nodes.delete(id); } }
+    A.graph.edges=A.graph.edges.filter(e=>{ return A.graph.nodes.has(e.source)&&A.graph.nodes.has(e.target); });
+    for(const n of A.graph.nodes.values()) delete n.gid;
+    state.groups=[]; A.renderer.setGroups([]);
+    state.vis=A.graph.getVisible(filters); A.renderer.setData(A.graph, state.vis, null);
+    A.countsInit(); A.updateStatus(); requestAnimationFrame(()=>A.renderer.fit());
     U.toast(I.t('ca.compareSchemasRemoved','Usunięto schematy porównawcze.'),'success');
   }
   function wireCompare(){
-    $('#btn-compare-add').onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadMainFirst','Najpierw wczytaj główny projekt.'),'error'); return; } openModal('modal-compare'); };
+    $('#btn-compare-add').onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadMainFirst','Najpierw wczytaj główny projekt.'),'error'); return; } A.openModal('modal-compare'); };
     $('#cmp-gh-go').onclick=()=>{
       const url=$('#cmp-gh-url').value.trim(); if(!url){ U.toast(I.t('ca.enterRepoAddress','Podaj adres repozytorium.'),'error'); return; }
-      closeModal($('#modal-compare'));
+      A.closeModal($('#modal-compare'));
       addCompareSource((p,s)=>Loaders.fromRepoURL(url, {fetchContent:true}, p, s), I.t('ca.connectingToRepo','Łączenie z repozytorium…'));
     };
     $('#cmp-gh-url').onkeydown=(e)=>{ if(e.key==='Enter') $('#cmp-gh-go').click(); };
     $('#cmp-files').onclick=()=>$('#input-compare-files').click();
     $('#cmp-map').onclick=()=>$('#input-compare').click();
-    $('#input-compare-files').onchange=(e)=>{ if(e.target.files.length){ closeModal($('#modal-compare'));
+    $('#input-compare-files').onchange=(e)=>{ if(e.target.files.length){ A.closeModal($('#modal-compare'));
       const files=e.target.files; addCompareSource((p)=>Loaders.fromFileList(files,p),I.t('ca.readingFiles','Czytanie plików…')); } e.target.value=''; };
-    $('#input-compare').onchange=async(e)=>{ const f=e.target.files[0]; if(!f)return; closeModal($('#modal-compare'));
+    $('#input-compare').onchange=async(e)=>{ const f=e.target.files[0]; if(!f)return; A.closeModal($('#modal-compare'));
       try{ const obj=await Storage.openMap(f); mergeGraph(obj); }catch(err){ U.toast(err.message,'error'); } e.target.value=''; };
     $('#btn-compare-clear').onclick=clearCompare;
     $('#btn-cycles').onclick=toggleCycles;
-    $('#btn-hotspots').onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; } UI.renderHotspots(graph, handlers); openModal('modal-hotspots'); };
+    $('#btn-hotspots').onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; } UI.renderHotspots(A.graph, handlers); A.openModal('modal-hotspots'); };
     const bi=$('#btn-inspect'); if(bi) bi.onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; } if(CM.Inspect) CM.Inspect.open(); };
   }
   // detect & highlight import dependency cycles (toggle)
   function toggleCycles(){
-    if(state.cyclesOn){ state.cyclesOn=false; renderer.setCycles(null); U.toast(I.t('ca.cyclesOff','Wyłączono podświetlenie cykli.'),'',1600); return; }
+    if(state.cyclesOn){ state.cyclesOn=false; A.renderer.setCycles(null); U.toast(I.t('ca.cyclesOff','Wyłączono podświetlenie cykli.'),'',1600); return; }
     if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; }
-    const res=graph.importCycles();
-    if(!res.components.length){ U.toast(I.t('ca.noCycles','Nie wykryto cykli zależności. 🎉'),'success',3000); renderer.setCycles(null); return; }
-    state.cyclesOn=true; renderer.setCycles(res.edges);
+    const res=A.graph.importCycles();
+    if(!res.components.length){ U.toast(I.t('ca.noCycles','Nie wykryto cykli zależności. 🎉'),'success',3000); A.renderer.setCycles(null); return; }
+    state.cyclesOn=true; A.renderer.setCycles(res.edges);
     const biggest=res.components.slice().sort((a,b)=>b.length-a.length)[0]||[];
-    const sample=biggest.slice(0,4).map(id=>{ const n=graph.nodes.get(id); return n?n.name:id; }).join(' → ');
+    const sample=biggest.slice(0,4).map(id=>{ const n=A.graph.nodes.get(id); return n?n.name:id; }).join(' → ');
     U.toast(I.t('ca.cyclesFoundPre','Wykryto <b>')+res.components.length+I.t('ca.cyclesFoundMid','</b> cykli zależności (')+res.nodes.size+I.t('ca.cyclesFoundMid2',' plików). Największy: ')+sample+(biggest.length>4?' → …':'')+I.t('ca.cyclesFoundPost','. Kliknij ponownie, aby wyłączyć.'),'',7000);
   }
 
@@ -1757,7 +1321,7 @@
     cv.addEventListener('dblclick',(e)=>{ const p=offsetXY(e,cv); const id=hoodPick(p.x,p.y); if(id) teleportTo(id); });
     // hover -> info tooltip about the module
     cv.addEventListener('mousemove',(e)=>{ if(down) return; const p=offsetXY(e,cv); const id=hoodPick(p.x,p.y);
-      const n=id?graph.nodes.get(id):null; UI.tooltip(n||null, e.clientX, e.clientY); cv.style.cursor=n?'pointer':'grab'; });
+      const n=id?A.graph.nodes.get(id):null; UI.tooltip(n||null, e.clientX, e.clientY); cv.style.cursor=n?'pointer':'grab'; });
     cv.addEventListener('mouseleave',()=>UI.tooltip(null));
     window.addEventListener('resize',()=>{ if(hoodState.open) drawHood(); });
     $('#hood-teleport').onclick=()=>{ if(hoodState.sel) teleportTo(hoodState.sel); };
@@ -1765,12 +1329,12 @@
   function offsetXY(e,cv){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
   function hoodPick(mx,my){ let best=null,bd=Infinity; for(const h of hoodHits){ const d=Math.hypot(mx-h.x,my-h.y); if(d<=h.rad+4 && d<bd){bd=d;best=h.id;} } return best; }
   function updateTeleport(){
-    const t=$('#hood-teleport'); const n=hoodState.sel?graph.nodes.get(hoodState.sel):null;
+    const t=$('#hood-teleport'); const n=hoodState.sel?A.graph.nodes.get(hoodState.sel):null;
     if(!n){ t.classList.add('hidden'); return; }
     t.classList.remove('hidden');
     t.querySelector('#hood-teleport-name').textContent = n.name + (n.type==='folder'?I.t('ca.folderSuffix','  (folder)'):'');
   }
-  function teleportTo(id){ closeHood(); setTimeout(()=>focusNode(id), 180); }
+  function teleportTo(id){ closeHood(); setTimeout(()=>A.focusNode(id), 180); }
   function openHood(){ const hood=$('#hood'); hood.classList.remove('hidden'); hoodState.open=true;
     hoodState.zoom=1; hoodState.ox=0; hoodState.oy=0; hoodState.sel=null; updateTeleport();
     requestAnimationFrame(()=>{ $('#hood-disc').classList.add('show'); setTimeout(drawHood,30); }); }
@@ -1801,7 +1365,7 @@
       const col=n.type==='folder'?'#22d3ee':n.type==='external'?'#a78bfa':((n.langInfo&&n.langInfo.color)||'#7d8aa0');
       const rad=Math.max(1.6,(n.r||6)*baseSc*0.7);
       // same 3D crystal figure as the main map
-      renderer.drawNodeSprite(ctx, p.x, p.y, rad, col, hoodState.tilt);
+      A.renderer.drawNodeSprite(ctx, p.x, p.y, rad, col, hoodState.tilt);
       if(hoodState.sel===n.id){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(p.x,p.y,rad+4,0,7); ctx.stroke(); ctx.lineWidth=0.6; }
       hoodHits.push({id:n.id, x:p.x, y:p.y, rad});
       // collect minimal module markings (folders + sizeable nodes)
@@ -1828,9 +1392,9 @@
   // ---------------- minimap ----------------
   function wireMinimap(){
     const mm=$('#minimap');
-    const go=(e)=>{ const m=renderer._mm; if(!m)return; const r=mm.getBoundingClientRect();
+    const go=(e)=>{ const m=A.renderer._mm; if(!m)return; const r=mm.getBoundingClientRect();
       const wx=((e.clientX-r.left)-m.ox)/m.sc, wy=((e.clientY-r.top)-m.oy)/m.sc;
-      renderer.cam.x=wx; renderer.cam.y=wy; renderer.onChange(); renderer.kick(); };
+      A.renderer.cam.x=wx; A.renderer.cam.y=wy; A.renderer.onChange(); A.renderer.kick(); };
     let down=false;
     mm.addEventListener('mousedown',(e)=>{down=true;go(e);});
     window.addEventListener('mousemove',(e)=>{if(down)go(e);});
@@ -1838,17 +1402,17 @@
     // collapse / expand minimap
     const wrap=$('#minimap-wrap'), tgl=$('#minimap-toggle');
     if(tgl) tgl.onclick=(e)=>{ e.stopPropagation(); wrap.classList.toggle('mm-collapsed');
-      if(!wrap.classList.contains('mm-collapsed')) renderer.drawMinimap($('#minimap'));
-      positionMinimap(); setTimeout(positionMinimap, 240); };   // re-centre for the new size (now + after transition)
-    window.addEventListener('resize', positionMinimap);
+      if(!wrap.classList.contains('mm-collapsed')) A.renderer.drawMinimap($('#minimap'));
+      A.positionMinimap(); setTimeout(A.positionMinimap, 240); };   // re-centre for the new size (now + after transition)
+    window.addEventListener('resize', A.positionMinimap);
     // the welcome card's height settles after async content (fonts, "restore last map" button) — observe
     // it so the minimap re-centres whenever the card's box changes, not just on the first frame.
     const card=$('.empty-card');
-    if(card && window.ResizeObserver){ try{ new ResizeObserver(()=>positionMinimap()).observe(card); }catch(e){} }
+    if(card && window.ResizeObserver){ try{ new ResizeObserver(()=>A.positionMinimap()).observe(card); }catch(e){} }
     // start minimized (no project yet) and wait for a file structure; expand only once one loads
     if(state.counts.nodes===0) wrap.classList.add('mm-collapsed');
-    positionMinimap(); setTimeout(positionMinimap,150); setTimeout(positionMinimap,650);
-    if(document.fonts&&document.fonts.ready) document.fonts.ready.then(positionMinimap).catch(()=>{});
+    A.positionMinimap(); setTimeout(A.positionMinimap,150); setTimeout(A.positionMinimap,650);
+    if(document.fonts&&document.fonts.ready) document.fonts.ready.then(A.positionMinimap).catch(()=>{});
   }
 
   // ---------------- rotation dial ----------------
@@ -1862,7 +1426,7 @@
     const ptrAngle=(e)=>{ const c=center(); return Math.atan2(e.clientY-c.y, e.clientX-c.x); };
     dial.addEventListener('mousedown',(e)=>{
       if(e.target.closest('#rot-grip')||e.target.closest('#rot-pin')||e.target.closest('#rot-min')) return;
-      rot=true; startA=ptrAngle(e); startRot=renderer.cam.rot; dial.classList.add('rotating'); e.preventDefault();
+      rot=true; startA=ptrAngle(e); startRot=A.renderer.cam.rot; dial.classList.add('rotating'); e.preventDefault();
     });
 
     // ---- GRIP: move the compass anywhere (disabled while pinned) ----
@@ -1874,7 +1438,7 @@
     });
 
     window.addEventListener('mousemove',(e)=>{
-      if(rot){ let d=ptrAngle(e)-startA; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; renderer.setRotation(startRot + d*0.5); }
+      if(rot){ let d=ptrAngle(e)-startA; while(d>Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI; A.renderer.setRotation(startRot + d*0.5); }
       else if(mov){ const w=dial.offsetWidth, h=dial.offsetHeight;
         place(U.clamp(e.clientX-offX,2,innerWidth-w-2), U.clamp(e.clientY-offY,2,innerHeight-h-2)); }
     });
@@ -1918,28 +1482,28 @@
         e.preventDefault(); toggleShortcutsOverlay(); return; }
       if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
       switch(e.key){
-        case 'f': case 'F': renderer.fit(); break;
-        case '+': case '=': renderer.zoomBy(1.3); break;
-        case '-': case '_': renderer.zoomBy(1/1.3); break;
-        case 'q': case 'Q': renderer.rotateBy(-Math.PI/12); break;
-        case 'e': case 'E': renderer.rotateBy(Math.PI/12); break;
-        case 'r': case 'R': renderer.resetRotation(); break;
-        case 't': case 'T': renderer.setTilt(renderer.cam.tilt>0.05?0:0.62); break;
-        case 'i': case 'I': if(renderer.selected) isolateNode(renderer.selected); break;   // skupienie na zaznaczonym
-        case 'x': case 'X': toggleImpact(); break;   // widok wpływu zależności (upstream/downstream)
+        case 'f': case 'F': A.renderer.fit(); break;
+        case '+': case '=': A.renderer.zoomBy(1.3); break;
+        case '-': case '_': A.renderer.zoomBy(1/1.3); break;
+        case 'q': case 'Q': A.renderer.rotateBy(-Math.PI/12); break;
+        case 'e': case 'E': A.renderer.rotateBy(Math.PI/12); break;
+        case 'r': case 'R': A.renderer.resetRotation(); break;
+        case 't': case 'T': A.renderer.setTilt(A.renderer.cam.tilt>0.05?0:0.62); break;
+        case 'i': case 'I': if(A.renderer.selected) A.isolateNode(A.renderer.selected); break;   // skupienie na zaznaczonym
+        case 'x': case 'X': A.toggleImpact(); break;   // widok wpływu zależności (upstream/downstream)
         case '/': e.preventDefault(); $('#search-input').focus(); break;
-        case 'Escape': UI.hideCtx(); select(null); renderer.setHighlight(null); break;
-        case 'ArrowUp': renderer.cam.y-=40/renderer.cam.zoom; renderer.onChange(); renderer.kick(); break;
-        case 'ArrowDown': renderer.cam.y+=40/renderer.cam.zoom; renderer.onChange(); renderer.kick(); break;
-        case 'ArrowLeft': renderer.cam.x-=40/renderer.cam.zoom; renderer.onChange(); renderer.kick(); break;
-        case 'ArrowRight': renderer.cam.x+=40/renderer.cam.zoom; renderer.onChange(); renderer.kick(); break;
+        case 'Escape': UI.hideCtx(); A.select(null); A.renderer.setHighlight(null); break;
+        case 'ArrowUp': A.renderer.cam.y-=40/A.renderer.cam.zoom; A.renderer.onChange(); A.renderer.kick(); break;
+        case 'ArrowDown': A.renderer.cam.y+=40/A.renderer.cam.zoom; A.renderer.onChange(); A.renderer.kick(); break;
+        case 'ArrowLeft': A.renderer.cam.x-=40/A.renderer.cam.zoom; A.renderer.onChange(); A.renderer.kick(); break;
+        case 'ArrowRight': A.renderer.cam.x+=40/A.renderer.cam.zoom; A.renderer.onChange(); A.renderer.kick(); break;
       }
     });
   }
 
   // ---------------- game-style navigation: WASD fly + mouse-look (FPS turning) ----------------
   function wireGameNav(){
-    const cv = renderer.canvas;
+    const cv = A.renderer.canvas;
     const held = new Set();          // currently-pressed movement keys
     let flyMode=false, raf=0, lastT=0, btnDown=false;
     const MOVE_SPEED=860;            // pan speed, screen px / second
@@ -1963,7 +1527,7 @@
       if(!navAllowed()){ held.clear(); return; }   // context changed (input focus / mode switch) → stop
       const now=performance.now(); let dt=(now-lastT)/1000; lastT=now;
       if(dt>0.05) dt=0.05;                       // clamp big gaps (tab switch / GC)
-      const cam=renderer.cam, W=renderer.w, H=renderer.h; let moved=false;
+      const cam=A.renderer.cam, W=A.renderer.w, H=A.renderer.h; let moved=false;
       // planar movement — computed in SCREEN space then mapped to world, so it follows the current rotation
       let mx=(held.has('d')?1:0)-(held.has('a')?1:0);
       let my=(held.has('s')?1:0)-(held.has('w')?1:0);
@@ -1976,7 +1540,7 @@
       // button is down so it never fights Shift+drag-rotate / Shift+click.
       const zdir=(held.has(' ')?1:0)-((held.has('shift')&&!btnDown)?1:0);
       if(zdir){ cam.zoom=U.clamp(cam.zoom*Math.pow(ZOOM_RATE, zdir*dt), 0.0008, 40); moved=true; }
-      if(moved){ renderer.onChange(); renderer.kick(); }
+      if(moved){ A.renderer.onChange(); A.renderer.kick(); }
       if(held.size) raf=requestAnimationFrame(step);
     }
     function ensureLoop(){ if(!raf){ lastT=performance.now(); raf=requestAnimationFrame(step); } }
@@ -1995,9 +1559,9 @@
 
     // ---- fly mode: FPS-style mouse-look via Pointer Lock (continuous turning, no scroll wheel) ----
     function onLookMove(e){ if(!flyMode) return;
-      if(e.movementX) renderer.cam.rot += e.movementX*LOOK_X;
-      if(e.movementY) renderer.cam.tilt = U.clamp(renderer.cam.tilt + e.movementY*LOOK_Y, 0, 0.85);
-      renderer.onChange(); renderer.kick();
+      if(e.movementX) A.renderer.cam.rot += e.movementX*LOOK_X;
+      if(e.movementY) A.renderer.cam.tilt = U.clamp(A.renderer.cam.tilt + e.movementY*LOOK_Y, 0, 0.85);
+      A.renderer.onChange(); A.renderer.kick();
     }
     function setFly(on){
       if(on && !navAllowed()) return;
@@ -2050,42 +1614,18 @@
       F('scripts/build.py', "import os, sys\nfrom pathlib import Path\n# prosty skrypt build\ndef build():\n    print('building...')\nif __name__=='__main__':\n    build()\n"),
     ];
   }
-  function loadDemo(){ ingest(()=>Promise.resolve({files:demoFiles(), meta:{name:'demo-app', source:'demo: demo-app', kind:'demo', createdAt:Date.now()}}),I.t('ca.loadingDemo','Ładowanie projektu demo…')); }
+  function loadDemo(){ A.ingest(()=>Promise.resolve({files:demoFiles(), meta:{name:'demo-app', source:'demo: demo-app', kind:'demo', createdAt:Date.now()}}),I.t('ca.loadingDemo','Ładowanie projektu demo…')); }
 
-  // ---------------- go ----------------
-  function boot(){ init();
-    if(location.hash==='#demo') setTimeout(loadDemo,150);
-    else if(location.hash.startsWith('#v=')) setTimeout(()=>{ restoreView().catch(()=>{}); },150);
-    autoTutorial();
-  }
-  // First launch of the INSTALLED app (also after a re-install) → start the tutorial automatically.
-  // 'appinstalled' sets a flag consumed on the next standalone launch; the legacy no-flag case
-  // (installed before this feature) runs once via codemap_tut_auto.
-  window.addEventListener('appinstalled',()=>{ try{ localStorage.setItem('codemap_fresh_install','1'); }catch(e){} });
-  function autoTutorial(){
-    let standalone=false;
-    try{ standalone=matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){}
-    if(!standalone) return;
-    let go=false;
-    try{
-      if(localStorage.getItem('codemap_fresh_install')==='1'){ localStorage.removeItem('codemap_fresh_install'); go=true; }
-      else if(!localStorage.getItem('codemap_tut_auto')) go=true;
-      if(go) localStorage.setItem('codemap_tut_auto','1');
-    }catch(e){}
-    if(go) setTimeout(()=>{ try{ if(CM.Settings&&CM.Settings.startTutorial) CM.Settings.startTutorial('codemap'); }catch(e){} }, 1100);
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
-  else boot();
   // ====================== ChatBot integration: app knowledge + action dispatcher ======================
   const CB_LAYOUTS=['pack','structtree','structradial','treemap','icicle','sunburst','force','layered','modules','arcdiagram','galaxy','nebula','cosmicrings'];
   // full, live snapshot of what the app currently is/shows — fed to ChatBot so it "knows everything"
   function appState(){
     const mind=document.body.classList.contains('mode-mindmap');
-    const sel=renderer&&renderer.selected;
+    const sel=A.renderer&&A.renderer.selected;
     const out={
       mode: mind?'mindmap':'codemap',
       hasProject: state.counts.nodes>0,
-      project: _pn(graph&&graph.meta&&(graph.meta.name||graph.meta.source))||null,
+      project: _pn(A.graph&&A.graph.meta&&(A.graph.meta.name||A.graph.meta.source))||null,
       counts:{ nodes:state.counts.nodes, edges:state.counts.edges, visible:state.vis.nodes.length },
       layout: state.layout,
       filters:{ folders:filters.folders, files:filters.files, externals:filters.externals,
@@ -2093,7 +1633,7 @@
                 metric:filters.metric, minMetric:filters.minMetric },
       theme: document.body.classList.contains('light')?'light':'dark',
       lang: I.getLang(),
-      impactView: !!impactOn,
+      impactView: !!A.impactOn,
       selected: sel?{name:_pn(sel.name), path:_pn(sel.path)||null, type:sel.type}:null,
       availableLayouts: CB_LAYOUTS,
       mindmap: (CM.MindMap&&CM.MindMap.isActive&&CM.MindMap.isActive())?{nodes:(CM.MindMap.nodeCount?CM.MindMap.nodeCount():0), name:_pn(CM.MindMap.mapName?CM.MindMap.mapName():'')}:null,
@@ -2109,18 +1649,18 @@
     args=args||{};
     switch(action){
       case 'loadDemo': loadDemo(); return I.t('cb.execDemo','Załadowano projekt demonstracyjny.');
-      case 'setMode': { const m=(args.mode||'').toLowerCase(); if(m!=='codemap'&&m!=='mindmap') throw new Error('mode: codemap|mindmap'); setMode(m); return I.t('cb.execMode','Tryb: ')+m; }
+      case 'setMode': { const m=(args.mode||'').toLowerCase(); if(m!=='codemap'&&m!=='mindmap') throw new Error('mode: codemap|mindmap'); A.setMode(m); return I.t('cb.execMode','Tryb: ')+m; }
       case 'setLayout': { _needProject(); const ly=(args.layout||'').toLowerCase(); if(CB_LAYOUTS.indexOf(ly)<0) throw new Error(I.t('cb.badLayout','Nieznany układ: ')+ly+' ('+CB_LAYOUTS.join(', ')+')');
-        const s=$('#sel-layout'); s.value=ly; state.layout=ly; state.displayLayout=ly; apply({relayout:true,refit:true});
+        const s=$('#sel-layout'); s.value=ly; state.layout=ly; state.displayLayout=ly; A.apply({relayout:true,refit:true});
         const lbl=$('#layout-menu-label'), opt=s.querySelector('option[value="'+ly+'"]'); if(lbl&&opt) lbl.textContent=opt.textContent;
         return I.t('cb.execLayout','Układ: ')+ly; }
       case 'search': { const q=(args.query||'').trim(); const inp=$('#search-input'); inp.value=q; inp.dispatchEvent(new Event('input',{bubbles:true})); return I.t('cb.execSearch','Szukam: ')+q; }
       case 'focusNode': { _needProject(); const q=(args.query||args.name||'').toLowerCase().trim(); if(!q) throw new Error(I.t('cb.needName','Podaj nazwę elementu.'));
-        let best=null,bs=-1; for(const n of graph.nodes.values()){ if(n.id==='__root__'||n.id==='__ext__')continue; const nm=(n.name||'').toLowerCase(),pt=(n.path||'').toLowerCase();
+        let best=null,bs=-1; for(const n of A.graph.nodes.values()){ if(n.id==='__root__'||n.id==='__ext__')continue; const nm=(n.name||'').toLowerCase(),pt=(n.path||'').toLowerCase();
           let s=nm===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1))); if(s>bs){bs=s;best=n;} }
-        if(!best) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+q); focusNode(best.id); return I.t('cb.execFocus','Skupiono na: ')+best.name; }
-      case 'fit': if(renderer&&renderer.fit) renderer.fit(); return I.t('cb.execFit','Dopasowano widok.');
-      case 'toggleImpact': _needProject(); toggleImpact(); return I.t('cb.execImpact','Przełączono widok wpływu zależności.');
+        if(!best) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+q); A.focusNode(best.id); return I.t('cb.execFocus','Skupiono na: ')+best.name; }
+      case 'fit': if(A.renderer&&A.renderer.fit) A.renderer.fit(); return I.t('cb.execFit','Dopasowano widok.');
+      case 'toggleImpact': _needProject(); A.toggleImpact(); return I.t('cb.execImpact','Przełączono widok wpływu zależności.');
       case 'setFilter': { const map={folders:'show-folders',files:'show-files',externals:'show-externals',contains:'edge-contains',imports:'edge-import',import:'edge-import',references:'edge-reference',reference:'edge-reference'};
         const ch=[]; for(const k in args){ const id=map[k]; if(id&&typeof args[k]==='boolean'){ if(_cb(id,args[k])) ch.push(k+'='+args[k]); } }
         if(!ch.length) throw new Error(I.t('cb.noFilter','Brak rozpoznanych filtrów (folders/files/externals/imports/references/contains).')); return I.t('cb.execFilter','Filtry: ')+ch.join(', '); }
@@ -2132,20 +1672,20 @@
       case 'hotspots': _needProject(); $('#btn-hotspots').click(); return I.t('cb.execHot','Pokazano hotspoty.');
       case 'setTheme': { const th=(args.theme||'').toLowerCase()==='light'?'light':'dark'; const b=document.querySelector('.theme-btn[data-theme="'+th+'"]'); if(b) b.click(); return I.t('cb.execTheme','Motyw: ')+th; }
       case 'setPreset': { const k=(args.name||args.preset||'').toLowerCase();
-        if(!THEME_PRESETS[k]||!_applyThemePreset) throw new Error(I.t('cb.badPreset','Nieznany preset: ')+k+' ('+Object.keys(THEME_PRESETS).join(', ')+')');
-        _applyThemePreset(k); saveSettings(); return I.t('cb.execPreset','Preset motywu: ')+k; }
+        if(!THEME_PRESETS[k]||!A._applyThemePreset) throw new Error(I.t('cb.badPreset','Nieznany preset: ')+k+' ('+Object.keys(THEME_PRESETS).join(', ')+')');
+        A._applyThemePreset(k); A.saveSettings(); return I.t('cb.execPreset','Preset motywu: ')+k; }
       case 'setAccent': { const c=args.color; if(!c||!/^#?[0-9a-f]{3,8}$/i.test(c)) throw new Error(I.t('cb.badColor','Podaj kolor HEX, np. #22d3ee.')); const e=$('#col-accent'); e.value=c[0]==='#'?c:('#'+c); e.dispatchEvent(new Event('input',{bubbles:true})); return I.t('cb.execAccent','Kolor akcentu: ')+e.value; }
       case 'setLang': { const l=(args.lang||'').toLowerCase(); if(l!=='pl'&&l!=='en') throw new Error('lang: pl|en'); I.setLang(l); return I.t('cb.execLang','Język: ')+l; }
       case 'startTutorial': { const m=(args.mode||'codemap').toLowerCase(); if(m!=='codemap'&&m!=='mindmap') throw new Error('mode: codemap|mindmap');
         if(CM.Settings&&CM.Settings.close) CM.Settings.close(); CM.Settings.startTutorial(m); return I.t('cb.execTut','Uruchomiono samouczek: ')+m; }
       case 'loadRepo': { const u=(args.url||'').trim(); if(!u) throw new Error(I.t('cb.needUrl','Podaj adres repozytorium (GitHub/GitLab/Bitbucket).'));
-        ingest((p,s)=>Loaders.fromRepoURL(u,{branch:args.branch,fetchContent:true},p,s), I.t('ca.connectingToRepo','Łączenie z repozytorium…'));
+        A.ingest((p,s)=>Loaders.fromRepoURL(u,{branch:args.branch,fetchContent:true},p,s), I.t('ca.connectingToRepo','Łączenie z repozytorium…'));
         return I.t('cb.execRepo','Wczytuję repozytorium: ')+u; }
-      case 'clearProject': _needProject(); clearAll(); return I.t('cb.execClear','Wyczyszczono projekt.');
+      case 'clearProject': _needProject(); A.clearAll(); return I.t('cb.execClear','Wyczyszczono projekt.');
       case 'togglePanel': { const side=(args.side||'').toLowerCase(); if(side!=='left'&&side!=='right') throw new Error('side: left|right');
         const p=$('#'+side+'-panel'); const collapsed=p.classList.contains('collapsed');
         const want=(typeof args.open==='boolean')?args.open:collapsed;
-        if(want===collapsed) togglePanel(side); return I.t('cb.execPanel','Panel ')+side+': '+(want?I.t('cb.on','wł'):I.t('cb.off','wył')); }
+        if(want===collapsed) A.togglePanel(side); return I.t('cb.execPanel','Panel ')+side+': '+(want?I.t('cb.on','wł'):I.t('cb.off','wył')); }
       case 'zoom': { const d=(args.dir||'').toLowerCase(); const id=d==='out'?'vc-zoom-out':'vc-zoom-in'; const b=$('#'+id); if(b) b.click(); return I.t('cb.execZoom','Zoom: ')+(d==='out'?'−':'+'); }
       case 'rotate': { const d=(args.dir||'').toLowerCase(); const id=d==='left'?'vc-rot-left':d==='right'?'vc-rot-right':'vc-rot-reset'; const b=$('#'+id); if(b) b.click(); return I.t('cb.execRotate','Obrót: ')+d; }
       case 'toggle3D': { const b=$('#vc-3d'); if(b) b.click(); return I.t('cb.exec3D','Przełączono widok 3D.'); }
@@ -2155,7 +1695,7 @@
       case 'openHistory': { _needProject(); $('#btn-history').click(); return I.t('cb.execHist','Otwarto historię migawek.'); }
       case 'openCompare': { $('#btn-compare-add').click(); return I.t('cb.execCompare','Otwarto porównywanie schematów.'); }
       case 'exportImage': { _needProject(); $('#btn-export-img').click(); return I.t('cb.execImg','Eksportuję obraz mapy.'); }
-      case 'copyLink': copyViewLink(); return I.t('cb.execLink','Kopiuję link do bieżącego widoku.');
+      case 'copyLink': A.copyViewLink(); return I.t('cb.execLink','Kopiuję link do bieżącego widoku.');
       case 'setSpacing': case 'setNodeScale': case 'setFontScale': {
         const id=action==='setSpacing'?'rng-spacing':action==='setNodeScale'?'rng-nscale':'rng-fscale';
         const v=+args.percent; if(!isFinite(v)) throw new Error(I.t('cb.needPercent','Podaj wartość procentową, np. 120.'));
@@ -2165,7 +1705,7 @@
         for(const k in map){ if(typeof args[k]==='number'){ const e=$('#'+map[k]); if(e){ e.value=Math.round(args[k]); e.dispatchEvent(new Event('input',{bubbles:true})); ch.push(k+'='+e.value); } } }
         if(!ch.length) throw new Error(I.t('cb.noGlass','Podaj transparency/menu/blur/tint (liczby).')); return I.t('cb.execGlass','Wygląd: ')+ch.join(', '); }
       case 'setBackground': { const c=args.color; if(!c||!/^#?[0-9a-f]{3,8}$/i.test(c)) throw new Error(I.t('cb.badColor','Podaj kolor HEX, np. #22d3ee.')); const e=$('#col-bg'); e.value=c[0]==='#'?c:('#'+c); e.dispatchEvent(new Event('input',{bubbles:true})); return I.t('cb.execBg','Kolor tła: ')+e.value; }
-      case 'resetAppearance': resetAppearance(); return I.t('cb.execResetApp','Przywrócono domyślny wygląd.');
+      case 'resetAppearance': A.resetAppearance(); return I.t('cb.execResetApp','Przywrócono domyślny wygląd.');
       case 'renderOption': { const map={grid:'opt-grid',curved:'opt-curved',lockall:'opt-lockall',hoverPreview:'opt-hover-preview'}; const ch=[];   // glow/particles/animate removed — edge animation was dropped, those opts no longer affect rendering
         for(const k in args){ const id=map[k]; if(id&&typeof args[k]==='boolean'){ if(_cb(id,args[k])) ch.push(k+'='+args[k]); } }
         if(!ch.length) throw new Error(I.t('cb.noOpt','Brak rozpoznanych opcji (grid/curved/lockall/hoverPreview).')); return I.t('cb.execOpt','Opcje: ')+ch.join(', '); }
@@ -2173,14 +1713,14 @@
         if(typeof args.min==='number'){ const r=$('#rng-minmetric'); r.value=args.min; r.dispatchEvent(new Event('input',{bubbles:true})); }
         return I.t('cb.execMetric','Metryka: ')+(args.metric||filters.metric)+(typeof args.min==='number'?(' ≥ '+args.min):''); }
       case 'toggleLang': { _needProject(); const k=(args.lang||'').toLowerCase(); if(!k) throw new Error(I.t('cb.needLangKey','Podaj język/technologię, np. js.'));
-        if(!graph.langStats.has(k)) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+k+' ('+Array.from(graph.langStats.keys()).join(', ')+')');
-        toggleLang(k); apply({relayout:false}); return I.t('cb.execToggleLang','Przełączono widoczność: ')+k; }
-      case 'openNode': { _needProject(); const r=exec('focusNode',args); const n=renderer.selected; if(n&&n.type==='file'){ handlers.openFile(n); return I.t('cb.execOpenFile','Otwarto podgląd pliku: ')+n.name; } return r; }
+        if(!A.graph.langStats.has(k)) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+k+' ('+Array.from(A.graph.langStats.keys()).join(', ')+')');
+        A.toggleLang(k); A.apply({relayout:false}); return I.t('cb.execToggleLang','Przełączono widoczność: ')+k; }
+      case 'openNode': { _needProject(); const r=exec('focusNode',args); const n=A.renderer.selected; if(n&&n.type==='file'){ handlers.openFile(n); return I.t('cb.execOpenFile','Otwarto podgląd pliku: ')+n.name; } return r; }
       case 'aiAnalyze': _needProject(); aiAnalyze(); return I.t('cb.execAnalyze','Uruchomiono analizę struktury AI.');
       case 'inspect': case 'runInspection': { _needProject(); if(CM.Inspect&&CM.Inspect.open){ CM.Inspect.open(); return I.t('cb.execInspect','Uruchomiono analizę statyczną (antywzorce).'); } throw new Error(I.t('cb.noInspect','Moduł analizy niedostępny.')); }
       case 'mindmap': { const a=(args.action||'').toLowerCase(); const ids={arrange:'mm-arrange',layout:'mm-layout',fit:'mm-fit',save:'mm-save',markdown:'mm-markdown',undo:'mm-undo'};
         if(!(a in ids)) throw new Error('action: arrange|layout|fit|save|markdown|undo');
-        if(!document.body.classList.contains('mode-mindmap')) setMode('mindmap');
+        if(!document.body.classList.contains('mode-mindmap')) A.setMode('mindmap');
         const go=()=>{ const b=document.getElementById(ids[a]); if(b) b.click(); }; setTimeout(go,260);
         return I.t('cb.execMind','MindMap: ')+a; }
       case 'installPWA': if(state._installApp){ state._installApp(); return I.t('cb.execPWA','Uruchomiono instalację aplikacji.'); } throw new Error(I.t('cb.noPWA','Instalacja PWA niedostępna w tej chwili.'));
@@ -2195,13 +1735,31 @@
     'hotspots','inspect','aiAnalyze','setTheme','setPreset','setAccent','setBackground','setGlass','setSpacing','setNodeScale','setFontScale',
     'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help'];
 
-  window.CMApp={get graph(){return graph;}, apply, focusNode, loadDemo, toggleImpact, copyViewLink, serializeView,
-    impactState:()=>impactOn,
-    loadFiles:(files,meta)=>ingest(()=>Promise.resolve({files,meta}),'test'),
-    loadFromJSON,
-    hasMap:()=>state.counts.nodes>0,
-    mapName:()=>(graph&&graph.meta&&(graph.meta.name||graph.meta.source))||'mapa',
-    mapJSON:()=>(graph&&state.counts.nodes>0)?graph.toJSON():null,
-    appState, exec,                       // ← ChatBot uses these
-    renderer:()=>renderer};
+  Object.assign(A, {
+    wirePWA, collectSettings, saveSettings, _lum, applySettings, wireSettings, startClock, wireMenus,
+    wireLayoutMenu, resetAppearance, wireSettingsUI, wireToolbar, setRail, updateInsets, positionMinimap, expandMinimap,
+    minimizeMinimap, togglePanel, wirePanels, wireCollapsibleSections, wireAppearance, wireNodeAppearance, wirePaste, wireFilters,
+    refreshMetricRange, updateMetricLabel, wireViewControls, wireSearch, wireDnD, openModal, closeModal, wireModals,
+    wireBrand, toggleShortcutsOverlay, wireKeyboard, ghAvatarUrl, refreshAuthors, centroidOf, positionAuthors, ensureAuthorCard,
+    closeAuthorCard, fmtJoined, renderAuthorCard, escapeHtml, safeUrl, openAuthorCard, repoHostName, nodeRepoUrl,
+    serializeView, updateHash, copyViewLink, restoreView, recentRepos, pushRecentRepo, renderRecentRepos, fillRefList,
+    refreshGhRate, compareBranches, exportGist, relayoutGroups, openHistory, doCompare, graphBounds, tagBaseGroup,
+    mergeGraph, mergeGraphInstance, addCompareSource, clearCompare, wireCompare, toggleCycles, updateRotDial, contextMenu,
+    expandBelow, collapseBelow, isolateNode, exportImage, wireNeighborhood, offsetXY, hoodPick, updateTeleport,
+    teleportTo, openHood, closeHood, drawHood, wireMinimap, wireRotDial, wireGameNav, paletteCommands,
+    buildPalette, aiStructureSummary, aiKeyList, aiModel, aiConfigured, aiGuard, aiChat, aiAnalyze,
+    aiAsk, aiAskNode, demoFiles, loadDemo, appState, _cb, _needProject, exec,
+  });
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', A.boot);
+  else A.boot();
+  window.CMApp={get graph(){return A.graph;}, apply:A.apply, focusNode:A.focusNode, loadDemo:A.loadDemo, toggleImpact:A.toggleImpact,
+    copyViewLink:A.copyViewLink, serializeView:A.serializeView,
+    impactState:()=>A.impactOn,
+    loadFiles:(files,meta)=>A.ingest(()=>Promise.resolve({files,meta}),'test'),
+    loadFromJSON:A.loadFromJSON,
+    hasMap:()=>A.state.counts.nodes>0,
+    mapName:()=>(A.graph&&A.graph.meta&&(A.graph.meta.name||A.graph.meta.source))||'mapa',
+    mapJSON:()=>(A.graph&&A.state.counts.nodes>0)?A.graph.toJSON():null,
+    appState:A.appState, exec:A.exec,     // ← ChatBot uses these
+    renderer:()=>A.renderer};
 })();
