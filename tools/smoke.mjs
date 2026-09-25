@@ -64,6 +64,10 @@ const status = await evalJs("(document.querySelector('#st-nodes')||{}).textConte
 const version = await evalJs('window.CM_VERSION');
 const sw = await evalJs("'serviceWorker' in navigator");
 const canvasOk = await evalJs("(function(){ const c=document.getElementById('map-canvas'); return !!c && c.width>0 && c.height>0; })()");
+// eksport grafu (czyste serializery na prawdziwym grafie demo; bez pobierania pliku)
+const exportOk = await evalJs(`(function(){ try{ const F=(CM.App&&CM.App.filters)||undefined; const out={};
+  for(const f of CM.Export.FORMATS){ const r=CM.Export.build(CMApp.graph, F, f); out[f]=r.nodes>1 && r.edges>0 && r.text.length>200; }
+  return Object.values(out).every(Boolean) ? 'ok' : JSON.stringify(out); }catch(e){ return String(e); } })()`);
 
 // --- przejście przez akcje aplikacji (wszystko, co nie otwiera systemowych okien ani nie pobiera plików) ---
 const sweep = await evalJs(`(async()=>{
@@ -94,6 +98,7 @@ check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${stat
 check(canvasOk, 'canvas mapy ma rozmiar');
 check(/^\d+\.\d+\.\d+$/.test(version || ''), `CM_VERSION = ${version}`);
 check(sw, 'API service workera dostępne');
+check(exportOk === 'ok', `eksport grafu DOT / Mermaid / GraphML na demo${exportOk === 'ok' ? '' : ': ' + exportOk}`);
 check(sweep && sweep.fails.length === 0 && sweep.ran === sweep.total, `akcje CMApp.exec: ${sweep?.ran}/${sweep?.total} OK${sweep?.fails?.length ? '\n   ' + sweep.fails.join('\n   ') : ''}`);
 check(sweep && sweep.nodesAfter === nodes, `graf nietknięty po przejściu (${sweep?.nodesAfter} węzłów)`);
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);

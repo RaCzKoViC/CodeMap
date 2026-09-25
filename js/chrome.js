@@ -218,6 +218,15 @@
         {ic:'download',label:I.t('ca.svgExport','SVG (wektor)'),action:()=>A.exportImage('svg')},
       ], r.left, r.bottom+4);
     };
+    // eksport widocznego grafu do formatów narzędzi zewnętrznych (Graphviz / Mermaid / yEd) — CM.Export
+    for(const fmt of (CM.Export?CM.Export.FORMATS:[])){
+      const b=$('#btn-export-'+fmt); if(!b) continue;
+      b.onclick=()=>{
+        if(state.counts.nodes===0){ U.toast(I.t('ca.noMapToExport','Brak mapy do eksportu.'),'error'); return; }
+        const r=CM.Export.download(A.graph, filters, fmt);
+        U.toast(I.t('ca.graphExported','💾 Graf wyeksportowany: ')+r.filename+' ('+r.nodes+' / '+r.edges+')','success');
+      };
+    }
     $('#btn-open').onclick=()=>$('#input-open').click();
     $('#input-open').onchange=async(e)=>{ const f=e.target.files[0]; if(!f)return;
       try{ const obj=await Storage.openMap(f); A.loadFromJSON(obj); }catch(err){ U.toast(err.message,'error'); } e.target.value=''; };

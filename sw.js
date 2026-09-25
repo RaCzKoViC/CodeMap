@@ -4,7 +4,7 @@ const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
 const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js','js/languages.js',
-  'js/analysis.js','js/graph.js','js/layouts.js','js/renderer.js','js/loaders.js','js/storage.js',
+  'js/analysis.js','js/graph.js','js/layouts.js','js/export.js','js/renderer.js','js/loaders.js','js/storage.js',
   'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js',
   'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/app.js','js/sim-worker.js'];
 
