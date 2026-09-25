@@ -656,6 +656,7 @@ CM.Renderer = (function(){
       const getXY=(e)=>{ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
 
       let dragGid=null;
+      let dragStart=null;   // pozycja węzła sprzed przeciągania — przywracana, gdy węzeł został upuszczony poza mapą (np. do ChatBota)
       cv.addEventListener('mousedown',(e)=>{
         const p=getXY(e); lastX=p.x; lastY=p.y; downX=p.x; downY=p.y; moved=false;
         // middle button OR right button OR shift+left -> rotate camera (like the compass)
@@ -666,7 +667,7 @@ CM.Renderer = (function(){
         const hit=this.hitTest(p.x,p.y);
         if(hit){ this.onSelect(hit);
           if(hit.locked || this.opts.lockAll){ mode=null; }   // locked figures don't move when touched
-          else { mode='dragNode'; dragNode=hit; dragNode.fixed=true; }
+          else { mode='dragNode'; dragNode=hit; dragNode.fixed=true; dragStart={x:hit.x, y:hit.y}; }
         }
         else { mode='pan'; cv.classList.add('grabbing'); }
       });
@@ -681,6 +682,7 @@ CM.Renderer = (function(){
           const a=this.cam.toWorld(lastX,lastY,this.w,this.h), b=this.cam.toWorld(p.x,p.y,this.w,this.h);
           dragNode.x+=(b.x-a.x); dragNode.y+=(b.y-a.y); dragNode.vx=0; dragNode.vy=0;
           if(this.sim){ this.sim.reheat(0.35); }
+          if(this.onNodeDragOver) this.onNodeDragOver(dragNode, e.clientX, e.clientY);   // podświetlenie strefy upuszczenia (ChatBot)
           this.kick();
         } else if(mode==='dragGroup' && dragGid){
           const a=this.cam.toWorld(lastX,lastY,this.w,this.h), b=this.cam.toWorld(p.x,p.y,this.w,this.h);
@@ -694,7 +696,13 @@ CM.Renderer = (function(){
         }
         lastX=p.x; lastY=p.y;
       });
-      window.addEventListener('mouseup',()=>{
+      window.addEventListener('mouseup',(e)=>{
+        // upuszczenie węzła poza mapą (np. w oknie ChatBota): odbiorca dostaje węzeł, a pozycja na mapie wraca
+        if(mode==='dragNode' && dragNode && moved && this.onNodeDrop && dragStart){
+          let taken=false; try{ taken=!!this.onNodeDrop(dragNode, e.clientX, e.clientY); }catch(err){}
+          if(taken){ dragNode.x=dragStart.x; dragNode.y=dragStart.y; dragNode.vx=0; dragNode.vy=0; this.kick(); }
+        }
+        dragStart=null;
         if(mode==='dragNode' && dragNode && !dragNode.pinned) dragNode.fixed=false;
         mode=null; dragNode=null; dragGid=null; midBtn=false; cv.classList.remove('grabbing','rotating');
       });

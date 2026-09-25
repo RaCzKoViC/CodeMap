@@ -36,6 +36,8 @@
     A.renderer.onDblFile = (n)=>{ select(n); A.renderer.centerOn(n); };
     A.renderer.onContext = (n,x,y)=>A.contextMenu(n,x,y);
     A.renderer.onEdgeSelect = (edge)=>selectEdge(edge);
+    A.renderer.onNodeDrop=(n,x,y)=>!!(CM.ChatBot&&CM.ChatBot.acceptDrop&&CM.ChatBot.acceptDrop(n,x,y));   // przeciągnij element mapy do ChatBota
+    A.renderer.onNodeDragOver=(n,x,y)=>{ if(CM.ChatBot&&CM.ChatBot.dragOver) CM.ChatBot.dragOver(x,y); };
     A.renderer.onChange = U.throttle(()=>{ updateStatus(); A.updateRotDial(); A.renderer.drawMinimap($('#minimap')); A.positionAuthors(); A.updateHash(); }, 55);
     A.renderer.onSettle = ()=>{
       // a pending view-restore (shared link) wins over fit-on-settle — otherwise the layout's own

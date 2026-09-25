@@ -15,14 +15,34 @@ CM.LocalAI = (function(){
   const MODEL_KEY='codemap_local_model';
   const CDN='https://esm.run/@mlc-ai/web-llm@0.2.79';
   // wyselekcjonowane małe modele (prebuilt MLC; rozmiar = pobranie na dysk, VRAM podobny)
+  // Wyselekcjonowane modele (prebuilt MLC; rozmiar = pobranie na dysk, VRAM podobny). Modele, których
+  // ten build silnika nie zna, są automatycznie pomijane na listach (resolveId). Pełną listę silnika
+  // daje listPrebuilt() — Ustawienia → AI → „Wszystkie modele silnika".
   const MODELS=[
+    {id:'SmolLM2-360M-Instruct-q4f16_1-MLC',   label:'SmolLM2 · 360M  (~270 MB — mikro; tylko najprostsze akcje)'},
     {id:'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',  label:'Qwen 2.5 · 0.5B  (~350 MB — najlżejszy; tylko proste akcje)'},
-    {id:'Llama-3.2-1B-Instruct-q4f16_1-MLC',  label:'Llama 3.2 · 1B  (~880 MB — polecany)'},
+    {id:'Llama-3.2-1B-Instruct-q4f16_1-MLC',  label:'Llama 3.2 · 1B  (~880 MB — polecany na start)'},
     {id:'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',  label:'Qwen 2.5 · 1.5B  (~1.6 GB)'},
-    {id:'Llama-3.2-3B-Instruct-q4f16_1-MLC',  label:'Llama 3.2 · 3B  (~2.3 GB — najmądrzejszy tutaj)'},
-    {id:'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC', label:'DeepSeek R1 · 7B  (~4.3 GB — myślący: pokazuje rozumowanie; TYLKO mocne GPU)', think:true},
+    {id:'Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC', label:'Qwen 2.5 Coder · 1.5B  (~1.6 GB — do kodu)'},
+    {id:'SmolLM2-1.7B-Instruct-q4f16_1-MLC',   label:'SmolLM2 · 1.7B  (~1.1 GB)'},
+    {id:'gemma-2-2b-it-q4f16_1-MLC',           label:'Gemma 2 · 2B  (~1.6 GB)'},
+    {id:'Llama-3.2-3B-Instruct-q4f16_1-MLC',  label:'Llama 3.2 · 3B  (~2.3 GB — dobry kompromis)'},
+    {id:'Qwen2.5-3B-Instruct-q4f16_1-MLC',    label:'Qwen 2.5 · 3B  (~2.2 GB — dobrze po polsku)'},
+    {id:'Phi-3.5-mini-instruct-q4f16_1-MLC',   label:'Phi 3.5 mini · 3.8B  (~2.5 GB)'},
+    {id:'Qwen2.5-7B-Instruct-q4f16_1-MLC',    label:'Qwen 2.5 · 7B  (~4.7 GB — mocne GPU)'},
+    {id:'Qwen2.5-Coder-7B-Instruct-q4f16_1-MLC', label:'Qwen 2.5 Coder · 7B  (~4.7 GB — do kodu; mocne GPU)'},
+    {id:'Llama-3.1-8B-Instruct-q4f16_1-MLC',  label:'Llama 3.1 · 8B  (~5 GB — mocne GPU)'},
+    {id:'Mistral-7B-Instruct-v0.3-q4f16_1-MLC', label:'Mistral · 7B v0.3  (~4.6 GB — mocne GPU)'},
+    {id:'Hermes-3-Llama-3.1-8B-q4f16_1-MLC',   label:'Hermes 3 · 8B  (~5 GB — dobre wywołania narzędzi; mocne GPU)'},
+    {id:'gemma-2-9b-it-q4f16_1-MLC',           label:'Gemma 2 · 9B  (~5.6 GB — mocne GPU)'},
+    {id:'DeepSeek-R1-Distill-Qwen-7B-q4f16_1-MLC', label:'DeepSeek R1 · 7B  (~4.3 GB — myślący: pokazuje rozumowanie; mocne GPU)', think:true},
+    {id:'DeepSeek-R1-Distill-Llama-8B-q4f16_1-MLC', label:'DeepSeek R1 Llama · 8B  (~5 GB — myślący; mocne GPU)', think:true},
   ];
-  const isThinking=(id)=>{ const m=MODELS.find(m=>m.id===(id||modelId())); return !!(m&&m.think); };
+  const EXTRA_KEY='codemap_local_models_extra';   // id-y wybrane z pełnej listy silnika (poza MODELS)
+  const extraIds=()=>{ try{ const a=JSON.parse(localStorage.getItem(EXTRA_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } };
+  const addExtraId=(id)=>{ const a=extraIds(); if(!a.includes(id)){ a.push(id); try{ localStorage.setItem(EXTRA_KEY, JSON.stringify(a.slice(-20))); }catch(e){} } };
+  const known=(id)=>MODELS.some(m=>m.id===id)||extraIds().includes(id);
+  const isThinking=(id)=>{ id=id||modelId(); const m=MODELS.find(m=>m.id===id); return m?!!m.think:/R1|Reason|Think/i.test(id); };
 
   let lib=null;            // WebLLM module (dynamic import, once)
   let engine=null;         // MLCEngine (worker-proxy lub main-thread fallback)
@@ -46,17 +66,20 @@ CM.LocalAI = (function(){
   const setProvider=(p)=>{ try{ localStorage.setItem(PROV_KEY, (p==='local'||p==='ollama')?p:'mistral'); }catch(e){} };
   // SANITYZACJA: id zapisany przez starszą wersję może wskazywać model usunięty z listy
   // (np. dawny DeepSeek-1.5B / Gemma) — wtedy każdy czat umierał na resolveId. Heal-write do domyślnego.
+  const DEFAULT_ID='Llama-3.2-1B-Instruct-q4f16_1-MLC';
   const modelId=()=>{
     const v=localStorage.getItem(MODEL_KEY);
-    if(v && MODELS.some(m=>m.id===v)) return v;
-    if(v) try{ localStorage.setItem(MODEL_KEY, MODELS[1].id); }catch(e){}
-    return MODELS[1].id;
+    if(v && known(v)) return v;
+    if(v) try{ localStorage.setItem(MODEL_KEY, DEFAULT_ID); }catch(e){}
+    return DEFAULT_ID;
   };
-  const setModel=(id)=>{ try{ localStorage.setItem(MODEL_KEY,id); }catch(e){} };
+  const setModel=(id)=>{ if(id && !MODELS.some(m=>m.id===id)) addExtraId(id); try{ localStorage.setItem(MODEL_KEY,id); }catch(e){} };
   const status=()=>engine&&loadedModel===modelId()?'ready':(loading?'loading':'unloaded');
   const busy=()=>!!loading||_genActive;
   const loadedId=()=>loadedModel;
-  const label=(id)=>{ const m=MODELS.find(m=>m.id===(id||modelId())); return m?m.label:(id||''); };
+  const label=(id)=>{ id=id||modelId(); const m=MODELS.find(m=>m.id===id); return m?m.label:prettyId(id); };
+  // czytelna nazwa z id prebuilt: 'Qwen2.5-3B-Instruct-q4f16_1-MLC' → 'Qwen2.5 3B Instruct (q4f16)'
+  const prettyId=(id)=>String(id||'').replace(/-MLC-1k$/,' [1k ctx]').replace(/-MLC$/,'').replace(/-(q\w+?)_\d+(?= |$)/,' ($1)').replace(/-/g,' ');
   const shortLabel=(id)=>label(id).split('(')[0].replace(/·/g,'').replace(/\s+/g,' ').trim();
   async function ensureLib(){ if(!lib) lib=await import(CDN); return lib; }
   // ---- appConfig + model-id resolution ----
@@ -84,12 +107,21 @@ CM.LocalAI = (function(){
     return !!(await L.hasModelInCache(await resolveId(id||modelId()), cfg)); }catch(e){ return false; } }
   async function listDownloaded(){
     const out=[];
-    for(const m of MODELS){
+    const all=MODELS.concat(extraIds().filter(id=>!MODELS.some(m=>m.id===id)).map(id=>({id, label:prettyId(id)})));
+    for(const m of all){
       // model, którego ten build silnika nie uruchomi, NIGDY nie jest listowany (zero dead-endów)
       try{ await resolveId(m.id); }catch(e){ continue; }
-      out.push({id:m.id, label:m.label, downloaded:await isDownloaded(m.id)});
+      out.push({id:m.id, label:m.label, downloaded:await isDownloaded(m.id), think:!!m.think});
     }
     return out;
+  }
+  // PEŁNA lista modeli czatu wbudowana w ten build WebLLM (bez embeddingów/wizji): [{id,label,vramMB,low}]
+  async function listPrebuilt(){
+    const cfg=await appCfg();
+    return (cfg.model_list||[])
+      .filter(m=>!/embed|snowflake|vision|-VL-|whisper/i.test(m.model_id))
+      .map(m=>({id:m.model_id, label:prettyId(m.model_id), vramMB:Math.round(m.vram_required_MB||0), low:!!m.low_resource_required, think:/R1|Reason|Think/i.test(m.model_id)}))
+      .sort((a,b)=>(a.vramMB||1e9)-(b.vramMB||1e9));
   }
   async function deleteModel(id){
     if(!id) return false;
@@ -311,7 +343,7 @@ CM.LocalAI = (function(){
     return out;
   }
 
-  return { MODELS, hasWebGPU, provider, setProvider, modelId, setModel, status, busy, loadedId, label, shortLabel, isThinking,
+  return { MODELS, hasWebGPU, provider, setProvider, modelId, setModel, status, busy, loadedId, label, shortLabel, isThinking, listPrebuilt,
            isDownloaded, listDownloaded, deleteModel, interrupt,
            ensureEngine, chat, unload, deleteDownloads, downloadedInfo, onProgress,
            progress:()=>progress, _clampMsgs:clampMsgs };

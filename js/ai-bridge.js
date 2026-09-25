@@ -303,6 +303,43 @@
         const go=()=>{ const b=document.getElementById(ids[a]); if(b) b.click(); }; setTimeout(go,260);
         return I.t('cb.execMind','MindMap: ')+a; }
       case 'installPWA': if(state._installApp){ state._installApp(); return I.t('cb.execPWA','Uruchomiono instalację aplikacji.'); } throw new Error(I.t('cb.noPWA','Instalacja PWA niedostępna w tej chwili.'));
+      // ---- narzędzia „/" ChatBota: statystyki, listy, wyszukiwanie w treści, zależności ----
+      case 'stats': { _needProject(); const g=A.graph; let files=0, folders=0, ext=0, lines=0; const langs=new Map(); const big=[];
+        for(const n of g.nodes.values()){ if(n.type==='file'){ files++; lines+=n.metrics?n.metrics.lines:0; const l=(n.langInfo&&n.langInfo.name)||n.lang; langs.set(l,(langs.get(l)||0)+1); big.push(n); }
+          else if(n.type==='external') ext++; else if(n.id!=='__root__'&&n.id!=='__ext__') folders++; }
+        big.sort((a,b)=>((b.metrics&&b.metrics.lines)||0)-((a.metrics&&a.metrics.lines)||0));
+        const cyc=g.importCycles?g.importCycles().components.length:0;
+        const top=[...langs.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>k+' ×'+v).join(', ');
+        return I.t('cb.stats','Pliki: ')+files+' · '+I.t('cb.statsFolders','foldery: ')+folders+' · '+I.t('cb.statsExt','zewnętrzne: ')+ext+' · '+I.t('cb.statsLines','linie: ')+lines
+          +' · '+I.t('cb.statsCycles','cykle: ')+cyc+'\n'+I.t('cb.statsLangs','Języki: ')+top+'\n'+I.t('cb.statsBig','Największe: ')+big.slice(0,5).map(n=>n.name+' ('+((n.metrics&&n.metrics.lines)||0)+')').join(', '); }
+      case 'topFiles': { _needProject(); const g=A.graph; const metric=(args.metric||'lines').toLowerCase(); const n=Math.max(1,Math.min(50,+args.n||10));
+        const val=(x)=>metric==='size'?(x.size||0):metric==='deps'?((x.importsIn||[]).length+(x.importsOut||[]).length):((x.metrics&&x.metrics[metric])||0);
+        const list=[...g.nodes.values()].filter(x=>x.type==='file').sort((a,b)=>val(b)-val(a)).slice(0,n);
+        if(A.renderer){ A.renderer.highlight=new Set(list.map(x=>x.id)); A.renderer.kick(); }
+        return I.t('cb.topFiles','Top wg ')+metric+': '+list.map(x=>x.name+' ('+val(x)+')').join(', '); }
+      case 'findText': { _needProject(); const q=String(args.query||'').trim(); if(!q) throw new Error(I.t('cb.needQuery','Podaj szukaną frazę.'));
+        const ql=q.toLowerCase(); const hits=[]; for(const x of A.graph.nodes.values()){ if(x.type==='file'&&x.preview&&String(x.preview).toLowerCase().includes(ql)) hits.push(x); if(hits.length>=200) break; }
+        if(A.renderer){ A.renderer.highlight=hits.length?new Set(hits.map(x=>x.id)):null; A.renderer.kick(); }
+        if(!hits.length) return I.t('cb.findNone','Brak plików zawierających: ')+q;
+        return I.t('cb.findHits','Znaleziono w ')+hits.length+': '+hits.slice(0,25).map(x=>x.path||x.name).join(', ')+(hits.length>25?' …':''); }
+      case 'listLang': { _needProject(); const k=String(args.lang||'').toLowerCase().trim(); if(!k) throw new Error(I.t('cb.needLangKey','Podaj język/technologię, np. js.'));
+        const list=[...A.graph.nodes.values()].filter(x=>x.type==='file'&&(String(x.lang).toLowerCase()===k||String((x.langInfo&&x.langInfo.name)||'').toLowerCase()===k));
+        if(!list.length) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+k+' ('+Array.from(A.graph.langStats.keys()).join(', ')+')');
+        if(A.renderer){ A.renderer.highlight=new Set(list.map(x=>x.id)); A.renderer.kick(); }
+        return k+': '+list.length+' — '+list.slice(0,30).map(x=>x.name).join(', ')+(list.length>30?' …':''); }
+      case 'dependsOn': case 'dependencies': { _needProject(); const q=String(args.query||args.name||'').toLowerCase().trim(); if(!q) throw new Error(I.t('cb.needName','Podaj nazwę elementu.'));
+        let best=null,bs=-1; for(const x of A.graph.nodes.values()){ if(x.id==='__root__'||x.id==='__ext__') continue; const nm=(x.name||'').toLowerCase(), pt=(x.path||'').toLowerCase();
+          const sc=nm===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1))); if(sc>bs){bs=sc;best=x;} }
+        if(!best) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+q);
+        const imp=A.graph.impactSet(best.id); const set=action==='dependsOn'?imp.up:imp.down;
+        const names=[...set].map(id=>(A.graph.nodes.get(id)||{}).name||id);
+        if(A.renderer){ A.renderer.highlight=new Set([best.id, ...set]); A.renderer.kick(); }
+        return best.name+(action==='dependsOn'?I.t('cb.depOn',' — zależą od niego: '):I.t('cb.depOf',' — zależy od: '))+(names.length?names.slice(0,40).join(', ')+(names.length>40?' …':''):I.t('cb.depNone','(nic)')); }
+      case 'explain': { _needProject(); const q=String(args.query||args.name||'').trim(); if(q) exec('focusNode',{query:q});
+        const node=A.renderer&&A.renderer.selected; if(!node) throw new Error(I.t('cb.needName','Podaj nazwę elementu.'));
+        A.aiAskNode(node, I.t('cb.explainQ','Wyjaśnij rolę tego elementu w projekcie i co warto o nim wiedzieć.')).then(txt=>{ if(CM.UI&&CM.UI.renderDetails) U.toast(String(txt||'').slice(0,400), 'info', 12000); }).catch(e=>U.toast((e&&e.message)||String(e),'error'));
+        return I.t('cb.explainRun','Pytam AI o: ')+node.name; }
+      case 'clearChat': { if(CM.ChatBot&&CM.ChatBot._newChat) CM.ChatBot._newChat(); return I.t('cb.execClearChat','Nowa rozmowa.'); }
       case 'help': case 'listActions': return I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', ');
       default: throw new Error(I.t('cb.unknownAction','Nieznana akcja: ')+action+'. '+I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', '));
     }
@@ -312,7 +349,8 @@
     'zoom','rotate','toggle3D','flyMode','collapseAll','toggleImpact','toggleMinimap','setFilter','setMetric','toggleLang',
     'openSettings','openDrive','openHistory','openCompare','saveMap','snapshot','exportImage','copyLink','detectCycles',
     'hotspots','inspect','aiAnalyze','setTheme','setPreset','setAccent','setBackground','setGlass','setSpacing','setNodeScale','setFontScale',
-    'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help'];
+    'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help',
+    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat'];
 
   Object.assign(A, {
     paletteCommands, buildPalette, aiStructureSummary, aiKeyList, aiModel, aiConfigured, aiGuard, aiChat,

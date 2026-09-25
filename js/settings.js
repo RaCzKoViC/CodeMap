@@ -41,6 +41,8 @@ CM.Settings = (function(){
     'ai.localLoading':'Pobieram / uruchamiam…','ai.localNoGPU':'Ta przeglądarka nie obsługuje WebGPU (wymagany Chrome/Edge 113+). Lokalne modele są niedostępne — użyj Mistral API.',
     'ai.localUnload':'Zwolnij z pamięci (RAM/VRAM)','ai.localDelete':'Usuń pobrane wagi z dysku','ai.localDeleted':'Usunięto pobrane modele: ','ai.localCached':'Pobrane dane modeli w przeglądarce: ',
     'ai.localCancel':'Anuluj pobieranie / ładowanie',
+    'ai.localAll':'Wszystkie modele silnika WebLLM','ai.localAllHint':'Pełna lista modeli czatu wbudowana w używaną wersję WebLLM (VRAM w MB). Wybór dopisuje model do listy powyżej.','ai.localAllShow':'Pokaż wszystkie modele','ai.localAllPick':'— wybierz model —',
+    'ai.ollamaPull':'Pobierz model do Ollamy','ai.ollamaPullHint':'Nazwa jak w bibliotece ollama.com (np. qwen2.5:3b). Pobieranie odbywa się w Ollamie, postęp poniżej.','ai.ollamaPullBtn':'Pobierz','ai.ollamaPullDone':'Pobrano: ','ai.ollamaPullCancel':'Anuluj','ai.ollamaSuggest':'Propozycje: ',
     'ai.localList':'Pobrane modele (zarządzanie)','ai.localNone':'Nie pobrano jeszcze żadnego modelu.','ai.localRun':'Uruchom (pobrany — bez ponownego pobierania)',
     'ai.localLoaded':'załadowany','ai.localDelOne':'Usuń','ai.localDelConfirm':'Usunąć pobrane wagi modelu „{n}” z dysku przeglądarki?',
     'ai.privacy':'Prywatność: wysyłana jest TYLKO struktura (ścieżki, liczby, rozmiary, języki) — nigdy treść plików. Klucz trzymany jest wyłącznie w Twojej przeglądarce.',
@@ -146,6 +148,8 @@ CM.Settings = (function(){
     'ai.localLoading':'Downloading / starting…','ai.localNoGPU':'This browser has no WebGPU (Chrome/Edge 113+ required). Local models are unavailable — use the Mistral API.',
     'ai.localUnload':'Release from memory (RAM/VRAM)','ai.localDelete':'Delete downloaded weights from disk','ai.localDeleted':'Deleted model downloads: ','ai.localCached':'Model data downloaded in this browser: ',
     'ai.localCancel':'Cancel download / load',
+    'ai.localAll':'All WebLLM engine models','ai.localAllHint':'The full chat-model list built into the WebLLM version in use (VRAM in MB). Picking one adds it to the list above.','ai.localAllShow':'Show all models','ai.localAllPick':'— pick a model —',
+    'ai.ollamaPull':'Pull a model into Ollama','ai.ollamaPullHint':'Name as in the ollama.com library (e.g. qwen2.5:3b). The download runs inside Ollama; progress below.','ai.ollamaPullBtn':'Pull','ai.ollamaPullDone':'Pulled: ','ai.ollamaPullCancel':'Cancel','ai.ollamaSuggest':'Suggestions: ',
     'ai.localList':'Downloaded models (manage)','ai.localNone':'No models downloaded yet.','ai.localRun':'Start (downloaded — no re-download)',
     'ai.localLoaded':'loaded','ai.localDelOne':'Delete','ai.localDelConfirm':'Delete the downloaded weights of "{n}" from this browser?',
     'ai.privacy':'Privacy: only the STRUCTURE is sent (paths, counts, sizes, languages) — never file contents. The key stays only in your browser.',
@@ -497,6 +501,31 @@ CM.Settings = (function(){
         const mSel=el('select',{class:'set-ai-input'});
         const stat=el('div',{class:'set-localai-stat'});
         ollamaBox.appendChild(mSel); ollamaBox.appendChild(stat);
+        // ---- pobieranie modeli do Ollamy z poziomu aplikacji ----
+        const pullBox=el('div',{class:'set-localai-pull'}); ollamaBox.appendChild(pullBox);
+        let pullCtl=null;
+        const renderPull=()=>{
+          if(pullBox.childElementCount) return;   // raz — odświeżenie listy modeli nie kasuje statusu pobierania
+          pullBox.innerHTML='';
+          pullBox.appendChild(el('div',{class:'set-label set-mt',text:t('ai.ollamaPull')}));
+          pullBox.appendChild(el('p',{class:'set-desc',text:t('ai.ollamaPullHint')}));
+          const prow=el('div',{class:'set-localai-row'});
+          const pinp=el('input',{class:'set-ai-input',style:'flex:1;min-width:0',placeholder:'qwen2.5:3b',spellcheck:'false',autocomplete:'off'});
+          const pbtn=el('button',{class:'tb-btn primary',html:ic.svg('download',{size:14})+' '+t('ai.ollamaPullBtn')});
+          prow.appendChild(pinp); prow.appendChild(pbtn); pullBox.appendChild(prow);
+          const pbar=el('div',{class:'set-localai-bar'}, el('div',{class:'set-localai-fill'})); pbar.style.display='none';
+          const pstat=el('div',{class:'set-localai-stat'}); pullBox.appendChild(pbar); pullBox.appendChild(pstat);
+          const sug=el('div',{class:'set-localai-sug'}); sug.appendChild(el('span',{class:'set-desc',text:t('ai.ollamaSuggest')}));
+          (CM.Ollama.SUGGESTED||[]).forEach(m=>{ const b=el('button',{class:'set-localai-sugbtn',type:'button',title:m.note+' · '+m.size,text:m.name,onclick:()=>{ pinp.value=m.name; pbtn.click(); }}); sug.appendChild(b); });
+          pullBox.appendChild(sug);
+          pbtn.onclick=async()=>{ const name=pinp.value.trim(); if(!name) return;
+            if(pullCtl){ pullCtl.abort(); return; }
+            pullCtl=new AbortController(); pbtn.innerHTML=t('ai.ollamaPullCancel'); pinp.disabled=true; pbar.style.display='block'; pstat.className='set-localai-stat';
+            try{ await CM.Ollama.pull(name, (p)=>{ pstat.textContent=(p.status||'')+(p.pct!=null?(' '+p.pct+'%'):''); pbar.firstChild.style.width=(p.pct||0)+'%'; }, pullCtl.signal);
+              pstat.textContent=t('ai.ollamaPullDone')+name; pstat.className='set-localai-stat ok'; CM.Ollama.setModel(name); await fill(); }
+            catch(e){ pstat.textContent=(e&&e.name==='AbortError')?'—':((e&&e.message)||String(e)); pstat.className='set-localai-stat err'; }
+            finally{ pullCtl=null; pbtn.innerHTML=ic.svg('download',{size:14})+' '+t('ai.ollamaPullBtn'); pinp.disabled=false; pbar.style.display='none'; } };
+        };
         const fill=async()=>{
           stat.className='set-localai-stat'; stat.textContent='…';
           try{
@@ -506,6 +535,7 @@ CM.Settings = (function(){
             stat.textContent=t('ai.ollamaOnline')+list.length; stat.className='set-localai-stat ok';
           }catch(e){ mSel.innerHTML=''; stat.textContent=(e&&e.message)||String(e); stat.className='set-localai-stat err'; }
           if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh();
+          renderPull();
         };
         mSel.onchange=()=>{ CM.Ollama.setModel(mSel.value); if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh(); };
         btn.onclick=()=>{ CM.Ollama.setBase(baseInp.value); fill(); };
@@ -566,6 +596,19 @@ CM.Settings = (function(){
           LA.ensureEngine().catch(()=>{}).then(()=>{
             if(renderLocal._off){ renderLocal._off(); renderLocal._off=null; if(localBox.isConnected) renderLocal(); } });
         }
+        // ---- pełna lista modeli wbudowanych w silnik (na żądanie — wymaga załadowania biblioteki WebLLM) ----
+        const allBox=el('div',{class:'set-localai-all'});
+        localBox.appendChild(el('div',{class:'set-label set-mt',text:t('ai.localAll')}));
+        localBox.appendChild(el('p',{class:'set-desc',text:t('ai.localAllHint')}));
+        const allBtn=el('button',{class:'tb-btn',html:ic.svg('layers',{size:14})+' '+t('ai.localAllShow')});
+        allBtn.onclick=async()=>{ allBtn.disabled=true; allBtn.textContent='…';
+          try{ const list=await LA.listPrebuilt(); allBox.innerHTML='';
+            const sel=el('select',{class:'set-ai-input'}); sel.appendChild(el('option',{value:'',text:t('ai.localAllPick')+' ('+list.length+')'}));
+            list.forEach(m=>sel.appendChild(el('option',{value:m.id,text:(m.think?'🧠 ':'')+m.label+(m.vramMB?(' — '+m.vramMB+' MB'):'')+(m.low?' · low':'')})));
+            sel.onchange=()=>{ if(!sel.value) return; LA.setModel(sel.value); renderLocal(); if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh(); };
+            allBox.appendChild(sel); allBtn.remove(); }
+          catch(e){ allBtn.disabled=false; allBtn.textContent=t('ai.localAllShow'); U.toast((e&&e.message)||String(e),'error'); } };
+        allBox.appendChild(allBtn); localBox.appendChild(allBox);
         const dled=dlmap.filter(m=>m.downloaded);
         if(!dled.length){ listBox.appendChild(el('p',{class:'set-desc',text:t('ai.localNone')})); }
         else for(const m of dled){

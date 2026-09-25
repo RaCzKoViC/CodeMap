@@ -2036,3 +2036,49 @@ body.light .auth-quota{background:rgba(0,0,0,.10)}
 .auth-dev{margin:8px 0;padding:10px;border:1px dashed var(--accent);border-radius:10px}
 body.light .set-ai-keycard{background:rgba(20,30,45,.04)}
 body.light .set-ai-prov{background:rgba(20,30,45,.08)}
+
+/* ---- ChatBot: menu narzędzi „/", załączniki z mapy, uchwyty rozmiaru, lista rozmów o zmiennej szerokości ---- */
+#cb-panel.cb-sb-open .cb-sidebar{width:var(--cb-sb-w,162px)}
+#cb-panel.cb-resizing{transition:none !important;user-select:none}
+#cb-panel.cb-resizing .cb-sidebar{transition:none}
+.cb-sb-handle{width:6px;flex-shrink:0;cursor:col-resize;background:transparent;position:relative;z-index:2;margin-left:-3px}
+.cb-sb-handle:hover,#cb-panel.cb-resizing .cb-sb-handle{background:color-mix(in srgb, var(--accent) 35%, transparent)}
+.cb-rz{position:absolute;z-index:6}
+.cb-rz-n{top:-3px;left:12px;right:12px;height:7px;cursor:ns-resize}
+.cb-rz-s{bottom:-3px;left:12px;right:12px;height:7px;cursor:ns-resize}
+.cb-rz-e{right:-3px;top:12px;bottom:12px;width:7px;cursor:ew-resize}
+.cb-rz-w{left:-3px;top:12px;bottom:12px;width:7px;cursor:ew-resize}
+.cb-rz-ne{right:-3px;top:-3px;width:14px;height:14px;cursor:nesw-resize}
+.cb-rz-sw{left:-3px;bottom:-3px;width:14px;height:14px;cursor:nesw-resize}
+.cb-rz-nw{left:-3px;top:-3px;width:14px;height:14px;cursor:nwse-resize}
+.cb-rz-se{right:-3px;bottom:-3px;width:14px;height:14px;cursor:nwse-resize}
+.cb-tools{margin:0 11px 4px;max-height:220px;overflow:auto;border:1px solid var(--glass-border);border-radius:10px;background:rgba(var(--glass-rgb),.96);box-shadow:0 10px 30px rgba(0,0,0,.35);font-size:12px}
+.cb-tools.hidden{display:none}
+.cb-tools-h{padding:6px 10px;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--text-mute);border-bottom:1px solid var(--glass-border)}
+.cb-tools-empty{padding:8px 10px;color:var(--text-mute)}
+.cb-tool{display:flex;align-items:baseline;gap:8px;padding:6px 10px;cursor:pointer;border-left:2px solid transparent}
+.cb-tool:hover,.cb-tool.sel{background:var(--cb-soft);border-left-color:var(--accent)}
+.cb-tool-n{font-weight:800;color:var(--accent);white-space:nowrap}
+.cb-tool-s{color:var(--text-dim);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;white-space:nowrap}
+.cb-tool-d{color:var(--text-mute);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cb-tool-w{color:var(--text-mute);font-size:10px}
+.cb-attach{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 11px 0}
+.cb-attach.hidden{display:none}
+.cb-att{display:inline-flex;align-items:center;gap:5px;max-width:180px;padding:3px 6px 3px 7px;border-radius:999px;background:var(--cb-soft);border:1px solid var(--cb-soft2);font-size:11.5px;color:var(--text)}
+.cb-att-ic{display:inline-flex;color:var(--accent)}
+.cb-att-n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cb-att-x{border:0;background:#ef4444;color:#fff;width:15px;height:15px;border-radius:50%;font-size:12px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
+.cb-att-x:hover{background:#dc2626}
+.cb-att-cnt{font-size:10.5px;color:var(--text-mute);margin-left:auto}
+.cb-att-msg{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.cb-att-ro{cursor:pointer}
+#cb-panel.cb-dropzone .cb-composer{outline:2px dashed var(--accent);outline-offset:-4px;background:color-mix(in srgb, var(--accent) 12%, transparent)}
+#cb-panel.cb-dropzone .cb-input::placeholder{color:var(--accent)}
+.cb-hbtn.cb-quick{font-size:15px;opacity:.55}
+.cb-hbtn.cb-quick.on{opacity:1;color:var(--accent);text-shadow:0 0 8px color-mix(in srgb, var(--accent) 60%, transparent)}
+.cb-think-b{max-height:none;font-style:normal}
+.cb-think summary{position:sticky;top:0;background:inherit}
+.set-localai-sug{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.set-localai-sugbtn{border:1px solid var(--glass-border);background:rgba(255,255,255,.05);color:var(--text);font-size:11px;padding:3px 8px;border-radius:999px;cursor:pointer}
+.set-localai-sugbtn:hover{border-color:var(--accent);color:var(--accent)}
+.set-localai-pull{margin-top:4px}

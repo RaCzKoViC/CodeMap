@@ -99,5 +99,39 @@ CM.Ollama = (function(){
     return full;
   }
 
-  return { base, setBase, model, setModel, models, online, chat, DEF_BASE };
+  // Pobieranie modelu do lokalnej Ollamy: POST /api/pull (NDJSON: {status, total, completed}) →
+  // onProgress({status, pct}); abort przez signal. Po sukcesie lista modeli jest odświeżana.
+  async function pull(name, onProgress, signal){
+    name=String(name||'').trim(); if(!name) throw new Error('model');
+    let r;
+    try{ r=await fetch(base()+'/api/pull',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:name, stream:true}), signal }); }
+    catch(e){ if(e&&e.name==='AbortError') throw e; throw offlineErr(); }
+    if(!r.ok){ let d=''; try{ d=(await r.json()).error||''; }catch(e){} throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
+    const reader=r.body.getReader(); const dec=new TextDecoder(); let buf='', last=null;
+    try{
+      for(;;){ const {done,value}=await reader.read(); if(done) break; buf+=dec.decode(value,{stream:true}); let nl;
+        while((nl=buf.indexOf('\n'))>=0){ const line=buf.slice(0,nl).trim(); buf=buf.slice(nl+1); if(!line) continue;
+          let j; try{ j=JSON.parse(line); }catch(e){ continue; }
+          if(j.error) throw new Error('Ollama: '+j.error);
+          last=j; if(onProgress) onProgress({status:j.status||'', pct:(j.total&&j.completed)?Math.round(j.completed/j.total*100):null, total:j.total||0, completed:j.completed||0}); } }
+    } finally { try{ reader.cancel(); }catch(e){} }
+    _models=null; try{ await models(true); }catch(e){}
+    return last;
+  }
+  // propozycje do pobrania (nazwa, rozmiar, do czego)
+  const SUGGESTED=[
+    {name:'qwen2.5:3b', size:'1.9 GB', note:'szybki, dobrze po polsku'},
+    {name:'llama3.2:3b', size:'2.0 GB', note:'lekki, uniwersalny'},
+    {name:'gemma2:2b', size:'1.6 GB', note:'bardzo lekki'},
+    {name:'phi3.5', size:'2.2 GB', note:'Microsoft, kompaktowy'},
+    {name:'qwen2.5:7b', size:'4.7 GB', note:'polecany do sterowania aplikacją'},
+    {name:'qwen2.5-coder:7b', size:'4.7 GB', note:'do kodu'},
+    {name:'llama3.1:8b', size:'4.9 GB', note:'uniwersalny, wywołania narzędzi'},
+    {name:'mistral:7b', size:'4.1 GB', note:'Mistral 7B'},
+    {name:'qwen3:8b', size:'5.2 GB', note:'myślący (szybka odpowiedź = bez myśli)'},
+    {name:'deepseek-r1:8b', size:'4.9 GB', note:'myślący (pokazuje tok rozumowania)'},
+    {name:'gemma3:4b', size:'3.3 GB', note:'Google, wielojęzyczny'},
+    {name:'gpt-oss:20b', size:'13 GB', note:'OpenAI open-weight (myślący; 16 GB+ RAM)'},
+  ];
+  return { base, setBase, model, setModel, models, online, chat, pull, SUGGESTED, DEF_BASE };
 })();
