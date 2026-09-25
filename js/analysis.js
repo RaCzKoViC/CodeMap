@@ -190,23 +190,85 @@ CM.Analysis = (function(){
     s = String(s).replace(/\/\*[\s\S]*?\*\//g,'').replace(/(^|[^:"])\/\/[^\n]*/g,'$1').replace(/,\s*([}\]])/g,'$1');
     return JSON.parse(s);
   }
-  // resolve a JS import via tsconfig/jsconfig paths + baseUrl
-  function aliasResolve(spec, aliases, idx){
-    for(const cfg of aliases){
-      const baseDir = normPath(joinPath(cfg.dir, cfg.baseUrl||'.'));
-      for(const key in (cfg.paths||{})){
-        const star=key.indexOf('*'); let cap=null, ok=false;
-        if(star>=0){ const pre=key.slice(0,star), suf=key.slice(star+1);
-          if(spec.startsWith(pre)&&spec.endsWith(suf)&&spec.length>=pre.length+suf.length){ cap=spec.slice(pre.length, spec.length-suf.length); ok=true; } }
-        else if(spec===key){ ok=true; cap=''; }
-        if(!ok) continue;
-        const targets=cfg.paths[key]; const arr=Array.isArray(targets)?targets:[targets];
-        for(const t of arr){ const resolved=t.indexOf('*')>=0?t.replace('*',cap):t;
-          const hit=tryExact(idx.byPath, expand(normPath(joinPath(baseDir, resolved)),'js')); if(hit) return hit; }
+  // ---------- manifesty: wpis dla buildEdges (tsconfig/jsconfig → aliasy; package.json → nazwa pakietu) ----------
+  // Zwraca null, gdy plik nie jest manifestem albo nie wnosi nic do rozwiązywania importów.
+  function manifestEntry(name, content, dir){
+    if(content == null) return null;
+    const n = String(name).toLowerCase(); dir = normPath(dir||'');
+    try{
+      if(n === 'package.json'){
+        const j = looseJSON(content);
+        if(typeof j.name === 'string' && j.name.trim()) return {kind:'package', eco:'npm', dir, name:j.name.trim(), main:j.main, module:j.module, exports:j.exports};
+        return null;
       }
-      if(cfg.baseUrl!=null){ const hit=tryExact(idx.byPath, expand(normPath(joinPath(baseDir, spec)),'js')); if(hit) return hit; }
-    }
+      if(/^(tsconfig|jsconfig)(\..+)?\.json$/.test(n)){   // też tsconfig.base.json / tsconfig.app.json — cele `extends`
+        const j = looseJSON(content); const co = j.compilerOptions || {};
+        if(!(co.paths || co.baseUrl != null || j.extends)) return null;
+        return {kind:'alias', dir, file: joinPath(dir, name), primary: n === 'tsconfig.json' || n === 'jsconfig.json',
+                baseUrl: co.baseUrl != null ? String(co.baseUrl) : null, paths: co.paths || null, extends: j.extends || null};
+      }
+    }catch(e){ /* uszkodzony manifest = brak wpisu */ }
     return null;
+  }
+
+  // Konfiguracje tsconfig/jsconfig: `extends` scalane (bliższy config nadpisuje klucze `paths`; `baseUrl`
+  // z najbliższego configu w łańcuchu, który go deklaruje, względem JEGO katalogu; `paths` bez baseUrl
+  // względem katalogu configu, który je deklaruje — jak w TS ≥ 4.1). Każda konfiguracja obowiązuje TYLKO
+  // dla plików w swoim katalogu i podkatalogach; najbliższa wygrywa i nie ma spadania do dalszych.
+  function aliasConfigs(manifests){
+    const cfgs = (manifests||[])
+      .filter(m => m && (m.kind === 'alias' || (!m.kind && (m.paths || m.baseUrl != null))))   // bez kind = stary format {dir,baseUrl,paths}
+      .map(m => ({dir: normPath(m.dir||''), file: normPath(m.file || joinPath(m.dir||'', 'tsconfig.json')), primary: m.primary !== false,
+                  baseUrl: m.baseUrl != null ? String(m.baseUrl) : null, paths: m.paths || null, extends: m.extends || null}));
+    const byFile = new Map(cfgs.map(c => [c.file, c]));
+    const chainOf = (cfg, seen) => {
+      const out = [cfg]; seen.add(cfg.file);
+      const exts = Array.isArray(cfg.extends) ? cfg.extends : (cfg.extends ? [cfg.extends] : []);
+      for(const e of exts){
+        if(typeof e !== 'string' || !/^\.{0,2}\//.test(e)) continue;   // `@tsconfig/node18` itp. nie są w projekcie
+        const base = normPath(joinPath(cfg.dir, e));
+        const parent = byFile.get(base) || byFile.get(base + '.json') || byFile.get(base + '/tsconfig.json');
+        if(parent && !seen.has(parent.file)) out.push(...chainOf(parent, seen));
+      }
+      return out;
+    };
+    const resolved = cfgs.map(cfg => {
+      const chain = chainOf(cfg, new Set());
+      let baseDir = null;
+      for(let i = chain.length-1; i >= 0; i--) if(chain[i].baseUrl != null) baseDir = normPath(joinPath(chain[i].dir, chain[i].baseUrl));
+      const paths = new Map();
+      for(let i = chain.length-1; i >= 0; i--){
+        const c = chain[i]; if(!c.paths || typeof c.paths !== 'object') continue;
+        // ściśle: względem baseUrl (jeśli jest w łańcuchu); awaryjnie katalog configu deklarującego `paths` —
+        // częsty błąd w monorepo (baza z baseUrl ".", pakiet z "@/*": ["src/*"]) i tak wskazuje istniejący plik
+        const bases = baseDir != null && baseDir !== c.dir ? [baseDir, c.dir] : [c.dir];
+        for(const k in c.paths){ const t = c.paths[k]; paths.set(k, {targets: (Array.isArray(t) ? t : [t]).filter(x => typeof x === 'string'), bases}); }
+      }
+      return {dir: cfg.dir, file: cfg.file, primary: cfg.primary, baseDir: baseDir != null ? baseDir : cfg.dir, paths};
+    });
+    // najgłębszy katalog pierwszy; w tym samym katalogu tsconfig.json/jsconfig.json przed wariantami (tsconfig.base.json)
+    resolved.sort((a, b) => (b.dir.length - a.dir.length) || ((b.primary ? 1 : 0) - (a.primary ? 1 : 0)));
+    return resolved;
+  }
+  function aliasFor(cfgs, filePath){
+    const dir = dirname(filePath);
+    for(const c of cfgs){ if(c.dir === '' || dir === c.dir || dir.startsWith(c.dir + '/')) return c; }
+    return null;
+  }
+  // rozwiązanie importu JS przez paths + baseUrl JEDNEJ (najbliższej) konfiguracji
+  function aliasResolve(spec, cfg, idx){
+    if(!cfg) return null;
+    for(const [key, {targets, bases}] of cfg.paths){
+      const star = key.indexOf('*'); let cap = null, ok = false;
+      if(star >= 0){ const pre = key.slice(0,star), suf = key.slice(star+1);
+        if(spec.startsWith(pre) && spec.endsWith(suf) && spec.length >= pre.length+suf.length){ cap = spec.slice(pre.length, spec.length-suf.length); ok = true; } }
+      else if(spec === key){ ok = true; cap = ''; }
+      if(!ok) continue;
+      for(const t of targets){ const resolved = t.indexOf('*') >= 0 ? t.replace('*', cap) : t;
+        for(const base of bases){ const hit = tryExact(idx.byPath, expand(normPath(joinPath(base, resolved)), 'js')); if(hit) return hit; } }
+    }
+    // baseUrl (jawny lub domyślnie katalog configu): `import 'src/x'`
+    return tryExact(idx.byPath, expand(normPath(joinPath(cfg.baseDir, spec)), 'js'));
   }
 
   function extractDeps(content, key){
@@ -324,7 +386,7 @@ CM.Analysis = (function(){
     return null;
   }
 
-  function resolveDep(file, dep, idx, aliases){
+  function resolveDep(file, dep, idx){
     const fam = family(file.lang);
     const dir = dirname(file.path);
     const spec = dep.spec;
@@ -351,7 +413,7 @@ CM.Analysis = (function(){
       case 'php-ns': { const cls = spec.split('\\').pop(); return suffixFind(idx, [cls+'.php']); }
       case 'bare': {
         if(fam==='css'){ const base = joinPath(dir, spec); return tryExact(idx.byPath, expand(base,'css')); }
-        if(fam==='js' && aliases && aliases.length){ const a=aliasResolve(spec, aliases, idx); if(a) return a; }
+        if(fam==='js' && idx.alias.length){ const a = aliasResolve(spec, idx.aliasFor(file.path), idx); if(a) return a; }
         return null;
       }
       default: return null;
@@ -365,7 +427,8 @@ CM.Analysis = (function(){
   }
 
   // build import / reference edges + external module summary
-  function buildEdges(nodes, aliases){
+  // manifests: wpisy z manifestEntry() (aliasy tsconfig/jsconfig, pakiety) — stary format {dir,baseUrl,paths} też działa
+  function buildEdges(nodes, manifests){
     const byPath = new Map(), byBase = new Map(), folderByPath = new Map();
     for(const n of nodes){
       byPath.set(n.path, n);
@@ -374,7 +437,9 @@ CM.Analysis = (function(){
       byBase.get(b).push(n);
       if(n.type === 'folder') folderByPath.set(n.path, n);
     }
-    const idx = {byPath, byBase, folderByPath};
+    const alias = aliasConfigs(manifests), aliasCache = new Map();
+    const idx = {byPath, byBase, folderByPath, alias,
+      aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];
     const seen = new Set();
     const externals = new Map();
@@ -386,7 +451,7 @@ CM.Analysis = (function(){
     for(const f of nodes){
       if(f.type!=='file' || !f.deps || !f.deps.length) continue;
       for(const dep of f.deps){
-        const tgt = resolveDep(f, dep, idx, aliases);
+        const tgt = resolveDep(f, dep, idx);
         if(tgt){ addEdge(f.id, tgt.id, dep.etype==='reference'?'reference':'import'); }
         else if(dep.kind==='bare' || dep.kind==='module' || dep.kind==='cs-ns' || dep.kind==='php-ns'){
           const name = externalName(dep.spec);
@@ -399,6 +464,6 @@ CM.Analysis = (function(){
     return {edges, externals};
   }
 
-  return {analyzeContent, extractDeps, extractSymbols, buildEdges, family, stripNonCode, looseJSON,
+  return {analyzeContent, extractDeps, extractSymbols, buildEdges, manifestEntry, family, stripNonCode, looseJSON,
           normPath, dirname, basename, joinPath, externalName};
 })();

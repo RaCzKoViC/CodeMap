@@ -2,11 +2,15 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCM, ALL_FILTERS, host } from './harness.mjs';
 import { FILES, META, EXPECTED_EDGES, EXPECTED_EXTERNALS } from './fixtures/sample-project.mjs';
+import { FILES as MONO_FILES, META as MONO_META } from './fixtures/monorepo.mjs';
 
 const CM = loadCM();
 const { Graph, diffSignatures } = CM.Graph;
 const build = () => new Graph().build(FILES.map((f) => ({ ...f })), META);
+const buildMono = () => new Graph().build(MONO_FILES.map((f) => ({ ...f })), MONO_META);
 const edgeKeys = (g) => new Set(g.edges.filter((e) => e.type !== 'contains').map((e) => `${e.source}|${e.target}|${e.type}`));
+/** Cele krawędzi import/reference wychodzących z pliku `src` (posortowane). */
+const targetsOf = (g, src) => host(g.edges.filter((e) => e.source === src && e.type !== 'contains').map((e) => e.target).sort());
 
 describe('Graph.build', () => {
   let g;
@@ -158,6 +162,29 @@ describe('serializacja', () => {
     assert.equal(g2.nodes.get('src').descFiles, 8, 'aggregates recomputed');
     assert.equal(g2.langStats.get('js').count, 8);
     assert.ok(g2.nodes.get('src/lib/util.js').importsIn.includes('src/index.js'), 'import degrees recomputed');
+  });
+});
+
+describe('aliasy tsconfig/jsconfig per katalog', () => {
+  test('najbliższy config wygrywa; dwa pakiety z tym samym aliasem @/* się nie mieszają', () => {
+    const g = buildMono();
+    assert.deepEqual(targetsOf(g, 'packages/a/src/main.ts'), ['ext:@root/gen', 'packages/a/src/x.ts', 'packages/shared/src/util.ts']);
+    assert.deepEqual(targetsOf(g, 'packages/b/src/main.ts'), ['ext:@shared/util', 'packages/b/lib/x.ts']);
+  });
+  test('extends scala paths i baseUrl z bazy (z rozszerzeniem .json i bez); root nie przecieka do pakietów', () => {
+    const g = buildMono();
+    // scripts/ nie ma własnego configu → root tsconfig.json (+ baza przez extends); `@/*` root nie zna
+    assert.deepEqual(targetsOf(g, 'scripts/build.ts'), ['ext:@/x', 'packages/shared/src/util.ts', 'tools/gen.ts']);
+    // `@root/*` z root tsconfig.json NIE obowiązuje w packages/a (a rozszerza tylko bazę)
+    assert.ok(!edgeKeys(g).has('packages/a/src/main.ts|tools/gen.ts|import'));
+  });
+  test('manifestEntry: tsconfig z samym extends też jest konfiguracją; JSONC; uszkodzony → null', () => {
+    const A = CM.Analysis;
+    const e = host(A.manifestEntry('tsconfig.json', '{ "extends": "./base.json", /* c */ }', 'pkg'));
+    assert.deepEqual(e, { kind: 'alias', dir: 'pkg', file: 'pkg/tsconfig.json', primary: true, baseUrl: null, paths: null, extends: './base.json' });
+    assert.equal(host(A.manifestEntry('tsconfig.build.json', '{ "compilerOptions": { "baseUrl": "src" } }', '')).primary, false);
+    assert.equal(A.manifestEntry('tsconfig.json', '{ not json', ''), null);
+    assert.equal(A.manifestEntry('tsconfig.json', '{ "compilerOptions": { "strict": true } }', ''), null, 'bez paths/baseUrl/extends nie ma czego rozwiązywać');
   });
 });
 

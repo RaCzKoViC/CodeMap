@@ -22,7 +22,7 @@ CM.Graph = (function(){
       this.clear();
       this.meta = Object.assign({name:'projekt', source:'', createdAt:Date.now()}, meta||{});
       this.root.name = this.meta.name;
-      const configs = [];   // tsconfig/jsconfig path-alias configs
+      const manifests = [];   // wpisy A.manifestEntry: aliasy tsconfig/jsconfig (z extends), pakiety workspaces
 
       for(const f of files){
         const path = A.normPath(f.path);
@@ -50,7 +50,7 @@ CM.Graph = (function(){
           // hitting the 4000-content-files cap stay well under ~256 MB of retained text
           node.preview = content.length > 65536 ? content.slice(0,65536) : content;
           if(node.metrics) node.size = node.size || node.metrics.chars;
-          this._scanManifest(node.name, content, A.dirname(path), configs);
+          this._scanManifest(node.name, content, A.dirname(path), manifests);
         } else {
           node.hash = 'bin:'+node.size;
         }
@@ -63,7 +63,7 @@ CM.Graph = (function(){
 
       // import / reference edges (with tsconfig/jsconfig path-alias resolution)
       const all = Array.from(this.nodes.values());
-      const {edges, externals} = A.buildEdges(all, configs);
+      const {edges, externals} = A.buildEdges(all, manifests);
       for(const e of edges) this.edges.push(e);
       this.externals = externals;
 
@@ -109,19 +109,17 @@ CM.Graph = (function(){
       this.edges.push({id:'c'+this.edges.length, source:parent.id, target:child.id, type:'contains'});
     }
 
-    // parse package/dependency manifests -> versions; tsconfig/jsconfig -> path-alias configs
-    _scanManifest(name, content, dir, configs){
+    // parse package/dependency manifests -> versions; wpisy do rozwiązywania importów (aliasy, pakiety) → manifests
+    _scanManifest(name, content, dir, manifests){
       const n = name.toLowerCase();
       const setV = (k,v,src)=>{ if(k) this.depVersions.set(k, {version:String(v||'').replace(/^[\^~>=<\s]+/,'').trim(), source:src}); };
+      const entry = A.manifestEntry(name, content, dir); if(entry) manifests.push(entry);
       try{
         if(n==='package.json'){
           const j = A.looseJSON(content);
           for(const grp of ['dependencies','devDependencies','peerDependencies','optionalDependencies']){
             const o = j[grp]; if(o&&typeof o==='object') for(const k in o) setV(k, o[k], 'npm');
           }
-        } else if(n==='tsconfig.json' || n==='jsconfig.json'){
-          const j = A.looseJSON(content); const co = j.compilerOptions||{};
-          if(co.paths || co.baseUrl) configs.push({dir, baseUrl: co.baseUrl!=null?co.baseUrl:'.', paths: co.paths||{}});
         } else if(n==='requirements.txt'){
           for(const line of content.split(/\r?\n/)){ const t=line.trim(); if(!t||t[0]==='#'||t.startsWith('-')) continue;
             const m=/^([A-Za-z0-9._-]+)\s*(?:[=<>!~]+\s*([0-9][\w.\-]*))?/.exec(t); if(m) setV(m[1].toLowerCase(), m[2]||'', 'pip'); }
