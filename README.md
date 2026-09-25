@@ -62,8 +62,13 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   hotspoty (rozmiar × zależności × złożoność).
 
 ### Inspect — analiza statyczna
-15 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
-głębokie zagnieżdżenie, minifikaty…) z progami statystycznymi, **health score** i raportem Markdown.
+16 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
+głębokie zagnieżdżenie, minifikaty, **zduplikowany kod** — winnowing na treści plików…) z progami
+statystycznymi, **health score** i raportem Markdown. Opcjonalny plik **`.codemap.rules.json`** w repozytorium
+(warstwy = globy ścieżek, `forbid` między warstwami, `noCycles`) jest egzekwowany jako reguła
+„naruszenia architektury". W panelu szczegółów każdy plik i folder ma **sprzężenia** Ca / Ce / I
+(afferent, efferent, niestabilność wg Martina). Widoczny graf da się **wyeksportować** do DOT (Graphviz),
+Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
 
 ### AI — opcjonalnie, z zachowaniem prywatności
 - **WebLLM** — modele uruchamiane w przeglądarce (WebGPU), wagi w cache, bez wysyłania czegokolwiek.
@@ -140,12 +145,15 @@ js/languages.js            # rejestr 150+ formatów
 js/analysis.js             # metryki, parsowanie importów, rozwiązywanie zależności
 js/graph.js                # model: hierarchia, agregaty, zwijanie, cykle, wpływ, (de)serializacja, diff
 js/layouts.js              # 13 układów (+ fizyka), js/sim-worker.js — Web Worker
+js/export.js               # eksport widocznego grafu: DOT (Graphviz), Mermaid, GraphML (yEd)
+js/metrics.js              # sprzężenia Ca/Ce/I per plik i folder, duplikaty kodu (winnowing)
+js/rules.js                # reguły architektury z .codemap.rules.json (warstwy, forbid, noCycles)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa
 js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral
 js/storage.js              # migawki i sesja (IndexedDB)
 js/ui.js                   # panele szczegółów, filtry, historia, diff
 js/settings.js             # ustawienia, samouczek, instrukcja
-js/inspect.js              # analiza statyczna (15 reguł, health score)
+js/inspect.js              # analiza statyczna (16 reguł + reguły architektury, health score)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
 js/mindmap.js  js/mmdraw.js  # tryb MindMap + warstwa rysowania
 js/drive.js                # Dysk (File System Access) i Sejf (OPFS + AES-GCM)

@@ -64,6 +64,10 @@ const status = await evalJs("(document.querySelector('#st-nodes')||{}).textConte
 const version = await evalJs('window.CM_VERSION');
 const sw = await evalJs("'serviceWorker' in navigator");
 const canvasOk = await evalJs("(function(){ const c=document.getElementById('map-canvas'); return !!c && c.width>0 && c.height>0; })()");
+// eksport grafu (czyste serializery na prawdziwym grafie demo; bez pobierania pliku)
+const exportOk = await evalJs(`(function(){ try{ const F=(CM.App&&CM.App.filters)||undefined; const out={};
+  for(const f of CM.Export.FORMATS){ const r=CM.Export.build(CMApp.graph, F, f); out[f]=r.nodes>1 && r.edges>0 && r.text.length>200; }
+  return Object.values(out).every(Boolean) ? 'ok' : JSON.stringify(out); }catch(e){ return String(e); } })()`);
 
 // --- przejście przez akcje aplikacji (wszystko, co nie otwiera systemowych okien ani nie pobiera plików) ---
 const sweep = await evalJs(`(async()=>{
@@ -88,14 +92,35 @@ const sweep = await evalJs(`(async()=>{
   return {ran, total:A.length, fails, nodesAfter:CMApp.graph.nodes.size, visible:CMApp.renderer()? (CMApp.renderer().nodes||[]).length : -1};
 })()`);
 
+// Inspect na demo (chunkowany run bez UI) + syntetyczny projekt z .codemap.rules.json i zduplikowanym
+// blokiem → reguły archviolation (CM.Rules) i dupcode (winnowing CM.Metrics) muszą się pojawić
+const inspectOk = await evalJs(`(async()=>{ try{
+  const rep=await CM.Inspect.run(CMApp.graph);
+  if(!rep || !Array.isArray(rep.findings) || typeof rep.score!=='number') return 'demo: '+JSON.stringify(rep);
+  const F=(p,c)=>({path:p,size:c.length,content:c,mtime:Date.now()});
+  const block=Array.from({length:24},(_,i)=>'export function fn'+i+'(a, b){ if(a > b){ return a - b; } return b - a + '+i+'; }').join('\\n');
+  const rules={layers:[{name:'core',match:'core/**'},{name:'ui',match:'ui/**'}],forbid:[{from:'core',to:'ui',why:'rdzen nie zna UI'}],noCycles:true};
+  CMApp.loadFiles([F('.codemap.rules.json', JSON.stringify(rules)), F('core/a.js', "import { u } from '../ui/u.js';\\n"+block),
+    F('ui/u.js', "export const u = 1;\\n"+block+"\\n"), F('ui/v.js', "import { u } from './u.js';\\nexport const v = u + 1;\\n")], {name:'rules-demo', source:'smoke'});
+  for(let i=0;i<50;i++){ if(CMApp.graph && CMApp.graph.meta && CMApp.graph.meta.name==='rules-demo' && CMApp.graph.nodes.size>4) break; await new Promise(r=>setTimeout(r,100)); }
+  const rep2=await CM.Inspect.run(CMApp.graph);
+  const rules2=rep2.findings.map(f=>f.rule);
+  const av=rep2.findings.find(f=>f.rule==='archviolation'), dc=rep2.findings.find(f=>f.rule==='dupcode');
+  const okA=av && av.sev==='high' && av.items.some(it=>it.id==='core/a.js' && /u\\.js/.test(it.detail));
+  const okD=dc && dc.sev==='med' && dc.items.some(it=>/a\\.js|u\\.js/.test(it.name) && /\\d+/.test(it.detail));
+  return okA && okD ? 'ok' : 'rules-demo: '+JSON.stringify(rules2)+' '+JSON.stringify((av||dc||{}).items);
+}catch(e){ return String(e&&e.stack||e); } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
 check(canvasOk, 'canvas mapy ma rozmiar');
 check(/^\d+\.\d+\.\d+$/.test(version || ''), `CM_VERSION = ${version}`);
 check(sw, 'API service workera dostępne');
+check(exportOk === 'ok', `eksport grafu DOT / Mermaid / GraphML na demo${exportOk === 'ok' ? '' : ': ' + exportOk}`);
 check(sweep && sweep.fails.length === 0 && sweep.ran === sweep.total, `akcje CMApp.exec: ${sweep?.ran}/${sweep?.total} OK${sweep?.fails?.length ? '\n   ' + sweep.fails.join('\n   ') : ''}`);
 check(sweep && sweep.nodesAfter === nodes, `graf nietknięty po przejściu (${sweep?.nodesAfter} węzłów)`);
+check(inspectOk === 'ok', `Inspect: reguły architektury (.codemap.rules.json) i duplikaty kodu${inspectOk === 'ok' ? '' : ': ' + inspectOk}`);
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

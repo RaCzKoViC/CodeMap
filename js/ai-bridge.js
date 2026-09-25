@@ -28,6 +28,9 @@
       c(I.t('ca.cmdHistory','Historia i porównania'),'clock',()=>btn('btn-history')),
       c(I.t('ca.cmdSave','Zapisz mapę (.json)'),'save',()=>btn('btn-save')),
       c(I.t('ca.cmdExportImg','Eksport obrazu (PNG / SVG)'),'image',()=>btn('btn-export-img')),
+      c(I.t('ca.cmdExportDot','Eksport grafu: DOT (Graphviz)'),'download',()=>btn('btn-export-dot')),
+      c(I.t('ca.cmdExportMermaid','Eksport grafu: Mermaid'),'download',()=>btn('btn-export-mermaid')),
+      c(I.t('ca.cmdExportGraphML','Eksport grafu: GraphML (yEd)'),'download',()=>btn('btn-export-graphml')),
       c(I.t('ca.cmdOpen','Otwórz zapisaną mapę'),'open',()=>btn('btn-open')),
       c(I.t('ca.cmdCompareAdd','Porównaj: dodaj schemat na mapę'),'layers',()=>btn('btn-compare-add')),
       c(I.t('ca.cmdClear','Wyczyść dane'),'trash',()=>btn('btn-clear')),
@@ -274,6 +277,9 @@
       case 'openHistory': { _needProject(); $('#btn-history').click(); return I.t('cb.execHist','Otwarto historię migawek.'); }
       case 'openCompare': { $('#btn-compare-add').click(); return I.t('cb.execCompare','Otwarto porównywanie schematów.'); }
       case 'exportImage': { _needProject(); $('#btn-export-img').click(); return I.t('cb.execImg','Eksportuję obraz mapy.'); }
+      case 'exportGraph': { _needProject(); const f=(args.format||'dot').toLowerCase();
+        if(!CM.Export||CM.Export.FORMATS.indexOf(f)<0) throw new Error(I.t('cb.badFormat','Nieznany format: ')+f+' ('+(CM.Export?CM.Export.FORMATS.join(', '):'')+')');
+        const r=CM.Export.download(A.graph, filters, f); return I.t('cb.execExportGraph','Eksportuję widoczny graf: ')+r.filename+' ('+r.nodes+' / '+r.edges+')'; }
       case 'copyLink': A.copyViewLink(); return I.t('cb.execLink','Kopiuję link do bieżącego widoku.');
       case 'setSpacing': case 'setNodeScale': case 'setFontScale': {
         const id=action==='setSpacing'?'rng-spacing':action==='setNodeScale'?'rng-nscale':'rng-fscale';
@@ -347,7 +353,7 @@
   // canonical action list — also injected into the ChatBot system prompt so the model knows the full API
   const CB_ACTIONS=['loadDemo','loadRepo','clearProject','setMode','setLayout','search','focusNode','openNode','fit',
     'zoom','rotate','toggle3D','flyMode','collapseAll','toggleImpact','toggleMinimap','setFilter','setMetric','toggleLang',
-    'openSettings','openDrive','openHistory','openCompare','saveMap','snapshot','exportImage','copyLink','detectCycles',
+    'openSettings','openDrive','openHistory','openCompare','saveMap','snapshot','exportImage','exportGraph','copyLink','detectCycles',
     'hotspots','inspect','aiAnalyze','setTheme','setPreset','setAccent','setBackground','setGlass','setSpacing','setNodeScale','setFontScale',
     'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help',
     'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat'];

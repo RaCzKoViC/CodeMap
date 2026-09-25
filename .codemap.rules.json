@@ -1,0 +1,10 @@
+{
+  "layers": [
+    { "name": "core", "match": ["js/analysis.js", "js/graph.js", "js/layouts.js"] },
+    { "name": "ui",   "match": ["js/chrome.js", "js/navigation.js", "js/ui.js"] }
+  ],
+  "forbid": [
+    { "from": "core", "to": "ui", "why": "rdzeń (analiza, graf, układy) nie zna UI" }
+  ],
+  "noCycles": true
+}

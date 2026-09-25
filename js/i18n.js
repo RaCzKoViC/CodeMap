@@ -24,6 +24,7 @@ CM.i18n = (function(){
     'project.btn':'Projekt','project.btn.title':'Operacje na projekcie',
     'project.snapshot':'Zapisz migawkę','project.history':'Historia i porównania',
     'project.save':'Zapisz mapę (.json)','project.exportimg':'Eksport obrazu (PNG / SVG)','project.open':'Otwórz zapisaną mapę',
+    'project.exportdot':'Eksportuj DOT (Graphviz)','project.exportmermaid':'Eksportuj Mermaid','project.exportgraphml':'Eksportuj GraphML (yEd)',
     'project.cycles':'Wykryj cykle zależności','project.hotspots':'Hotspoty (rozmiar × zależności)','project.inspect':'Analiza statyczna (antywzorce)',
     'th.depth':'Głębia','th.graphite':'Grafit','th.forest':'Las','th.plum':'Śliwka','th.paper':'Papier','th.parchment':'Pergamin','th.mist':'Mgła',
     'project.compareadd':'Porównaj: dodaj schemat na mapę','project.compareclear':'Usuń schematy porównawcze',
@@ -405,6 +406,12 @@ CM.i18n = (function(){
     "layout.sunburst":"Sunburst","layout.treemap":"Treemap (sizes)","layout.icicle":"Icicle","layout.solar":"Solar system",
     "layout.honeycomb":"Honeycomb","layout.arcdiagram":"Arc diagram","layout.dendrite":"Radial dendrogram",
     "layout.helix":"Helix","layout.constellation":"Constellation","layout.vortex":"Vortex",
+    /* --- Faza 2: eksport grafu (DOT / Mermaid / GraphML) --- */
+    "project.exportdot":"Export DOT (Graphviz)","project.exportmermaid":"Export Mermaid","project.exportgraphml":"Export GraphML (yEd)",
+    "ca.graphExported":"💾 Graph exported: ","ca.cmdExportDot":"Export graph: DOT (Graphviz)","ca.cmdExportMermaid":"Export graph: Mermaid","ca.cmdExportGraphML":"Export graph: GraphML (yEd)",
+    "cb.execExportGraph":"Exporting the visible graph: ","cb.badFormat":"Unknown format: ",
+    /* --- Faza 2: metryki sprzężeń (panel szczegółów) --- */
+    "cu.coupling":"Coupling","cu.couplingHint":"Ca = files outside the unit that depend on it · Ce = files outside the unit it depends on · I = Ce/(Ca+Ce): 0 = stable foundation, 1 = leaf without clients",
   }
   };
 
