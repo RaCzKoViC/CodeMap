@@ -161,11 +161,12 @@
   // ---------------- Web Worker force-sim (off main thread for large graphs) ----------------
   // Single source of truth for the version: the worker is fetched at the SAME ?v= as app-core.js itself
   // (read off our own <script> tag), so bumping index.html bumps the worker too — no drift.
-  const SIM_WORKER_URL=(()=>{
+  const ASSET_V=(()=>{
     const s=document.currentScript || document.querySelector('script[src*="js/app-core.js"]');
-    const v=s && s.src && (s.src.match(/[?&]v=([\w.-]+)/)||[])[1];
-    return 'js/sim-worker.js'+(v?('?v='+v):'');
+    return (s && s.src && (s.src.match(/[?&]v=([\w.-]+)/)||[])[1]) || '';
   })();
+  const SIM_WORKER_URL='js/sim-worker.js'+(ASSET_V?('?v='+ASSET_V):'');
+  const ANALYSIS_WORKER_URL='js/analysis-worker.js'+(ASSET_V?('?v='+ASSET_V):'');
   let _workerOK = (typeof window.Worker==='function');
   // Offload physics to the Web Worker for anything beyond a trivially small map, so the main thread
   // is never blocked by the force simulation. Tiny graphs (< threshold) settle main-thread in a blink.
@@ -349,6 +350,39 @@
 
   // generation token: a newer load (or Cancel) invalidates every still-running older ingest,
   // so a slow fetch can never clobber the project the user loaded afterwards
+  // ---------------- analiza plików w Web Workerze (metryki, importy, symbole, hash) ----------------
+  // graph.build był jednym synchronicznym blokiem: przy 4000 plikach z treścią UI zamierało na sekundy.
+  // Teraz parsowanie idzie do analysis-worker.js (chunki + postęp), a główny wątek składa z wyników
+  // tylko strukturę i krawędzie. Bez Workera (file://) — te same kroki chunkami z oddawaniem wątku.
+  function analyzeFiles(files, gen, onProgress){
+    const withContent=files.filter(f=>f&&f.content!=null);
+    if(!withContent.length) return Promise.resolve(new Map());
+    if(!_workerOK) return analyzeInline(withContent, gen, onProgress);
+    return new Promise((resolve)=>{
+      let w; try{ w=new Worker(ANALYSIS_WORKER_URL); }catch(e){ resolve(null); return; }
+      let settled=false;
+      const finish=(v)=>{ if(settled) return; settled=true; try{ w.terminate(); }catch(e){} resolve(v); };
+      w.onerror=(e)=>{ console.warn('analysis worker failed — falling back to main thread', e&&e.message); finish(null); };
+      w.onmessage=(ev)=>{ const d=ev.data||{}; if(d.gen!==gen) return;
+        if(gen!==A._ingestGen){ finish(new Map()); return; }          // anulowane w trakcie
+        if(d.type==='progress'){ if(onProgress) onProgress(d.done, d.total); }
+        else if(d.type==='done'){ const m=new Map(); for(const r of (d.results||[])) if(r&&!r.error) m.set(r.path, r); finish(m); } };
+      w.postMessage({type:'analyze', gen, files:withContent.map(f=>({path:f.path, content:f.content}))});
+    }).then(m=> m || analyzeInline(withContent, gen, onProgress));
+  }
+  async function analyzeInline(files, gen, onProgress){
+    const An=CM.Analysis, L=CM.languages; const m=new Map(); const CHUNK=40;
+    for(let i=0;i<files.length;i+=CHUNK){
+      if(gen!==A._ingestGen) return m;
+      for(const f of files.slice(i,i+CHUNK)){
+        const path=An.normPath(f.path); if(!path) continue; const info=L.lookup(An.basename(path)); if(!info.text) continue;
+        const r=An.analyzeFile(f.content, info.key); m.set(path,{path, metrics:r.metrics, deps:r.deps, symbols:r.symbols, hash:U.hashString(f.content)});
+      }
+      if(onProgress) onProgress(Math.min(i+CHUNK,files.length), files.length);
+      await tick();
+    }
+    return m;
+  }
   A._ingestGen=0;
   async function ingest(factory, statusText){
     const gen=++A._ingestGen;
@@ -360,8 +394,12 @@
       if(!files || !files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return; }
       setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
       if(gen!==A._ingestGen) return;
+      const pre=await analyzeFiles(files, gen, (done,total)=>{ setLoadingText(I.t('ca.analyzingPre','Analiza plików ')+done+' / '+total+'…'); });
+      if(gen!==A._ingestGen) return;
+      setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
+      if(gen!==A._ingestGen) return;
       resetProjectState();
-      A.graph=new Graph(); A.graph.build(files, meta);
+      A.graph=new Graph(); A.graph.build(files, meta, pre);
       state.layout=$('#sel-layout').value; state.displayLayout=state.layout;
       if(A.graph.nodes.size>1400) A.graph.collapseToBudget(2600);   // adaptive: works for deep AND wide-flat repos
       // BIG repos: declutter automatically — no edges, tiny nodes, huge spacing
@@ -482,7 +520,7 @@
     if(go) setTimeout(()=>{ try{ if(CM.Settings&&CM.Settings.startTutorial) CM.Settings.startTutorial('codemap'); }catch(e){} }, 1100);
   }
 
-  Object.assign(A, {
+  Object.assign(A, { analyzeFiles, analyzeInline,
     state, filters, init, onHover, THEME_PRESETS, saveSessionDebounced, restoreSessionPrompt, setMode,
     wireModes, selectEdge, handlers, useWorker, startWorkerSim, apply, seedUnplaced, select,
     applyImpact, toggleImpact, toggleCollapse, toggleLang, revealNode, focusNode, biggestInFolder, tick,

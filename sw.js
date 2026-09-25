@@ -1,12 +1,12 @@
 /* ===================== sw.js — CodeMap service worker (offline app shell) ===================== */
-const CACHE = 'codemap-shell-v91';
+const CACHE = 'codemap-shell-v92';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
 const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js','js/languages.js',
   'js/analysis.js','js/graph.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/renderer.js','js/loaders.js','js/storage.js',
   'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js',
-  'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/app.js','js/sim-worker.js'];
+  'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/app.js','js/sim-worker.js','js/analysis-worker.js'];
 
 self.addEventListener('install', (e)=>{
   e.waitUntil((async()=>{
@@ -20,7 +20,7 @@ self.addEventListener('install', (e)=>{
       const html = await (await fetch('index.html', {cache:'no-cache'})).text();
       assets = [...html.matchAll(/(?:src|href)="((?:js|css)\/[^"]+\?v=[^"]+)"/g)].map(m=>m[1]);
       const appV = (html.match(/js\/app\.js\?v=([\w.-]+)/)||[])[1];
-      if(appV) assets.push('js/sim-worker.js?v='+appV);   // worker is loaded by app-core.js at the shared ?v= stamp (read off js/app.js in the HTML)
+      if(appV){ assets.push('js/sim-worker.js?v='+appV); assets.push('js/analysis-worker.js?v='+appV); }   // worker is loaded by app-core.js at the shared ?v= stamp (read off js/app.js in the HTML)
     }catch(_){ }
     if(!assets.length) assets = ASSET_FALLBACK;
     await c.addAll(assets).catch(()=>{});

@@ -439,9 +439,9 @@ CM.Analysis = (function(){
     return tryExact(idx.byPath, expand(normPath(joinPath(cfg.baseDir, spec)), 'js'));
   }
 
-  function extractDeps(content, key){
-    if(content == null) return [];
-    content = stripNonCode(content, key);
+  function extractDeps(content, key){ if(content == null) return []; return depsFromStripped(stripNonCode(content, key), key); }
+  // wariant na tekście już oczyszczonym z komentarzy (analyzeFile robi stripNonCode RAZ dla deps i symbols)
+  function depsFromStripped(content, key){
     const d = [];
     const fam = family(key);
     if(fam === 'js' || ['vue','svelte','astro'].includes(key)) jsDeps(content, d);
@@ -467,9 +467,8 @@ CM.Analysis = (function(){
   }
 
   // ---------- symbol extraction (functions / classes / types) + per-symbol complexity ----------
-  function extractSymbols(content, key){
-    if(content==null) return [];
-    const src=stripNonCode(content, key);
+  function extractSymbols(content, key){ if(content==null) return []; return symbolsFromStripped(stripNonCode(content, key), key); }
+  function symbolsFromStripped(src, key){
     const fam=family(key);
     const lines=src.split(/\r\n|\r|\n/);
     const syms=[];
@@ -754,6 +753,15 @@ CM.Analysis = (function(){
     return {edges, externals};
   }
 
-  return {analyzeContent, extractDeps, extractSymbols, buildEdges, manifestEntry, family, stripNonCode, looseJSON,
+  // Pełna analiza jednego pliku: metryki + importy + symbole z JEDNYM przebiegiem stripNonCode
+  // (dotąd extractDeps i extractSymbols czyściły tę samą treść dwa razy). Używane przez graph.build
+  // i przez analysis-worker.js — jedno źródło prawdy dla parserów.
+  function analyzeFile(content, key){
+    if(content==null) return {metrics:null, deps:[], symbols:[]};
+    const stripped=stripNonCode(content, key);
+    return {metrics:analyzeContent(content, key), deps:depsFromStripped(stripped, key), symbols:symbolsFromStripped(stripped, key)};
+  }
+
+  return {analyzeContent, analyzeFile, extractDeps, extractSymbols, buildEdges, manifestEntry, family, stripNonCode, looseJSON,
           normPath, dirname, basename, joinPath, externalName};
 })();

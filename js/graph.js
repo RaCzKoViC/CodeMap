@@ -18,7 +18,7 @@ CM.Graph = (function(){
 
     // ---- build from a flat file list ----
     // files: [{path, size, content|null, mtime}]
-    build(files, meta){
+    build(files, meta, pre){   // pre: Map path → {metrics, deps, symbols, hash} z analysis-worker.js (opcjonalnie)
       this.clear();
       this.meta = Object.assign({name:'projekt', source:'', createdAt:Date.now()}, meta||{});
       this.root.name = this.meta.name;
@@ -42,10 +42,9 @@ CM.Graph = (function(){
           x:0, y:0, vx:0, vy:0, r:6, collapsed:false,
         };
         if(content != null){
-          node.metrics = A.analyzeContent(content, info.key);
-          node.deps = A.extractDeps(content, info.key);
-          node.symbols = A.extractSymbols(content, info.key);
-          node.hash = U.hashString(content);
+          const p = pre && pre.get(path);   // policzone w Web Workerze → główny wątek nie parsuje
+          if(p){ node.metrics = p.metrics; node.deps = p.deps || []; node.symbols = p.symbols || []; node.hash = p.hash || U.hashString(content); }
+          else { const r = A.analyzeFile(content, info.key); node.metrics = r.metrics; node.deps = r.deps; node.symbols = r.symbols; node.hash = U.hashString(content); }
           // keep (almost) the whole file for the hover preview — bounded at 64 KB so even projects
           // hitting the 4000-content-files cap stay well under ~256 MB of retained text
           node.preview = content.length > 65536 ? content.slice(0,65536) : content;

@@ -276,7 +276,7 @@ CM.i18n = (function(){
     "ca.noMapToSave":"No map to save.","ca.mapExported":"💾 Map exported.","ca.noMapToExport":"No map to export.",
     "ca.pngExport":"PNG (2×)","ca.pngExportHi":"PNG (high res 4×)","ca.svgExport":"SVG (vector)",
     "ca.clearConfirm":"Clear the loaded map? (snapshots and saved files will remain)","ca.newWinBlocked":"The browser blocked the new window — allow pop-ups.",
-    "ca.cleared":"🧹 Data cleared.","ca.pastingPre":"Pasting ","ca.pastingPost":" files…","ca.notCodemapFile":"This is not a CodeMap map file.","ca.mapTooNew":"This file comes from a newer CodeMap version — update the app.",
+    "ca.cleared":"🧹 Data cleared.","ca.pastingPre":"Pasting ","ca.pastingPost":" files…","ca.notCodemapFile":"This is not a CodeMap map file.","ca.analyzingPre":"Analysing files ","ca.mapTooNew":"This file comes from a newer CodeMap version — update the app.",
     "ca.mapLoaded":"📂 Map loaded from file.","ca.readingDropped":"Reading dropped files…","ca.expandToolbar":"Expand toolbar","ca.collapseToolbar":"Collapse toolbar",
     "ca.enterAddress":"Enter an address.","ca.connectingToPre":"Connecting to ","ca.connectingToPost":"…",
     "ca.historyExported":"History exported.","ca.importedSnapshotsPre":"Imported ","ca.importedSnapshotsPost":" snapshots.","ca.importError":"Import error.",
