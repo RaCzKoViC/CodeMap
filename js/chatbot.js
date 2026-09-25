@@ -961,7 +961,9 @@ CM.ChatBot = (function(){
           throw e; }
         finally{ off(); updateSub(); }
       } else if(useOllama()){
-        streamOpts.maxTokens=900;   // native speed — roomy but bounded
+        // Ollama NIE przerywa generacji po zerwaniu polaczenia (reload/Stop) i kolejkuje zadania per model —
+        // za dlugi num_predict blokuje kolejne pytania na minuty. JSON z akcjami to <150 tokenow; rozumowanie dostaje wiecej.
+        streamOpts.maxTokens=(quick||!modelThinks())?400:1200;
         if(structured){ streamOpts.temperature=0.3; streamOpts.repeatPenalty=1.15;
           // Gramatyka JSON (format) w Ollamie kosztuje ~0,2-0,3 s/token przy dużym słowniku (Qwen/Llama 3),
           // a z rozumowaniem ~1 tok/s (sonda: 167 s vs 15 s). Duże modele (≥ ~3,5 GB, czyli 7B+) i tak

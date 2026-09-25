@@ -1,5 +1,5 @@
 /* ===================== sw.js — CodeMap service worker (offline app shell) ===================== */
-const CACHE = 'codemap-shell-v90';
+const CACHE = 'codemap-shell-v91';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
