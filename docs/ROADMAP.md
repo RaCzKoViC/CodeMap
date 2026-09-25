@@ -25,7 +25,7 @@ Bezpieczeństwo backendu:
 - [x] `Cache-Control: no-store` dla odpowiedzi `/api/*`.
 - [x] Rezerwacja quoty atomowo przed zapisem (`UPDATE … WHERE used_bytes + ? <= quota_bytes`), korekta po zapisie (`server/blobs.js:58`, `sync.js`, `vault.js`).
 - [x] Nagłówki w Caddy: HSTS, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`; CSP w trybie report-only jako punkt startowy.
-- [x] Logi bez query stringów (`disableRequestLogging` + własny hook) — tokeny weryfikacji nie trafiają do journald.
+- [x] Logi bez query stringów (serializer `req` bez query) — tokeny weryfikacji nie trafiają do journald.
 - [x] Hardening unitu systemd i `backup.sh` (`umask 077`, `-mindepth 1`, `chmod 600 .env`).
 
 Frontend:
