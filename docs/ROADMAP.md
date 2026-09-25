@@ -52,15 +52,15 @@ Publikacja:
 - [x] Backend (blokada per konto 30 s → 15 min, 3 maile/h na adres, wysyłka poza ścieżką odpowiedzi, limit współbieżności argon2, GC co godzinę, PBKDF2 600k z polem `kdf`, min. 8 znaków hasła albumu). Pierwotny opis: rate limit per konto (backoff po nieudanych logowaniach), limit maili per adres, sprzątanie wygasłych sesji i tokenów, PBKDF2 ≥ 600k iteracji z polem `kdf` w meta Sejfu, minimum 12 znaków hasła albumu synchronizowanego.
 - [x] Autozapis: nie serializować całego grafu po każdym `apply()`; zapis tylko po zmianie struktury lub pozycji.
 
-## Faza 2 — wyróżnik: głębsza analiza
+## Faza 2 — wyróżnik: głębsza analiza — W TOKU (stan 2026-09-26)
 
-- Graf symboli i call graph przez `web-tree-sitter` (WASM ładowany na żądanie, jak WebLLM); symbole jako węzły drugiego poziomu, serializowane w mapie.
-- Analiza w Web Workerze i w chunkach (`graph.build` dziś blokuje UI); jeden przebieg `stripNonCode` zamiast dwóch.
-- Rozwiązywanie zależności: aliasy tsconfig per katalog + `extends`, `package.json#imports/exports`, workspaces monorepo (`@scope/pkg` → `packages/pkg`), dynamiczne importy z literałów, `new Worker()`/`new URL()`, SCSS `@use/@forward`, C# `using` i Rust `use crate::` łączone z plikami.
+- [ ] Graf symboli i call graph przez `web-tree-sitter` (WASM ładowany na żądanie, jak WebLLM); symbole jako węzły drugiego poziomu, serializowane w mapie.
+- [ ] Analiza w Web Workerze i w chunkach (`graph.build` dziś blokuje UI); jeden przebieg `stripNonCode` zamiast dwóch.
+- [x] Rozwiązywanie zależności (bez `package.json#imports` i `extends` na pakiet npm): aliasy tsconfig per katalog + `extends`, `package.json#imports/exports`, workspaces monorepo (`@scope/pkg` → `packages/pkg`), dynamiczne importy z literałów, `new Worker()`/`new URL()`, SCSS `@use/@forward`, C# `using` i Rust `use crate::` łączone z plikami.
 - [x] Plik reguł architektury (`.codemap.rules.json`: warstwy, zakazane importy, `noCycles`) egzekwowany przez silnik Inspect (`js/rules.js`, reguła `archviolation`; przykład dla samego CodeMap w korzeniu repo).
 - [x] Metryki sprzężeń Ca / Ce / niestabilność per plik i folder (`js/metrics.js`, panel szczegółów); POZOSTAŁO: abstractness (wymaga symboli z tree-sittera).
 - [x] Wykrywanie duplikatów kodu — winnowing na treści (`CM.Metrics.findDuplicates`, reguła `dupcode` zamiast porównania nazw plików; ≥ 20 linii, próbka 1500 największych, chunkowane).
-- Wyszukiwanie w treści plików (grep/regex) z wynikami na mapie; parsery Kotlin/Swift/Dart/Scala/Elixir.
+- [x] Wyszukiwanie w treści plików z wynikami na mapie (narzędzie ChatBota `/findText`; POZOSTAŁO: pole w UI i regex); parsery Swift/Dart/Elixir/Lua/Zig/Haskell/Shell (Kotlin/Scala już w rodzinie Java).
 - [x] Eksport DOT / GraphML / Mermaid (`js/export.js`, menu Projekt, paleta Ctrl+K, akcja ChatBota `exportGraph`).
 
 ## Faza 3 — inteligencja git

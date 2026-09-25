@@ -37,6 +37,8 @@ CM.Ollama = (function(){
     return _models;
   }
   async function online(){ try{ await models(true); return true; }catch(e){ return false; } }
+  // rozmiar bieżącego modelu w GB z cache listy (null, gdy lista jeszcze nie pobrana)
+  const modelSizeGB=(name)=>{ const m=(_models||[]).find(x=>x.name===(name||model())); return m&&m.sizeGB!=null?+m.sizeGB:null; };
 
   // chat kompatybilny z aiChat()/CM.LocalAI.chat: messages=[{role,content}...]
   // opts: {temperature, maxTokens, onToken(delta, full), signal, model} → pełny tekst odpowiedzi
@@ -133,5 +135,5 @@ CM.Ollama = (function(){
     {name:'gemma3:4b', size:'3.3 GB', note:'Google, wielojęzyczny'},
     {name:'gpt-oss:20b', size:'13 GB', note:'OpenAI open-weight (myślący; 16 GB+ RAM)'},
   ];
-  return { base, setBase, model, setModel, models, online, chat, pull, SUGGESTED, DEF_BASE };
+  return { base, setBase, model, setModel, models, online, chat, pull, modelSizeGB, SUGGESTED, DEF_BASE };
 })();

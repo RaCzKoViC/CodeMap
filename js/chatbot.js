@@ -963,10 +963,12 @@ CM.ChatBot = (function(){
       } else if(useOllama()){
         streamOpts.maxTokens=900;   // native speed — roomy but bounded
         if(structured){ streamOpts.temperature=0.3; streamOpts.repeatPenalty=1.15;
-          // Gramatyka JSON (format) + rozumowanie = w Ollamie ~1 tok/s (167 s vs 15 s w sondzie): model myslacy
-          // bez trybu szybkiego dostaje sam prompt (JSON i tak wychodzi, ratuje parseStructured); gramatyka
-          // zostaje dla modeli niemyslacych i dla trybu szybkiego (think:false, ~8 s).
-          if(quick||!modelThinks()) streamOpts.format=ACT_SCHEMA;
+          // Gramatyka JSON (format) w Ollamie kosztuje ~0,2-0,3 s/token przy dużym słowniku (Qwen/Llama 3),
+          // a z rozumowaniem ~1 tok/s (sonda: 167 s vs 15 s). Duże modele (≥ ~3,5 GB, czyli 7B+) i tak
+          // trzymają się JSON-a z promptu (ratuje parseStructured), więc gramatykę włączamy tylko dla
+          // małych modeli i nigdy razem z rozumowaniem.
+          const sz=CM.Ollama.modelSizeGB(); const small=(sz!=null && sz<3.5);
+          if(small && (quick||!modelThinks())) streamOpts.format=ACT_SCHEMA;
           if(quick) streamOpts.think=false; }
         else if(quick) streamOpts.think=false;   // szybka odpowiedź: Ollama pomija rozumowanie (qwen3, deepseek-r1 w nowszych wersjach)
         try{ acc=await CM.Ollama.chat(messages, streamOpts); }

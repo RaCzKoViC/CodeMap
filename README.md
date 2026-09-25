@@ -42,8 +42,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 
 ### Analiza
 - Metryki per plik: linie, kod, komentarze, złożoność, funkcje, TODO/FIXME, rozmiar, data.
-- Parsowanie importów dla 12 rodzin języków (JS/TS, Python, C/C++, Go, Java, C#, PHP, Ruby, Rust, CSS,
-  HTML, Markdown), aliasy z `tsconfig`/`jsconfig`, zależności zewnętrzne jako osobne węzły.
+- Parsowanie importów dla 19 rodzin języków (JS/TS, Python, C/C++, Go, Java, C#, PHP, Ruby, Rust, Swift, Dart, Elixir, Lua, Zig, Haskell, Shell, CSS/SCSS,
+  HTML, Markdown), aliasy `tsconfig`/`jsconfig` per katalog z `extends`, workspaces monorepo, dynamiczne
+  odwołania (`new Worker`, `import.meta.glob`…), zależności zewnętrzne jako osobne węzły.
 - Symbole (funkcje, klasy, typy) z własną złożonością w panelu szczegółów.
 - Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
 
@@ -78,6 +79,11 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   przyciskiem „Testuj" (lista modeli), model wybierany per klucz; działające klucze używane rotacyjnie.
 - **ChatBot** steruje aplikacją (ok. 50 akcji: układ, filtry, motyw, wyszukiwanie, migawki…). Akcje spoza
   zbioru „tylko widok" wymagają kliknięcia — model nie może sam wczytać, skasować ani wyeksportować.
+- W polu czatu wpisz **`/`**, aby zobaczyć wszystkie narzędzia (statystyki, top plików, szukanie w treści,
+  zależności, eksport…); przeciągnij element z mapy do okna czatu, aby dołączyć go do pytania (do 30).
+  Okno czatu można przesuwać i rozciągać, a lista rozmów ma regulowaną szerokość.
+- Modele myślące (DeepSeek R1, Qwen 3) pokazują tok rozumowania w zwijanym panelu; przycisk ⚡ daje
+  szybką odpowiedź bez rozumowania.
   Modele lokalne (WebLLM, Ollama) odpowiadają w **trybie strukturalnym**: JSON `{reply, actions}` wymuszony
   schematem, więc nawet małe modele niezawodnie wykonują polecenia.
 - **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.

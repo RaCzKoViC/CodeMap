@@ -20,6 +20,26 @@ Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
 - Inspect: reguła **zduplikowany kod** — winnowing (k=5 tokenów, okno 4, ≥ 8 wspólnych odcisków)
   na treści plików ≥ 20 linii, próbka 1500 największych, liczone w chunkach; zastępuje dawną
   regułę porównującą same nazwy plików.
+- Rozwiązywanie zależności: aliasy `tsconfig`/`jsconfig` **per katalog** z `extends` (najbliższy config
+  wygrywa, monorepo się nie miesza), **workspaces** (import po nazwie pakietu z `package.json` →
+  `exports`/`module`/`main`/folder), dynamiczne odwołania JS (`new Worker`, `new URL(…, import.meta.url)`,
+  `importScripts`, `require.resolve`, `import.meta.glob`), SCSS `@use`/`@forward`, C# `using` → pliki
+  z `namespace`, Rust `use crate::/self::/super::`, Python: moduł z katalogu importera i nazwy po
+  `from X import`; nowe parsery: **Swift, Dart, Elixir, Lua, Zig, Haskell, Shell** (`js/analysis.js`).
+- ChatBot: menu narzędzi po wpisaniu **`/`** (54 narzędzia, filtrowanie, `/nazwa argument`), nowe
+  narzędzia `stats`, `topFiles`, `findText` (szukanie w treści plików z podświetleniem na mapie),
+  `listLang`, `dependsOn`, `dependencies`, `explain`, `exportGraph`, `clearChat`.
+- ChatBot: okno rozciągane za 8 uchwytów, lista rozmów o zmiennej szerokości (przeciągnij do 0 = zwiń),
+  **elementy mapy jako załączniki** — przeciągnij węzeł do okna czatu (miniaturka z nazwą i krzyżykiem,
+  maks. 30), panel myśli w pełni widoczny i zwijany, przycisk **⚡ Szybka odpowiedź** dla modeli myślących.
+- Modele lokalne: 18 wyselekcjonowanych modeli WebLLM + pełna lista silnika (135), pobieranie modeli
+  do Ollamy z Ustawień (postęp, propozycje); strumień rozumowania Ollamy pokazywany na żywo.
+
+### Naprawione
+- ChatBot wykonywał auto-akcje z pustymi argumentami (`setLayout` → „Nieznany układ", `setTheme` zawsze
+  ciemny) — główna przyczyna, dla której modele lokalne „nie sterowały aplikacją".
+- Gramatyka JSON Ollamy tylko dla małych modeli i nigdy z rozumowaniem (z nią ~1 tok/s; duże modele
+  trzymają JSON z promptu).
 - Testy: `test/export.test.mjs`, `test/metrics.test.mjs`, `test/rules.test.mjs`; smoke sprawdza eksport
   trzech formatów na grafie demo.
 
