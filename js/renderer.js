@@ -28,9 +28,8 @@ CM.Renderer = (function(){
       this.diffMode = false;
       this.opts = {
         showGrid:true, showLabels:true, labelZoom:0.5, dim:0.10,
-        edgeOpacity:0.45, glow:true, curvedImports:true, nodeScale:1, showArrows:true,
-        labelMax:260, animateEdges:true, animSpeed:0.55, particles:true,
-        depth3d:true,                 // render solid volumes when tilted
+        edgeOpacity:0.45, curvedImports:true, nodeScale:1, showArrows:true,
+        labelMax:260,
         labelScale:1,                 // user font-size multiplier for on-figure text
         cosmic:false,                 // nebula/galaxy colour mode (set by cosmic layouts)
         cosmicPalette:['#fffdf0','#ffd27a','#ff7ac0','#7c5cff','#1b1740'],
@@ -41,8 +40,6 @@ CM.Renderer = (function(){
         lodHugeNodes:9000,           // node count past which "huge graph" rules kick in
         lodSpecialCap:600,           // ceiling on per-node decorated (special) figures per frame
       };
-      this._t = 0;                 // animation time accumulator
-      this._animatable = false;    // whether current view has animatable edges (and not too many)
       // callbacks
       this.onSelect=()=>{}; this.onHover=()=>{}; this.onToggleCollapse=()=>{};
       this.onContext=()=>{}; this.onChange=()=>{}; this.onDblFile=()=>{};
@@ -60,7 +57,6 @@ CM.Renderer = (function(){
       this.edges = vis.edges;
       this.nodeById = new Map(this.nodes.map(n=>[n.id,n]));
       this.sim = sim || null;
-      this._animatable = false;   // edge animation removed (it tanked FPS); connections are static
       this.kick();
     }
     setSelected(node){
@@ -215,14 +211,11 @@ CM.Renderer = (function(){
       const tick=()=>{
         this._raf=requestAnimationFrame(tick);
         const now=performance.now(); const dt=Math.min(64, now-last); last=now;
-        const animating = this.opts.animateEdges && this._animatable;
-        if(animating) this._t += dt*0.06*this.opts.animSpeed;
         if(this.sim && this.sim.running){ this.sim.tick(); this.dirty=true; this._wasRunning=true; }
         else if(this._wasRunning){ this._wasRunning=false; this.onSettle(); }   // simulation just settled
-        if(animating) this.dirty=true;          // keep flowing connections alive
         if(this.dirty){ this._draw(); this.dirty=false; this._idle=0; }
         else this._idle++;
-        if(this._idle>3 && !(this.sim&&this.sim.running) && !animating){ cancelAnimationFrame(this._raf); this._running=false; }
+        if(this._idle>3 && !(this.sim&&this.sim.running)){ cancelAnimationFrame(this._raf); this._running=false; }
       };
       this._raf=requestAnimationFrame(tick);
     }
@@ -353,22 +346,6 @@ CM.Renderer = (function(){
           if(this.opts.showArrows && z>0.4) this._arrow(ctx,s,t,'#ffffff',0.95); } }
     }
     // small chevrons along an edge pointing source -> target (direction made visible on zoom)
-    _dirChevrons(ctx, d, z){
-      const {s,t,cpx,cpy}=d;
-      const at=(f)=>{ if(cpx!=null){ const u=1-f; return {x:u*u*s.x+2*u*f*cpx+f*f*t.x, y:u*u*s.y+2*u*f*cpy+f*f*t.y}; } return {x:s.x+(t.x-s.x)*f, y:s.y+(t.y-s.y)*f}; };
-      const a=4.6/z, positions=d.ref?[0.5]:[0.36,0.64];
-      ctx.strokeStyle=U.rgba(d.col,d.alpha); ctx.lineWidth=1.1/z; ctx.lineCap='round'; ctx.lineJoin='round';
-      for(const f of positions){
-        const p0=at(Math.max(0,f-0.02)), p1=at(Math.min(1,f+0.02));
-        const dx=p1.x-p0.x, dy=p1.y-p0.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
-        const c=at(f);
-        ctx.beginPath();
-        ctx.moveTo(c.x-ux*a-uy*a*0.62, c.y-uy*a+ux*a*0.62);
-        ctx.lineTo(c.x, c.y);
-        ctx.lineTo(c.x-ux*a+uy*a*0.62, c.y-uy*a-ux*a*0.62);
-        ctx.stroke();
-      }
-    }
     _arrow(ctx, s, t, col, alpha){
       const dx=t.x-s.x, dy=t.y-s.y; const L=Math.hypot(dx,dy)||1; const ux=dx/L, uy=dy/L;
       const tipX=t.x-ux*(t.r+2), tipY=t.y-uy*(t.r+2); const a=7/this.cam.zoom;
@@ -379,8 +356,6 @@ CM.Renderer = (function(){
       ctx.lineTo(tipX-ux*a+uy*a*0.6, tipY-uy*a-ux*a*0.6);
       ctx.closePath(); ctx.fill();
     }
-
-    fileShape(n){ return autoShape(n); }
 
     // cosmic palette — colour a node by its layout-assigned tone (0=core .. 1=outskirts)
     cosmicColor(t){ const lut=this._cosmicLUT; if(lut) return lut[U.clamp(Math.round((t||0)*(lut.length-1)),0,lut.length-1)];
@@ -462,36 +437,8 @@ CM.Renderer = (function(){
     }
 
     // soft flattened ground shadow under a billboarded crystal (screen space)
-    _groundShadow(ctx, x, y, rPx, tilt){
-      if(rPx<2) return;
-      const off=rPx*(0.5 + tilt*0.7), rr=rPx*1.05;
-      ctx.save(); ctx.translate(x, y+off); ctx.scale(1, 0.34);
-      const g=ctx.createRadialGradient(0,0,0, 0,0,rr);
-      g.addColorStop(0, U.rgba('#000000',0.38)); g.addColorStop(0.55, U.rgba('#000000',0.18)); g.addColorStop(1, U.rgba('#000000',0));
-      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(0,0,rr,0,7); ctx.fill(); ctx.restore();
-    }
-
     // draw an extruded "wall + base" so a node reads as a solid body; extrusion follows
     // screen-down (wd) and screen-right (wd) vectors -> stays 3D under any rotation
-    _extrude(ctx, shape, x, y, r, depthPx, col, z, wd){
-      if(depthPx<0.5 || !wd) return;
-      const dx=wd.dx*depthPx, dy=wd.dy*depthPx;           // world delta toward screen-bottom
-      const hw=r*z;                                       // half-width in screen px
-      const lx=x-wd.rx*hw, ly=y-wd.ry*hw;                 // top-left silhouette extreme
-      const rxp=x+wd.rx*hw, ryp=y+wd.ry*hw;               // top-right
-      // base (bottom face) — darkest, drawn first so the wall overlays it
-      ctx.fillStyle = U.rgba(U.mix(col,'#000000',0.58), 0.96);
-      drawShape(ctx, shape, x+dx, y+dy, r, z); ctx.fill();
-      // side wall (gradient lighter top -> darker bottom) for roundness
-      const g=ctx.createLinearGradient(x, y, x+dx, y+dy);
-      g.addColorStop(0, U.rgba(U.mix(col,'#000000',0.2),0.96));
-      g.addColorStop(1, U.rgba(U.mix(col,'#000000',0.52),0.96));
-      ctx.fillStyle=g;
-      ctx.beginPath();
-      ctx.moveTo(lx,ly); ctx.lineTo(rxp,ryp);
-      ctx.lineTo(rxp+dx,ryp+dy); ctx.lineTo(lx+dx,ly+dy); ctx.closePath(); ctx.fill();
-    }
-
     _drawLabels(ctx){
       const imp=this.impact, z=this.cam.zoom, dimMode=!!this.highlight||!!imp, scale=this.opts.nodeScale;
       const isBright=(id)=> imp ? imp.all.has(id) : (!this.highlight||this.highlight.has(id));
@@ -839,88 +786,16 @@ CM.Renderer = (function(){
   function roundRect(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath();
     ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
     ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
-  function drawShape(ctx, shape, x, y, r, z){
-    switch(shape){
-      case 'square': roundRect(ctx,x-r,y-r,r*2,r*2,4/z); break;
-      case 'diamond':
-        ctx.beginPath(); ctx.moveTo(x,y-r); ctx.lineTo(x+r,y); ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); break;
-      case 'hexagon':
-        ctx.beginPath();
-        for(let i=0;i<6;i++){ const a=i*Math.PI/3-Math.PI/6; if(i===0) ctx.moveTo(x+r*Math.cos(a),y+r*Math.sin(a)); else ctx.lineTo(x+r*Math.cos(a),y+r*Math.sin(a)); }
-        ctx.closePath(); break;
-      case 'star':
-        ctx.beginPath();
-        for(let i=0;i<10;i++){ const a=i*Math.PI/5-Math.PI/2; const rad=i%2===0?r:r*0.42; if(i===0) ctx.moveTo(x+rad*Math.cos(a),y+rad*Math.sin(a)); else ctx.lineTo(x+rad*Math.cos(a),y+rad*Math.sin(a)); }
-        ctx.closePath(); break;
-      case 'pill': roundRect(ctx,x-r,y-r*0.6,r*2,r*1.2,r*0.55); break;
-      default: ctx.beginPath(); ctx.arc(x,y,r,0,7);
-    }
-  }
   // build an SVG element string for a node shape (world coords)
-  function shapeSVG(shape, x, y, r, fill, stroke, sw){
-    const poly=(pts)=>`<polygon points="${pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    switch(shape){
-      case 'square': return `<rect x="${(x-r).toFixed(1)}" y="${(y-r).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*2).toFixed(1)}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-      case 'pill': return `<rect x="${(x-r).toFixed(1)}" y="${(y-r*0.6).toFixed(1)}" width="${(r*2).toFixed(1)}" height="${(r*1.2).toFixed(1)}" rx="${(r*0.55).toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-      case 'diamond': return poly([[x,y-r],[x+r,y],[x,y+r],[x-r,y]]);
-      case 'hexagon':{ const p=[]; for(let i=0;i<6;i++){ const a=i*Math.PI/3-Math.PI/6; p.push([x+r*Math.cos(a),y+r*Math.sin(a)]); } return poly(p); }
-      case 'star':{ const p=[]; for(let i=0;i<10;i++){ const a=i*Math.PI/5-Math.PI/2, rad=i%2===0?r:r*0.42; p.push([x+rad*Math.cos(a),y+rad*Math.sin(a)]); } return poly(p); }
-      default: return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
-    }
-  }
   // --- sphere sprite cache: render each colour's shaded ball ONCE, then blit (drawImage) every frame.
   // This is far cheaper than building gradients/clips per node per frame -> smooth with 1000s of nodes.
   const _SPR_S=128, _SPR_PAD=7, _SPR_R=_SPR_S/2-_SPR_PAD;
   const _SPR_SCALE=_SPR_S/(2*_SPR_R);
   const _sphereCache=new Map();
   let _shadowSprite=null;
-  function getSphereSprite(col){
-    let spr=_sphereCache.get(col); if(spr) return spr;
-    const cv=document.createElement('canvas'); cv.width=_SPR_S; cv.height=_SPR_S;
-    const c=cv.getContext('2d'); const C=_SPR_S/2, R=_SPR_R;
-    const g=c.createRadialGradient(C-R*0.36, C-R*0.36, R*0.05, C, C, R*1.06);
-    g.addColorStop(0, U.mix(col,'#ffffff',0.62));
-    g.addColorStop(0.45, col);
-    g.addColorStop(1, U.mix(col,'#000000',0.42));
-    c.fillStyle=g; c.beginPath(); c.arc(C,C,R,0,7); c.fill();
-    c.strokeStyle=U.rgba('#06121f',0.35); c.lineWidth=1.4; c.beginPath(); c.arc(C,C,R,0,7); c.stroke();
-    c.fillStyle=U.rgba('#ffffff',0.5); c.beginPath(); c.arc(C-R*0.33, C-R*0.33, R*0.17, 0, 7); c.fill();
-    if(_sphereCache.size>64) _sphereCache.clear();   // safety cap
-    _sphereCache.set(col, cv); return cv;
-  }
-  function getShadowSprite(){
-    if(_shadowSprite) return _shadowSprite;
-    const S=96, cv=document.createElement('canvas'); cv.width=S; cv.height=S;
-    const c=cv.getContext('2d'); const C=S/2;
-    const g=c.createRadialGradient(C,C,0, C,C,C);
-    g.addColorStop(0,'rgba(0,0,0,0.42)'); g.addColorStop(0.55,'rgba(0,0,0,0.2)'); g.addColorStop(1,'rgba(0,0,0,0)');
-    c.fillStyle=g; c.beginPath(); c.arc(C,C,C,0,7); c.fill();
-    _shadowSprite=cv; return cv;
-  }
   // blit a cached sphere for a node (screen px). Cheap: one drawImage.
-  function drawSphereSprite(ctx, x, y, r, col){
-    const d=2*r*_SPR_SCALE;
-    ctx.drawImage(getSphereSprite(col), x-d/2, y-d/2, d, d);
-  }
   // 0..1 weight of a module from its connectivity / size
-  function nodeImportance(n){
-    let v=0;
-    if(n.type==='folder') v=n.descFiles||0;
-    else if(n.type==='external') v=(n.count||0)*1.5;
-    else v=((n.importsIn||[]).length+(n.importsOut||[]).length)*1.4 + (n.metrics?n.metrics.lines/180:0);
-    return Math.min(1, Math.log2(v+1)/6.5);
-  }
   // shapes are SYSTEM-IMPOSED by node type/kind (no user picker) so categories stay distinguishable
-  function autoShape(n){
-    if(n.type==='folder') return 'square';
-    if(n.type==='external') return 'diamond';
-    const e=((n.ext||n.lang||'')+'').toLowerCase();
-    if(/(png|jpe?g|gif|svg|webp|bmp|ico|avif|tiff?)/.test(e)) return 'star';
-    if(/(json|ya?ml|xml|csv|tsv|toml|ini|env|lock|properties)/.test(e)) return 'diamond';
-    if(/(md|markdown|txt|rst|pdf|docx?|rtf|adoc)/.test(e)) return 'square';
-    if(/(html?|css|scss|sass|less|vue|svelte|astro|pug|hbs)/.test(e)) return 'hexagon';
-    return 'circle';   // code & everything else
-  }
   // short format/extension code shown on top of a node
   function formatCode(n){
     if(n.type==='folder') return n.collapsed?'DIR+':'DIR';
@@ -930,12 +805,6 @@ CM.Renderer = (function(){
     return (c||'?').toUpperCase().slice(0,4);
   }
   // per-node animation signature (stable phase + speed) so every figure's outgoing paths flow distinctly
-  function edgeAnim(n){
-    if(n._ea) return n._ea;
-    let h=0; const s=n.id||''; for(let i=0;i<s.length;i++){ h=(h*31 + s.charCodeAt(i))>>>0; }
-    n._ea={ phase:(h%997)/997, spd:0.55 + ((h>>5)%90)/100 };
-    return n._ea;
-  }
   function badgeColor(n){
     if(n.type==='folder') return '#22d3ee';
     if(n.type==='external') return '#a78bfa';

@@ -578,11 +578,7 @@ CM.Settings = (function(){
     // ---- up to 4 Mistral API keys (stored as JSON array; key #1 mirrored to the legacy single-key slot) ----
     c.appendChild(el('div',{class:'set-label',text:t('ai.keys')}));
     c.appendChild(el('p',{class:'set-desc',text:t('ai.keysHint')}));
-    let keys=[]; try{ keys=JSON.parse(localStorage.getItem('codemap_mistral_keys')||'[]'); }catch(e){}
-    if(!Array.isArray(keys)) keys=[];
-    const legacy=(localStorage.getItem('codemap_mistral_key')||'').trim();
-    if(legacy && !keys.length) keys=[legacy];          // migrate previously-saved single key into slot #1
-    keys=keys.slice(0,4); while(keys.length<4) keys.push('');
+    let keys=U.mistralKeySlots();   // 4 sloty pozycyjne + migracja dawnego pojedynczego klucza — jedno źródło w util.js
     const countEl=el('div',{class:'set-ai-keycount'});
     function refreshCount(){ const n=keys.map(k=>(k||'').trim()).filter(Boolean).length; countEl.textContent=t('ai.keysCount')+n+' / 4'; }
     function persist(){
@@ -659,7 +655,7 @@ CM.Settings = (function(){
     {sel:()=>fb('#lang-filters'), k:'tour.filetypes', before:()=>panel('left',true)},
     {sel:()=>fb('#sel-metric'), k:'tour.complexity', before:()=>panel('left',true)},
     {sel:()=>fb('#rng-trans'), k:'tour.appearance', before:()=>panel('left',true)},
-    {sel:()=>fb('#opt-animate'), k:'tour.map', before:()=>panel('left',true)},
+    {sel:()=>fb('#opt-grid'), k:'tour.map', before:()=>panel('left',true)},
     {sel:()=>fb('#rng-nscale'), k:'tour.figures', before:()=>panel('left',true)},
     {sel:()=>$('#view-controls'), k:'tour.viewcontrols'},
     {sel:()=>$('#vc-3d'), k:'tour.threed', before:()=>{ const b=$('#vc-3d'); if(b) b.click(); }, after:()=>{ const b=$('#vc-3d'); if(b) b.click(); }},

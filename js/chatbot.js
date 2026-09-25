@@ -14,7 +14,7 @@ CM.ChatBot = (function(){
     'open':'Otwórz ChatBota','collapse':'Zwiń do paska','newchat':'Nowa rozmowa','history':'Historia rozmów','togglebar':'Pokaż / ukryj historię',
     'placeholder':'Napisz wiadomość lub zleć akcję w aplikacji…','send':'Wyślij','stop':'Zatrzymaj',
     'welcome':'Cześć! Jestem **ChatBot** — wbudowany asystent CodeMap. Znam stan Twojej aplikacji i mogę w niej działać. Poproś np. *„wczytaj demo"*, *„zmień układ na force"*, *„pokaż hotspoty"* albo zadaj dowolne pytanie.',
-    'thinking':'ChatBot pisze…','aborted':'(przerwano)','errPrefix':'⚠ ',
+    'aborted':'(przerwano)','errPrefix':'⚠ ',
     'noKey':'Brak klucza Mistral API w **drugim slocie**. Dodaj go w Ustawieniach → AI (slot #2) — albo przełącz się tam na **model lokalny** (bez klucza).','goSettings':'Otwórz Ustawienia → AI',
     'noWebGPU':'Wybrany jest **lokalny model AI**, ale ta przeglądarka nie obsługuje WebGPU (wymagany Chrome/Edge 113+). Przełącz provider w Ustawieniach → AI albo zaktualizuj przeglądarkę.',
     'subLocal':'Asystent CodeMap · lokalny','notDownloaded':'nie pobrany','modelSel':'Przełącz lokalny model (pobrane w Ustawieniach → AI)',
@@ -35,7 +35,7 @@ CM.ChatBot = (function(){
     'open':'Open ChatBot','collapse':'Collapse to bar','newchat':'New chat','history':'Conversations','togglebar':'Show / hide history',
     'placeholder':'Write a message or command an action in the app…','send':'Send','stop':'Stop',
     'welcome':"Hi! I'm **ChatBot** — the built-in CodeMap assistant. I know your app's state and can act in it. Try *“load demo”*, *“switch layout to force”*, *“show hotspots”*, or ask me anything.",
-    'thinking':'ChatBot is typing…','aborted':'(stopped)','errPrefix':'⚠ ',
+    'aborted':'(stopped)','errPrefix':'⚠ ',
     'noKey':'No Mistral API key in the **second slot**. Add it in Settings → AI (slot #2) — or switch to the **local model** there (no key needed).','goSettings':'Open Settings → AI',
     'noWebGPU':'The **local AI model** is selected, but this browser has no WebGPU (Chrome/Edge 113+ required). Switch the provider in Settings → AI or update your browser.',
     'subLocal':'CodeMap assistant · local','notDownloaded':'not downloaded','modelSel':'Switch local model (download in Settings → AI)',
@@ -55,11 +55,8 @@ CM.ChatBot = (function(){
 
   /* ---------------- key (second slot) + model ---------------- */
   function chatKey(){
-    let arr=[]; try{ arr=JSON.parse(localStorage.getItem('codemap_mistral_keys')||'[]'); }catch(e){}
-    if(!Array.isArray(arr)) arr=[];
-    const slot2=(arr[1]||'').trim(); if(slot2) return slot2;
-    const any=arr.map(k=>(k||'').trim()).filter(Boolean);
-    return any[0]||(localStorage.getItem('codemap_mistral_key')||'').trim()||'';
+    const s=U.mistralKeySlots();   // slot #2 jest dla ChatBota; w razie braku — pierwszy niepusty
+    return s[1]||s.find(Boolean)||'';
   }
   function aiModel(){ return localStorage.getItem('codemap_mistral_model')||'mistral-small-latest'; }
   // local on-device provider (WebLLM) — no key needed; selected in Settings → AI

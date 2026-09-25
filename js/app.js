@@ -178,7 +178,7 @@
   const SETTINGS_INPUTS=['rng-trans','rng-menu','rng-blur','rng-tint','col-accent','col-bg',
     'rng-nscale','rng-spacing','rng-fscale','sel-layout','sel-metric',
     'show-folders','show-files','show-externals','edge-contains','edge-import','edge-reference',
-    'opt-animate','opt-particles','opt-glow','opt-grid','opt-curved','opt-lockall','opt-hover-preview'];
+    'opt-grid','opt-curved','opt-lockall','opt-hover-preview'];
   function collectSettings(){
     const s={};
     for(const id of SETTINGS_INPUTS){ const el=$('#'+id); if(!el) continue; s[id]= el.type==='checkbox'? el.checked : el.value; }
@@ -1082,8 +1082,7 @@
     });
     // map render options
     const optBind=(id,key)=>{ const el=$('#'+id); el.onchange=()=>{ renderer.opts[key]=el.checked; renderer.kick(); }; renderer.opts[key]=el.checked; };
-    optBind('opt-animate','animateEdges'); optBind('opt-particles','particles');
-    optBind('opt-glow','glow'); optBind('opt-grid','showGrid'); optBind('opt-curved','curvedImports');
+    optBind('opt-grid','showGrid'); optBind('opt-curved','curvedImports');
     optBind('opt-lockall','lockAll');
   }
 
@@ -1389,11 +1388,7 @@
   }
   // ---- Mistral API keys: up to 4, used app-wide with round-robin + automatic fallback ----
   function aiKeyList(){
-    let arr=[]; try{ arr=JSON.parse(localStorage.getItem('codemap_mistral_keys')||'[]'); }catch(e){}
-    if(!Array.isArray(arr)) arr=[];
-    arr=arr.map(k=>(k||'').trim()).filter(Boolean);
-    const legacy=(localStorage.getItem('codemap_mistral_key')||'').trim();   // back-compat: single-key storage
-    if(legacy && arr.indexOf(legacy)<0) arr.unshift(legacy);
+    const arr=U.mistralKeySlots().filter(Boolean);   // jedno źródło slotów (util.js), z migracją legacy
     return arr.filter((k,i)=>arr.indexOf(k)===i);   // de-dupe, keep order
   }
   function aiModel(){ return localStorage.getItem('codemap_mistral_model')||'mistral-small-latest'; }
@@ -1561,8 +1556,6 @@
       items.push({ic:'collapse',label:I.t('ca.ctxCollapseL1','Zwiń do poziomu 1'),action:()=>{ graph.collapseAll(1); apply({}); }});
       items.push({sep:true});
       items.push({ic:'grid',label:I.t('ca.ctxToggleGrid','Przełącz siatkę tła'),action:()=>{ renderer.opts.showGrid=!renderer.opts.showGrid; $('#opt-grid').checked=renderer.opts.showGrid; renderer.kick(); }});
-      items.push({ic:'sparkle',label:I.t('ca.ctxToggleEdgeAnim','Przełącz animacje krawędzi'),action:()=>{ renderer.opts.animateEdges=!renderer.opts.animateEdges; $('#opt-animate').checked=renderer.opts.animateEdges; renderer.kick(); }});
-      items.push({ic:'flow',label:I.t('ca.ctxToggleParticles','Przełącz cząsteczki'),action:()=>{ renderer.opts.particles=!renderer.opts.particles; $('#opt-particles').checked=renderer.opts.particles; renderer.kick(); }});
       items.push({ic:'cube',label:I.t('ca.ctxToggle3d','Przełącz perspektywę 3D'),action:()=>renderer.setTilt(renderer.cam.tilt>0.05?0:0.62)});
       items.push({sep:true});
       items.push({ic:'bookmark',label:I.t('ca.ctxSnapshot','Zapisz migawkę'),action:()=>$('#btn-snapshot').click()});

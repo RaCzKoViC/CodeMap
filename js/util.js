@@ -180,6 +180,18 @@ CM.util = (function(){
     };
   }
 
+  // Sloty kluczy Mistral: dokładnie 4, POZYCYJNE (slot #2 = ChatBot). Jedno miejsce odczytu dla
+  // app.js (round-robin), chatbot.js i settings.js; migracja z dawnego pojedynczego klucza.
+  function mistralKeySlots(){
+    let arr=[]; try{ arr=JSON.parse(localStorage.getItem('codemap_mistral_keys')||'[]'); }catch(e){}
+    if(!Array.isArray(arr)) arr=[];
+    arr=arr.slice(0,4).map(k=>String(k||'').trim());
+    const legacy=(localStorage.getItem('codemap_mistral_key')||'').trim();
+    if(legacy && !arr.some(Boolean)) arr[0]=legacy;
+    while(arr.length<4) arr.push('');
+    return arr;
+  }
+
   return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,
-          clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera};
+          clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera,mistralKeySlots};
 })();
