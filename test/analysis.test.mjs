@@ -58,6 +58,10 @@ describe('extractDeps per język', () => {
     const d = A.extractDeps('import os, sys as system\nfrom .helpers import x\nfrom pkg.sub import y\n', 'py');
     assert.deepEqual(host(d.map((x) => [x.spec, x.kind])), [['os', 'module'], ['sys', 'module'], ['.helpers', 'py-rel'], ['pkg.sub', 'module']]);
   });
+  test('Python: nazwy po `from X import` (as, nawiasy wieloliniowe, *)', () => {
+    const d = A.extractDeps('from .helpers import x, y as z\nfrom pkg import (a,\n    b as c)\nfrom m import *\nimport os\n', 'py');
+    assert.deepEqual(host(d.map((x) => [x.spec, x.names || null])), [['os', null], ['.helpers', ['x', 'y']], ['pkg', ['a', 'b']], ['m', null]]);   // `import` skanowane przed `from`
+  });
   test('C: "local.h" jest względne, <system> jest systemowe', () => {
     const d = A.extractDeps('#include "util.h"\n#include <stdio.h>\n', 'c');
     assert.deepEqual(host(d.map((x) => [x.spec, x.kind])), [['util.h', 'rel'], ['stdio.h', 'system']]);
@@ -71,6 +75,65 @@ describe('extractDeps per język', () => {
   test('CSS: @import i url()', () => {
     assert.deepEqual(specs("@import './theme.css';\n@import url(\"vars.css\");\n", 'css'), ['./theme.css', 'vars.css']);
   });
+  test('C#: using (zwykły / static / alias) + deklaracje namespace (file-scoped i blokowe) jako decl', () => {
+    const c = 'using System;\nusing static My.App.Util.Helpers;\nusing Log = My.App.Logging.Logger;\nusing (var x = new X()) {}\nusing var y = new Y();\nnamespace My.App.Services;\nnamespace Other.Block\n{\n}\n';
+    const d = host(A.extractDeps(c, 'cs').map((x) => [x.spec, x.kind, !!x.up]));
+    assert.deepEqual(d, [['System', 'cs-ns', false], ['My.App.Util.Helpers', 'cs-ns', true], ['My.App.Logging.Logger', 'cs-ns', true],
+      ['My.App.Services', 'decl', false], ['Other.Block', 'decl', false]]);
+  });
+  test('Rust: use crate/self/super, pub use = reexport, grupy {a, b::c, self}, mod, pub(crate) mod', () => {
+    const c = 'mod a;\npub(crate) mod util;\nuse crate::a::b::c::run;\npub use super::x::Y;\nuse self::z;\nuse std::collections::HashMap;\nuse crate::a::{b, c::d, self};\nuse super::*;\nuse ::core::fmt;\n';
+    const d = host(A.extractDeps(c, 'rs').map((x) => [x.spec, x.kind, !!x.reexport]));
+    assert.deepEqual(d, [['a', 'rust-mod', false], ['util', 'rust-mod', false], ['crate::a::b::c::run', 'rust-use', false], ['super::x::Y', 'rust-use', true],
+      ['self::z', 'rust-use', false], ['std::collections::HashMap', 'rust-use', false], ['crate::a::b', 'rust-use', false], ['crate::a::c::d', 'rust-use', false],
+      ['crate::a', 'rust-use', false], ['super', 'rust-use', false], ['core::fmt', 'rust-use', false]]);
+    assert.equal(A.externalName('serde::Serialize'), 'serde');
+  });
+  test('manifestEntry: Cargo.toml → nazwa crate z [package] (nie z [dependencies])', () => {
+    assert.deepEqual(host(A.manifestEntry('Cargo.toml', '[dependencies]\nname = "zly"\n\n[package]\nname = "demo"\nversion = "0.1.0"\n', 'rs')), { kind: 'package', eco: 'cargo', dir: 'rs', name: 'demo' });
+    assert.equal(A.manifestEntry('Cargo.toml', '[workspace]\nmembers = ["a"]\n', ''), null);
+  });
+  test('Swift: import [@testable] [struct] Module.Sub → moduł', () => {
+    assert.deepEqual(specs('import Foundation\n@testable import Core\nimport struct Helpers.Point\n// import Ghost\n', 'swift'), ['Foundation', 'Core', 'Helpers']);
+  });
+  test('Dart: dart: = system, package: = dart-pkg, względne import/export/part; export = reexport', () => {
+    const c = "import 'dart:io';\nimport 'package:myapp/src/util.dart' as u;\nimport 'widgets/home.dart' show Home;\nexport 'src/api.dart';\npart 'main.g.dart';\npart of my.lib;\n";
+    assert.deepEqual(host(A.extractDeps(c, 'dart').map((x) => [x.spec, x.kind, !!x.reexport])),
+      [['dart:io', 'system', false], ['myapp/src/util.dart', 'dart-pkg', false], ['widgets/home.dart', 'rel', false], ['src/api.dart', 'rel', true], ['main.g.dart', 'rel', false]]);
+  });
+  test('Elixir: alias/import/use/require (+ grupy {A, B.C}, as:), defmodule jako decl, moduły stdlib jako ex-std', () => {
+    const c = 'defmodule MyAppWeb.UserController do\n  use MyAppWeb, :controller\n  alias MyApp.{Repo, Accounts.User}\n  alias Legacy.Thing, as: T\n  import Ecto.Query, only: [from: 2]\n  require Logger\n  alias __MODULE__.Inner\nend\n';
+    assert.deepEqual(host(A.extractDeps(c, 'ex').map((x) => [x.spec, x.kind])), [['MyAppWeb.UserController', 'decl'], ['MyAppWeb', 'module'], ['MyApp.Repo', 'module'],
+      ['MyApp.Accounts.User', 'module'], ['Legacy.Thing', 'module'], ['Ecto.Query', 'module'], ['Logger', 'ex-std']]);
+  });
+  test('Lua: require z nawiasami i bez, kropki; komentarz blokowy --[[ ]] pomijany', () => {
+    assert.deepEqual(specs("local a = require('lib.a')\nlocal b = require \"lib/b\"\n--[[ require('ghost')\n]] local s = require('socket')\n", 'lua'), ['lib.a', 'lib/b', 'socket']);
+  });
+  test('Zig: @import("x.zig") względne, std/builtin/root systemowe, inne = pakiet', () => {
+    assert.deepEqual(host(A.extractDeps('const std = @import("std");\nconst u = @import("util.zig");\nconst s = @import("sub/thing.zig");\nconst z = @import("zap");\n', 'zig').map((x) => [x.spec, x.kind])),
+      [['std', 'system'], ['util.zig', 'rel'], ['sub/thing.zig', 'rel'], ['zap', 'bare']]);
+  });
+  test('Haskell: import [qualified] [safe] ["pkg"] Mod.Name; pragmy {-# #-} i {- -} pomijane', () => {
+    const c = "{-# LANGUAGE OverloadedStrings #-}\nmodule Main where\nimport qualified Data.Map as M\nimport Data.List (foldl')\nimport {-# SOURCE #-} Lib.Core (core)\nimport safe \"base\" Prelude hiding (id)\n{- import Ghost -}\n-- import Ghost2\n";
+    assert.deepEqual(specs(c, 'hs'), ['Data.Map', 'Data.List', 'Lib.Core', 'Prelude']);
+  });
+  test('Shell: source / . ze ścieżką (cudzysłowy, bez zmiennych)', () => {
+    assert.deepEqual(specs('#!/bin/bash\nsource ./lib/common.sh\n. "$HOME/.profile"\n. lib/colors.sh; echo x\nsource "scripts/env.sh"\n', 'sh'), ['./lib/common.sh', 'lib/colors.sh', 'scripts/env.sh']);
+  });
+  test('family: nowe rodziny', () => {
+    assert.deepEqual(host(['swift', 'dart', 'ex', 'exs', 'lua', 'zig', 'hs', 'lhs', 'sh', 'bash', 'zsh', 'fish'].map((k) => A.family(k))),
+      ['swift', 'dart', 'elixir', 'elixir', 'lua', 'zig', 'hs', 'hs', 'sh', 'sh', 'sh', 'sh']);
+  });
+  test('JS: export … from oznacza reexport:true, zwykły import nie', () => {
+    const d = host(A.extractDeps("import a from './a';\nexport * from './b';\nexport { c as d } from './c';\nexport default from './e';\n", 'js'));
+    assert.deepEqual(d.map((x) => [x.spec, !!x.reexport]), [['./a', false], ['./b', true], ['./c', true], ['./e', true]]);
+  });
+  test('SCSS: @use / @forward (as, with, show) jak @import; sass:* to moduł wbudowany; @forward = reexport', () => {
+    const c = "@use 'sass:math';\n@use 'config' as cfg;\n@use 'theme' with ($primary: red);\n@forward 'mixins' as mx-*;\n@forward 'vars' show $a, $b;\n@import 'legacy';\n.x { background: url('img.png'); }\n";
+    const d = host(A.extractDeps(c, 'scss').map((x) => [x.spec, x.kind, x.etype, !!x.reexport]));
+    assert.deepEqual(d, [['sass:math', 'system', 'import', false], ['config', 'bare', 'import', false], ['theme', 'bare', 'import', false],
+      ['mixins', 'bare', 'import', true], ['vars', 'bare', 'import', true], ['legacy', 'bare', 'import', false], ['img.png', 'bare', 'reference', false]]);
+  });
   test('HTML: src/href jako referencje', () => {
     const d = A.extractDeps('<link href="a.css"><script src="b.js"></script><a href="#top">x</a>', 'html');
     assert.deepEqual(host(d.map((x) => [x.spec, x.etype]).sort()), [['a.css', 'reference'], ['b.js', 'reference']]);
@@ -80,6 +143,24 @@ describe('extractDeps per język', () => {
   });
   test('brak treści → pusta lista', () => {
     assert.deepEqual(host(A.extractDeps(null, 'js')), []);
+  });
+  test('JS dynamiczne: Worker, SharedWorker, new URL(…, import.meta.url), importScripts, require.resolve, import.meta.glob (+ negacje); fetch nie', () => {
+    const c = [
+      "new Worker('./w.js', { type: 'module' });",
+      "new SharedWorker(new URL('./s.js', import.meta.url));",
+      "const u = new URL('./a.wasm', import.meta.url);",
+      "new URL('https://cdn.example/x.js'); new URL('/api', location.href);",
+      "importScripts('lib/a.js', \"./b.js\");",
+      "require.resolve('./cfg'); require.resolve('pkg');",
+      "import.meta.glob('./plugins/*.js'); import.meta.globEager(['./views/**/*.vue', '!./views/skip.vue']);",
+      "fetch('./data.json');",
+    ].join('\n');
+    const d = host(A.extractDeps(c, 'js').map((x) => [x.spec, x.kind]));
+    assert.deepEqual(d, [['./w.js', 'rel'], ['./s.js', 'rel'], ['./a.wasm', 'rel'], ['lib/a.js', 'rel'], ['./b.js', 'rel'],
+      ['./cfg', 'rel'], ['pkg', 'bare'], ['./plugins/*.js', 'glob'], ['./views/**/*.vue', 'glob']]);
+    const glob = A.extractDeps(c, 'js').find((x) => x.spec === './views/**/*.vue');
+    assert.deepEqual(host(glob.exclude), ['./views/skip.vue']);
+    assert.ok(A.extractDeps(c, 'js').every((x) => x.etype === 'import'));
   });
 });
 

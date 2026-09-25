@@ -2,11 +2,17 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCM, ALL_FILTERS, host } from './harness.mjs';
 import { FILES, META, EXPECTED_EDGES, EXPECTED_EXTERNALS } from './fixtures/sample-project.mjs';
+import { FILES as MONO_FILES, META as MONO_META } from './fixtures/monorepo.mjs';
+import { FILES as POLY_FILES, META as POLY_META } from './fixtures/polyglot.mjs';
 
 const CM = loadCM();
 const { Graph, diffSignatures } = CM.Graph;
 const build = () => new Graph().build(FILES.map((f) => ({ ...f })), META);
+const buildMono = () => new Graph().build(MONO_FILES.map((f) => ({ ...f })), MONO_META);
+const buildPoly = () => new Graph().build(POLY_FILES.map((f) => ({ ...f })), POLY_META);
 const edgeKeys = (g) => new Set(g.edges.filter((e) => e.type !== 'contains').map((e) => `${e.source}|${e.target}|${e.type}`));
+/** Cele krawędzi import/reference wychodzących z pliku `src` (posortowane). */
+const targetsOf = (g, src) => host(g.edges.filter((e) => e.source === src && e.type !== 'contains').map((e) => e.target).sort());
 
 describe('Graph.build', () => {
   let g;
@@ -158,6 +164,148 @@ describe('serializacja', () => {
     assert.equal(g2.nodes.get('src').descFiles, 8, 'aggregates recomputed');
     assert.equal(g2.langStats.get('js').count, 8);
     assert.ok(g2.nodes.get('src/lib/util.js').importsIn.includes('src/index.js'), 'import degrees recomputed');
+  });
+});
+
+describe('aliasy tsconfig/jsconfig per katalog', () => {
+  test('najbliższy config wygrywa; dwa pakiety z tym samym aliasem @/* się nie mieszają', () => {
+    const g = buildMono();
+    assert.deepEqual(targetsOf(g, 'packages/a/src/main.ts'), ['ext:@root/gen', 'packages/a/src/x.ts', 'packages/shared/src/util.ts']);
+    assert.deepEqual(targetsOf(g, 'packages/b/src/main.ts'), ['ext:@shared/util', 'packages/b/lib/x.ts']);
+  });
+  test('extends scala paths i baseUrl z bazy (z rozszerzeniem .json i bez); root nie przecieka do pakietów', () => {
+    const g = buildMono();
+    // scripts/ nie ma własnego configu → root tsconfig.json (+ baza przez extends); `@/*` root nie zna
+    assert.deepEqual(targetsOf(g, 'scripts/build.ts'), ['ext:@/x', 'packages/shared/src/util.ts', 'tools/gen.ts']);
+    // `@root/*` z root tsconfig.json NIE obowiązuje w packages/a (a rozszerza tylko bazę)
+    assert.ok(!edgeKeys(g).has('packages/a/src/main.ts|tools/gen.ts|import'));
+  });
+  test('manifestEntry: tsconfig z samym extends też jest konfiguracją; JSONC; uszkodzony → null', () => {
+    const A = CM.Analysis;
+    const e = host(A.manifestEntry('tsconfig.json', '{ "extends": "./base.json", /* c */ }', 'pkg'));
+    assert.deepEqual(e, { kind: 'alias', dir: 'pkg', file: 'pkg/tsconfig.json', primary: true, baseUrl: null, paths: null, extends: './base.json' });
+    assert.equal(host(A.manifestEntry('tsconfig.build.json', '{ "compilerOptions": { "baseUrl": "src" } }', '')).primary, false);
+    assert.equal(A.manifestEntry('tsconfig.json', '{ not json', ''), null);
+    assert.equal(A.manifestEntry('tsconfig.json', '{ "compilerOptions": { "strict": true } }', ''), null, 'bez paths/baseUrl/extends nie ma czego rozwiązywać');
+  });
+});
+
+describe('workspaces monorepo', () => {
+  test('import po nazwie pakietu → main / exports["."] / exports subpath + wzorzec / string exports / folder', () => {
+    const g = buildMono();
+    assert.deepEqual(targetsOf(g, 'packages/a/src/uses.ts'), [
+      'ext:left-pad',
+      'packages/b/lib/feat/one.ts',      // exports["./feat/*"]
+      'packages/b/lib/index.mjs',        // exports["."].import
+      'packages/b/lib/x.ts',             // exports["./x"]
+      'packages/c/c.ts',                 // exports jako string
+      'packages/shared/src/index.ts',    // main
+      'packages/util',                   // brak main/index → folder pakietu
+      'packages/util/helper.ts',         // podścieżka bez exports → plik w pakiecie
+    ]);
+  });
+  test('pakiety workspace nie są zależnościami zewnętrznymi; nieznany pakiet nadal jest', () => {
+    const g = buildMono();
+    for (const name of ['@mono/shared', '@mono/b', '@mono/c', 'util-pkg']) assert.ok(!g.externals.has(name), `${name} nie może być external`);
+    assert.ok(g.externals.has('left-pad'));
+    assert.equal(host(CM.Analysis.manifestEntry('package.json', '{ "name": "@s/p", "main": "x.js" }', 'pk')).name, '@s/p');
+    assert.equal(CM.Analysis.manifestEntry('package.json', '{ "private": true }', ''), null, 'bez nazwy nie ma czego mapować');
+  });
+});
+
+describe('dynamiczne odwołania JS', () => {
+  test('Worker / SharedWorker / new URL(import.meta.url) / require.resolve / import.meta.glob → krawędzie import', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'web/main.js'), [
+      'web/assets/mod.wasm',        // new URL('./assets/mod.wasm', import.meta.url) — też zasób binarny
+      'web/config.js',              // require.resolve('./config')
+      'web/plugins/p1.js', 'web/plugins/p2.js',          // glob './plugins/*.js' — bez nested/p3.js
+      'web/views/Home.vue', 'web/views/admin/Users.vue', // glob './views/**/*.vue' minus '!./views/**/skip.vue'
+      'web/workers/heavy.js',       // new Worker('./workers/heavy.js', {type:'module'})
+      'web/workers/shared.js',      // new SharedWorker(new URL('./workers/shared.js', import.meta.url))
+    ]);
+    assert.ok(g.edges.filter((e) => e.source === 'web/main.js' && e.type !== 'contains').every((e) => e.type === 'import'));
+    assert.deepEqual(targetsOf(g, 'web/workers/heavy.js'), ['web/workers/b.js', 'web/workers/lib/a.js']);   // importScripts
+    assert.ok(!g.externals.has('api') && !g.externals.has('https'), 'URL-e absolutne i /api nie są zależnościami');
+  });
+});
+
+describe('SCSS @use / @forward', () => {
+  test('partiale, index w katalogu, sass:* bez externala; reexport nie zmienia krawędzi', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'sass/main.scss'), ['sass/_partial.scss', 'sass/legacy/index.scss', 'sass/lib/_index.scss', 'sass/theme.scss']);
+    assert.deepEqual(targetsOf(g, 'sass/lib/_index.scss'), ['sass/lib/_mixins.scss']);
+    assert.ok(![...g.externals.keys()].some((k) => k.startsWith('sass')), 'sass:math nie jest zależnością zewnętrzną');
+    assert.ok(g.nodes.get('sass/main.scss').deps.find((d) => d.spec === 'theme').reexport === true);
+  });
+});
+
+describe('C# namespace i Rust use', () => {
+  test('C#: using → wszystkie pliki z tym namespace; static/alias → namespace typu; System zewnętrzny, decl bez krawędzi', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'cs/App/Program.cs'), ['cs/Logging/Logger.cs', 'cs/Services/OrderService.cs', 'cs/Services/UserService.cs', 'cs/Util/Helpers.cs', 'ext:System']);
+    assert.deepEqual(targetsOf(g, 'cs/Services/Unrelated.cs'), ['cs/Services/OrderService.cs', 'cs/Services/UserService.cs']);
+    assert.ok(!g.externals.has('MyApp'));
+    assert.deepEqual(targetsOf(g, 'cs/Util/Helpers.cs'), [], 'sama deklaracja namespace nie tworzy krawędzi');
+  });
+  test('Rust: crate:: od src/ crate\'a (Cargo.toml), nazwa crate, self/super względem modułu, najdłuższa ścieżka pierwsza', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'rs/src/main.rs'), ['ext:serde', 'ext:std', 'rs/src/a/b.rs', 'rs/src/a/b/c.rs', 'rs/src/a/mod.rs', 'rs/src/util.rs']);
+    assert.deepEqual(targetsOf(g, 'rs/src/a/mod.rs'), ['rs/src/a/b.rs', 'rs/src/a/b/c.rs', 'rs/src/util.rs']);
+    assert.deepEqual(targetsOf(g, 'rs/src/a/b.rs'), ['rs/src/a/b/c.rs', 'rs/src/a/mod.rs', 'rs/src/util.rs']);
+    assert.deepEqual(targetsOf(g, 'rs/src/a/b/c.rs'), ['rs/src/util.rs']);
+    assert.equal(g.nodes.get('ext:serde').version, '1', 'wersja z [dependencies] Cargo.toml');
+    assert.ok(!g.externals.has('crate') && !g.externals.has('super') && !g.externals.has('demo'));
+  });
+});
+
+describe('nowe parsery: Swift, Dart, Elixir, Lua, Zig, Haskell, Shell', () => {
+  let g;
+  beforeEach(() => { g = buildPoly(); });
+  test('Swift: import Core → folder Sources/Core; Foundation/Helpers zewnętrzne', () => {
+    assert.deepEqual(targetsOf(g, 'swift/Sources/App/main.swift'), ['ext:Foundation', 'ext:Helpers', 'swift/Sources/Core']);
+    assert.deepEqual(targetsOf(g, 'swift/Tests/CoreTests/CoreTests.swift'), ['ext:XCTest', 'swift/Sources/Core']);
+  });
+  test('Dart: package:myapp/… → lib/ z pubspec.yaml, względne, export, part; dart:io bez externala, flutter zewnętrzny', () => {
+    assert.deepEqual(targetsOf(g, 'dart/lib/main.dart'), ['dart/lib/main.g.dart', 'dart/lib/src/api.dart', 'dart/lib/src/util.dart', 'dart/lib/widgets/home.dart', 'ext:flutter']);
+    assert.deepEqual(targetsOf(g, 'dart/lib/main.g.dart'), ['dart/lib/main.dart']);
+    assert.ok(!g.externals.has('dart') && !g.externals.has('myapp'));
+  });
+  test('Elixir: defmodule w projekcie (także gdy ścieżka nie pasuje), snake_case ścieżka, stdlib bez externala, Ecto zewnętrzne', () => {
+    assert.deepEqual(targetsOf(g, 'ex/lib/my_app_web/controllers/user_controller.ex'),
+      ['ex/lib/legacy.ex', 'ex/lib/my_app/accounts/user.ex', 'ex/lib/my_app/repo.ex', 'ex/lib/my_app_web.ex', 'ext:Ecto']);
+    assert.ok(!g.externals.has('Logger') && !g.externals.has('MyApp'));
+  });
+  test('Lua: a/b.lua i a/b/init.lua; socket zewnętrzny', () => {
+    assert.deepEqual(targetsOf(g, 'lua/main.lua'), ['ext:socket', 'lua/lib/a.lua', 'lua/lib/b/init.lua']);
+  });
+  test('Zig: względne .zig; std bez externala; zap zewnętrzny', () => {
+    assert.deepEqual(targetsOf(g, 'zig/src/main.zig'), ['ext:zap', 'zig/src/sub/thing.zig', 'zig/src/util.zig']);
+    assert.ok(!g.externals.get('std').importers.includes('zig/src/main.zig'), 'std Ziga nie jest externalem (std Rusta z rs/ jest)');
+  });
+  test('Haskell: Lib.Util → src/Lib/Util.hs; Data.Map zewnętrzne', () => {
+    assert.deepEqual(targetsOf(g, 'hs/src/Main.hs'), ['ext:Data', 'hs/src/Lib/Core.hs', 'hs/src/Lib/Util.hs']);
+  });
+  test('Shell: source względem skryptu i od korzenia; $HOME pomijane', () => {
+    assert.deepEqual(targetsOf(g, 'sh/run.sh'), ['scripts/env.sh', 'sh/lib/colors.sh', 'sh/lib/common.sh']);
+  });
+});
+
+describe('Python: rozwiązywanie modułów', () => {
+  let g;
+  beforeEach(() => { g = buildPoly(); });
+  test('import utils → utils.py z katalogu importera, nie najkrótsza ścieżka o tej nazwie', () => {
+    assert.deepEqual(targetsOf(g, 'py2/pkg_b/sub/mod.py'), ['py2/pkg_b/__init__.py', 'py2/pkg_b/shared.py', 'py2/pkg_b/sub/__init__.py', 'py2/pkg_b/sub/utils.py']);
+    assert.deepEqual(targetsOf(g, 'py2/pkg_a/core.py'), ['py2/pkg_a/utils.py', 'py2/pkg_b/sub/__init__.py', 'py2/pkg_b/sub/utils.py']);
+  });
+  test('poza katalogiem: bliższy pakiet (wspólny prefiks ścieżki) przed najkrótszą ścieżką; brak wspólnego → najkrótsza', () => {
+    assert.deepEqual(targetsOf(g, 'py2/pkg_b/tools/run.py'), ['py2/pkg_b/sub/utils.py']);
+    assert.deepEqual(targetsOf(g, 'py2/other/deep/x/mod2.py'), ['py2/pkg_a/utils.py']);
+  });
+  test('from pkg import a, b → także podmoduły pkg/a.py (nieistniejące nazwy = zwykłe symbole)', () => {
+    assert.ok(!g.externals.has('missing') && !g.externals.has('utils'));
+    const s = build();   // sample-project: `from . import helpers` w __init__.py — dawne „znane ograniczenie"
+    assert.ok(edgeKeys(s).has('py/pkg/__init__.py|py/pkg/helpers.py|import'));
   });
 });
 
