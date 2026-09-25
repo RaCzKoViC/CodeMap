@@ -23,14 +23,13 @@ CM.Sync = (function(){
   }};
   function t(k){ const d=STR[I.getLang()]||STR.pl; return (k in d)?d[k]:(STR.pl[k]||k); }
 
-  // Klucze ustawień synchronizowane z serwerem. ŚWIADOMIE pomijamy sekrety
-  // (codemap_mistral_keys) i ustawienia specyficzne dla urządzenia (codemap_ollama_base, flagi instalacji).
+  // Klucze ustawień synchronizowane z serwerem. Wygląd, filtry, układ i opcje renderowania żyją
+  // w JEDNYM blobie `codemap_settings` (app.js collectSettings) — wcześniejsza lista 17 osobnych
+  // kluczy (codemap_theme, codemap_accent, …) nigdy nie była nigdzie zapisywana, więc sync wyglądu
+  // był martwy. ŚWIADOMIE pomijamy sekrety (codemap_mistral_keys) i ustawienia specyficzne dla
+  // urządzenia (codemap_ollama_base, flagi instalacji, pozycja panelu ChatBota).
   const SYNC_KEYS=[
-    'codemap_lang','codemap_theme','codemap_accent','codemap_bg','codemap_tint',
-    'codemap_trans_win','codemap_trans_menu','codemap_trans_blur',
-    'codemap_nscale','codemap_fscale','codemap_spacing',
-    'codemap_animate','codemap_particles','codemap_glow','codemap_grid','codemap_curved','codemap_hover_preview',
-    'codemap_filters','codemap_metric','codemap_minmetric',
+    'codemap_lang','codemap_settings',
     'codemap_ai_provider','codemap_mistral_model','codemap_local_model','codemap_ollama_model',
   ];
   const LS_PULLED_TS='codemap_sync_settings_ts';

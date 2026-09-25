@@ -576,7 +576,10 @@
   };
 
   // ---------------- core view pipeline ----------------
-  function apply({relayout=true, refit=false}={}){
+  // persist: zapis sesji (IndexedDB + ewentualny push do chmury) tylko gdy zmienia się to, co sesja
+  // przechowuje — pozycje/układ/zwinięcia. Filtry, metryka i języki żyją w codemap_settings, więc ich
+  // przełączanie nie serializuje całego grafu (na dużych mapach = dziesiątki MB na każde kliknięcie).
+  function apply({relayout=true, refit=false, persist=relayout}={}){
     // Halt ANY running simulation (worker OR main-thread) before re-filtering / relaying out.
     // Critical for performance: a filter/layer toggle must never leave the force physics churning on
     // the main thread — that is what tanked FPS to a crawl on medium+ graphs and made the panel unusable.
@@ -626,7 +629,7 @@
     refreshAuthors();
     // static layouts fit immediately; animated ones fit once the live simulation settles (onSettle)
     if(refit && !state._fitOnSettle) requestAnimationFrame(()=>renderer.fit());
-    saveSessionDebounced();
+    if(persist) saveSessionDebounced();
   }
 
   // seed only nodes that have never been placed (e.g. just-revealed by a filter) near their parent,
@@ -677,7 +680,7 @@
     if(impactOn && !renderer.selected) U.toast(I.t('ca.impactHint','Widok wpływu: zaznacz plik, aby zobaczyć od czego zależy (w dół) i co od niego zależy (w górę).'),'',3200);
     applyImpact();
   }
-  function toggleCollapse(node){ node.collapsed=!node.collapsed; apply({relayout:false}); if(renderer.selected) UI.renderDetails(renderer.selected, graph, handlers); }
+  function toggleCollapse(node){ node.collapsed=!node.collapsed; apply({relayout:false, persist:true}); if(renderer.selected) UI.renderDetails(renderer.selected, graph, handlers); }
   function toggleLang(key){ if(filters.langsOff.has(key)) filters.langsOff.delete(key); else filters.langsOff.add(key); apply({relayout:false}); }
 
   function revealNode(id){
@@ -1123,8 +1126,10 @@
     });
   }
 
+  const MAP_FORMAT_VERSION=2;   // = Graph.toJSON().version; starsze wczytujemy (format zgodny wstecz), nowsze odrzucamy
   function loadFromJSON(obj){
     if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return; }
+    if((Number(obj.version)||1)>MAP_FORMAT_VERSION){ U.toast(I.t('ca.mapTooNew','Ten plik pochodzi z nowszej wersji CodeMap — zaktualizuj aplikację.'),'error',6000); return; }
     resetProjectState();
     graph=Graph.fromJSON(obj);
     for(const n of graph.nodes.values()){ if(Number.isFinite(n.x)&&Number.isFinite(n.y)) n._placed=true; }
