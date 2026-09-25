@@ -71,6 +71,24 @@ describe('extractDeps per język', () => {
   test('CSS: @import i url()', () => {
     assert.deepEqual(specs("@import './theme.css';\n@import url(\"vars.css\");\n", 'css'), ['./theme.css', 'vars.css']);
   });
+  test('C#: using (zwykły / static / alias) + deklaracje namespace (file-scoped i blokowe) jako decl', () => {
+    const c = 'using System;\nusing static My.App.Util.Helpers;\nusing Log = My.App.Logging.Logger;\nusing (var x = new X()) {}\nusing var y = new Y();\nnamespace My.App.Services;\nnamespace Other.Block\n{\n}\n';
+    const d = host(A.extractDeps(c, 'cs').map((x) => [x.spec, x.kind, !!x.up]));
+    assert.deepEqual(d, [['System', 'cs-ns', false], ['My.App.Util.Helpers', 'cs-ns', true], ['My.App.Logging.Logger', 'cs-ns', true],
+      ['My.App.Services', 'decl', false], ['Other.Block', 'decl', false]]);
+  });
+  test('Rust: use crate/self/super, pub use = reexport, grupy {a, b::c, self}, mod, pub(crate) mod', () => {
+    const c = 'mod a;\npub(crate) mod util;\nuse crate::a::b::c::run;\npub use super::x::Y;\nuse self::z;\nuse std::collections::HashMap;\nuse crate::a::{b, c::d, self};\nuse super::*;\nuse ::core::fmt;\n';
+    const d = host(A.extractDeps(c, 'rs').map((x) => [x.spec, x.kind, !!x.reexport]));
+    assert.deepEqual(d, [['a', 'rust-mod', false], ['util', 'rust-mod', false], ['crate::a::b::c::run', 'rust-use', false], ['super::x::Y', 'rust-use', true],
+      ['self::z', 'rust-use', false], ['std::collections::HashMap', 'rust-use', false], ['crate::a::b', 'rust-use', false], ['crate::a::c::d', 'rust-use', false],
+      ['crate::a', 'rust-use', false], ['super', 'rust-use', false], ['core::fmt', 'rust-use', false]]);
+    assert.equal(A.externalName('serde::Serialize'), 'serde');
+  });
+  test('manifestEntry: Cargo.toml → nazwa crate z [package] (nie z [dependencies])', () => {
+    assert.deepEqual(host(A.manifestEntry('Cargo.toml', '[dependencies]\nname = "zly"\n\n[package]\nname = "demo"\nversion = "0.1.0"\n', 'rs')), { kind: 'package', eco: 'cargo', dir: 'rs', name: 'demo' });
+    assert.equal(A.manifestEntry('Cargo.toml', '[workspace]\nmembers = ["a"]\n', ''), null);
+  });
   test('JS: export … from oznacza reexport:true, zwykły import nie', () => {
     const d = host(A.extractDeps("import a from './a';\nexport * from './b';\nexport { c as d } from './c';\nexport default from './e';\n", 'js'));
     assert.deepEqual(d.map((x) => [x.spec, !!x.reexport]), [['./a', false], ['./b', true], ['./c', true], ['./e', true]]);

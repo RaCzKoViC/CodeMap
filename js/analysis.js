@@ -150,7 +150,11 @@ CM.Analysis = (function(){
     });
   }
   function csDeps(c, d){
-    matchAll(/^[ \t]*using[ \t]+(?:static[ \t]+)?([\w.]+)[ \t]*;/gm, c, m=>add(d,m[1], 'cs-ns', 'import'));
+    // `using X.Y;` | `using static X.Y.Type;` | `using Alias = X.Y.Type;` — static/alias wskazują TYP, więc przy
+    // rozwiązywaniu wolno spaść do namespace nadrzędnego (up). `using (var x…)` / `using var x = …` nie pasują.
+    matchAll(/^[ \t]*using[ \t]+(?:(static)[ \t]+)?(?:(\w+)[ \t]*=[ \t]*)?([\w.]+)[ \t]*;/gm, c, m=>add(d,m[3], 'cs-ns', 'import', (m[1]||m[2]) ? {up:true} : null));
+    // deklaracje `namespace A.B;` (file-scoped) i `namespace A.B {` — indeks namespace→pliki dla `using` z innych plików
+    matchAll(/^[ \t]*namespace[ \t]+([\w.]+)[ \t]*(?:;|\{|$)/gm, c, m=>add(d,m[1], 'decl', 'decl'));
   }
   function phpDeps(c, d){
     matchAll(/\b(?:require|require_once|include|include_once)\b[ \t]*\(?[ \t]*['"]([^'"]+)['"]/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
@@ -161,8 +165,18 @@ CM.Analysis = (function(){
     matchAll(/\brequire[ \t]+['"]([^'"]+)['"]/g, c, m=>add(d,m[1], 'bare', 'import'));
   }
   function rustDeps(c, d){
-    matchAll(/^[ \t]*(?:pub[ \t]+)?mod[ \t]+(\w+)[ \t]*;/gm, c, m=>add(d,m[1], 'rust-mod', 'import'));
-    matchAll(/^[ \t]*use[ \t]+([\w:]+)/gm, c, m=>add(d,m[1], 'rust-use', 'import'));
+    matchAll(/^[ \t]*(?:pub(?:\([^)]*\))?[ \t]+)?mod[ \t]+(\w+)[ \t]*;/gm, c, m=>add(d,m[1], 'rust-mod', 'import'));
+    // `use a::b::c;` | `pub use …` (reexport) | `use a::{b, c::d, self, *}` (jeden poziom nawiasów) | `use ::core::x`
+    matchAll(/^[ \t]*(pub(?:\([^)]*\))?[ \t]+)?use[ \t]+(?:::)?([\w:]+)(?:\{([^}]*)\})?/gm, c, m=>{
+      const extra = m[1] ? {reexport:true} : null, base = m[2];
+      if(m[3] == null){ add(d, base.replace(/::$/,''), 'rust-use', 'import', extra); return; }
+      for(let item of m[3].split(',')){
+        item = item.trim().split(/\s+as\s+/)[0];
+        const nested = item.indexOf('{'); if(nested >= 0) item = item.slice(0, nested).replace(/::$/,'');   // `b::{c,d}` → b
+        if(!item) continue;
+        add(d, (item === 'self' || item === '*') ? base.replace(/::$/,'') : base + item, 'rust-use', 'import', extra);
+      }
+    });
   }
   function cssDeps(c, d){
     // `@import 'x'` / `@import url(x)`; Sass: `@use 'x' [as y] [with (...)]`, `@forward 'x' [as y-*] [show/hide …]`
@@ -240,6 +254,14 @@ CM.Analysis = (function(){
         if(!(co.paths || co.baseUrl != null || j.extends)) return null;
         return {kind:'alias', dir, file: joinPath(dir, name), primary: n === 'tsconfig.json' || n === 'jsconfig.json',
                 baseUrl: co.baseUrl != null ? String(co.baseUrl) : null, paths: co.paths || null, extends: j.extends || null};
+      }
+      if(n === 'cargo.toml'){   // [package] name = "x" → `use x::…` i korzeń src/ dla `crate::`
+        let sec = '';
+        for(const line of content.split(/\r?\n/)){ const t = line.trim();
+          if(t.startsWith('[')){ sec = t; continue; }
+          if(sec === '[package]'){ const m = /^name[ \t]*=[ \t]*["']([^"']+)["']/.exec(t); if(m) return {kind:'package', eco:'cargo', dir, name:m[1]}; }
+        }
+        return null;
       }
     }catch(e){ /* uszkodzony manifest = brak wpisu */ }
     return null;
@@ -475,12 +497,53 @@ CM.Analysis = (function(){
     return null;
   }
 
+  // ---------- Rust: moduły plikowe ----------
+  // katalog src/ crate'a, do którego należy plik (segment `src` najbliżej pliku; awaryjnie katalog pliku — tests/, examples/)
+  function rustRoot(file){
+    const segs = dirname(file.path).split('/'); const k = segs.lastIndexOf('src');
+    return k >= 0 ? segs.slice(0, k+1).join('/') : dirname(file.path);
+  }
+  // katalog modułu pliku: `a/b.rs` → moduł a::b, dzieci w `a/b/`; `mod.rs`/`lib.rs`/`main.rs` → własny katalog
+  function rustModDir(file){
+    const b = basename(file.path), d = dirname(file.path);
+    return /^(mod|lib|main)\.rs$/.test(b) ? d : joinPath(d, b.replace(/\.rs$/, ''));
+  }
+  // `base` + segmenty ścieżki `use`: od najdłuższej (`a/b/c.rs` | `a/b/c/mod.rs`, potem `a/b.rs` …); bez segmentów = sam moduł
+  function rustFind(base, segs, idx){
+    if(!segs.length) return tryExact(idx.byPath, [base+'.rs', base+'/mod.rs', base+'/lib.rs', base+'/main.rs'].map(normPath));
+    for(let take = segs.length; take >= 1; take--){
+      const p = joinPath(base, segs.slice(0, take).join('/'));
+      const hit = tryExact(idx.byPath, [p+'.rs', p+'/mod.rs'].map(normPath)); if(hit) return hit;
+    }
+    return null;
+  }
+  function rustUse(file, spec, idx){
+    const segs = spec.split('::').filter(Boolean); if(!segs.length) return null;
+    const head = segs[0];
+    if(head === 'crate') return rustFind(rustRoot(file), segs.slice(1), idx);
+    if(head === 'self' || head === 'super'){
+      let base = rustModDir(file), i = 0;
+      while(segs[i] === 'super'){ base = dirname(base); i++; }
+      if(segs[i] === 'self') i++;
+      return rustFind(base, segs.slice(i), idx);
+    }
+    const pkg = idx.cargo.find(p => p.name === head || p.name.replace(/-/g,'_') === head);   // `use my_crate::x` (lib z bin/tests)
+    if(pkg) return rustFind(joinPath(pkg.dir, 'src'), segs.slice(1), idx);
+    return rustFind(rustRoot(file), segs, idx);   // edycja 2018: `use util::x` = moduł lokalny, jeśli taki plik istnieje
+  }
+
   function resolveDep(file, dep, idx){
     const fam = family(file.lang);
     const dir = dirname(file.path);
     const spec = dep.spec;
     switch(dep.kind){
-      case 'system': case 'cs-ns': case 'rust-use': return null;
+      case 'system': case 'decl': return null;
+      case 'cs-ns': {   // pliki deklarujące dokładnie ten namespace; static/alias (typ) → także namespace nadrzędny
+        const hit = idx.decl.get('cs:'+spec); if(hit) return hit;
+        if(dep.up && spec.includes('.')) return idx.decl.get('cs:'+spec.slice(0, spec.lastIndexOf('.'))) || null;
+        return null;
+      }
+      case 'rust-use': return rustUse(file, spec, idx);
       case 'rel': {
         const base = joinPath(dir, spec);
         return tryExact(idx.byPath, expand(base, fam));
@@ -490,7 +553,7 @@ CM.Analysis = (function(){
         const re = pat(spec), ex = (dep.exclude||[]).map(pat);
         return idx.files.filter(n => re.test(n.path) && !ex.some(r => r.test(n.path)));
       }
-      case 'rust-mod': return tryExact(idx.byPath, [joinPath(dir,spec)+'.rs', joinPath(dir,spec)+'/mod.rs'].map(normPath));
+      case 'rust-mod': { const md = rustModDir(file); return tryExact(idx.byPath, [joinPath(md,spec)+'.rs', joinPath(md,spec)+'/mod.rs'].map(normPath)); }   // `mod c;` w a/b.rs → a/b/c.rs
       case 'py-rel': {
         const dots = spec.match(/^\.+/)[0].length;
         let up = dir; for(let i=1;i<dots;i++) up = dirname(up);
@@ -520,7 +583,15 @@ CM.Analysis = (function(){
   function externalName(spec){
     if(spec.startsWith('@')){ const p = spec.split('/'); return p.slice(0,2).join('/'); }
     if(spec.includes('\\')) return spec.split('\\')[0];
+    if(spec.includes('::')) return spec.split('::')[0];
     return spec.split('/')[0].split('.')[0] || spec;
+  }
+  // nierozwiązany wpis, który reprezentuje pakiet/moduł spoza projektu (→ węzeł zależności zewnętrznej)
+  const EXTERNAL_KINDS = new Set(['bare','module','cs-ns','php-ns']);
+  function isExternal(dep){
+    if(EXTERNAL_KINDS.has(dep.kind)) return true;
+    if(dep.kind === 'rust-use') return !/^(crate|self|super)(::|$)/.test(dep.spec);   // std, serde, … ale nie ścieżki lokalne
+    return false;
   }
 
   // build import / reference edges + external module summary
@@ -535,7 +606,13 @@ CM.Analysis = (function(){
       if(n.type === 'folder') folderByPath.set(n.path, n);
     }
     const alias = aliasConfigs(manifests), aliasCache = new Map();
-    const idx = {byPath, byBase, folderByPath, files: nodes.filter(n => n.type === 'file'), alias, pkgs: packageIndex(manifests),
+    const files = nodes.filter(n => n.type === 'file');
+    // indeks deklaracji (C# `namespace A.B` …) z wpisów kind 'decl': "<rodzina>:<nazwa>" → pliki, które ją deklarują
+    const decl = new Map();
+    for(const f of files){ if(!f.deps) continue; for(const d of f.deps){ if(d.kind !== 'decl') continue;
+      const k = family(f.lang)+':'+d.spec; if(!decl.has(k)) decl.set(k, []); if(!decl.get(k).includes(f)) decl.get(k).push(f); } }
+    const idx = {byPath, byBase, folderByPath, files, alias, decl, pkgs: packageIndex(manifests),
+      cargo: (manifests||[]).filter(m => m && m.kind === 'package' && m.eco === 'cargo' && m.name).map(m => ({...m, dir: normPath(m.dir||'')})),
       aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];
     const seen = new Set();
@@ -548,10 +625,11 @@ CM.Analysis = (function(){
     for(const f of nodes){
       if(f.type!=='file' || !f.deps || !f.deps.length) continue;
       for(const dep of f.deps){
-        const tgt = resolveDep(f, dep, idx);                       // węzeł, tablica węzłów (glob) albo null
+        if(dep.kind === 'decl') continue;                          // deklaracja (namespace) — tylko cel dla innych
+        const tgt = resolveDep(f, dep, idx);                       // węzeł, tablica węzłów (glob, namespace) albo null
         const tgts = Array.isArray(tgt) ? tgt : (tgt ? [tgt] : []);
         if(tgts.length){ for(const t of tgts) addEdge(f.id, t.id, dep.etype==='reference'?'reference':'import'); }
-        else if(dep.kind==='bare' || dep.kind==='module' || dep.kind==='cs-ns' || dep.kind==='php-ns'){
+        else if(isExternal(dep)){
           const name = externalName(dep.spec);
           if(!name) continue;
           if(!externals.has(name)) externals.set(name, {name, count:0, importers:[]});

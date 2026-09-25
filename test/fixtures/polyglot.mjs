@@ -38,6 +38,22 @@ export const FILES = [
   F('sass/lib/_mixins.scss', '@mixin m {}\n'),
   F('sass/theme.scss', '$c: blue;\n'),
   F('sass/legacy/index.scss', '.l {}\n'),
+
+  // ---- C#: using X.Y → pliki deklarujące `namespace X.Y` (file-scoped i blokowe); static/alias → namespace typu ----
+  F('cs/App/Program.cs', 'using System;\nusing MyApp.Services;\nusing static MyApp.Util.Helpers;\nusing Log = MyApp.Logging.Logger;\nnamespace MyApp;\nclass Program { static void Main() {} }\n'),
+  F('cs/Services/UserService.cs', 'namespace MyApp.Services;\npublic class UserService {}\n'),
+  F('cs/Services/OrderService.cs', 'namespace MyApp.Services\n{\n    public class OrderService {}\n}\n'),
+  F('cs/Util/Helpers.cs', 'namespace MyApp.Util;\npublic static class Helpers {}\n'),
+  F('cs/Logging/Logger.cs', 'namespace MyApp.Logging { public class Logger {} }\n'),
+  F('cs/Services/Unrelated.cs', 'using MyApp.Services;\nnamespace MyApp.Other;\npublic class U {}\n'),   // using własnego ns z innego pliku
+
+  // ---- Rust: use crate::a::b::c → src/a/b/c.rs | c/mod.rs | a/b.rs (od najdłuższej); super/self względem modułu ----
+  F('rs/Cargo.toml', '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\nserde = "1"\n'),
+  F('rs/src/main.rs', 'mod a;\nmod util;\nuse crate::a::b::c::run;\nuse crate::util;\nuse std::collections::HashMap;\nuse serde::Serialize;\nuse demo::a::b;\nfn main() { run(); }\n'),
+  F('rs/src/a/mod.rs', 'pub mod b;\nuse super::util::helper;\nuse self::b::c;\n'),
+  F('rs/src/a/b.rs', 'pub mod c;\nuse super::super::util;\nuse super::*;\n'),
+  F('rs/src/a/b/c.rs', 'use crate::util::helper;\npub fn run() { helper(); }\n'),
+  F('rs/src/util.rs', 'pub fn helper() {}\n'),
 ];
 
 export const META = { name: 'polyglot', source: 'test' };

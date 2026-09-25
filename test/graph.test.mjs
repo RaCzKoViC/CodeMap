@@ -240,6 +240,25 @@ describe('SCSS @use / @forward', () => {
   });
 });
 
+describe('C# namespace i Rust use', () => {
+  test('C#: using → wszystkie pliki z tym namespace; static/alias → namespace typu; System zewnętrzny, decl bez krawędzi', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'cs/App/Program.cs'), ['cs/Logging/Logger.cs', 'cs/Services/OrderService.cs', 'cs/Services/UserService.cs', 'cs/Util/Helpers.cs', 'ext:System']);
+    assert.deepEqual(targetsOf(g, 'cs/Services/Unrelated.cs'), ['cs/Services/OrderService.cs', 'cs/Services/UserService.cs']);
+    assert.ok(!g.externals.has('MyApp'));
+    assert.deepEqual(targetsOf(g, 'cs/Util/Helpers.cs'), [], 'sama deklaracja namespace nie tworzy krawędzi');
+  });
+  test('Rust: crate:: od src/ crate\'a (Cargo.toml), nazwa crate, self/super względem modułu, najdłuższa ścieżka pierwsza', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'rs/src/main.rs'), ['ext:serde', 'ext:std', 'rs/src/a/b.rs', 'rs/src/a/b/c.rs', 'rs/src/a/mod.rs', 'rs/src/util.rs']);
+    assert.deepEqual(targetsOf(g, 'rs/src/a/mod.rs'), ['rs/src/a/b.rs', 'rs/src/a/b/c.rs', 'rs/src/util.rs']);
+    assert.deepEqual(targetsOf(g, 'rs/src/a/b.rs'), ['rs/src/a/b/c.rs', 'rs/src/a/mod.rs', 'rs/src/util.rs']);
+    assert.deepEqual(targetsOf(g, 'rs/src/a/b/c.rs'), ['rs/src/util.rs']);
+    assert.equal(g.nodes.get('ext:serde').version, '1', 'wersja z [dependencies] Cargo.toml');
+    assert.ok(!g.externals.has('crate') && !g.externals.has('super') && !g.externals.has('demo'));
+  });
+});
+
 describe('sygnatury i diff', () => {
   test('diffSignatures: dodane, zmienione, usunięte, delty', () => {
     const a = build().signature();
