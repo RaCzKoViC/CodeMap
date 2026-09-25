@@ -104,6 +104,20 @@ CM.UI = (function(){
       grid.appendChild(metric(node.version?('v'+node.version.replace(/^v/,'')):'—',I.t('cu.version','Wersja')));
     }
     body.appendChild(grid);
+    // sprzężenia (Ca / Ce / I) — CM.Metrics, dla plików i folderów projektu (nie dla pakietów zewnętrznych)
+    if((node.type==='file' || (node.type==='folder' && !node.external)) && CM.Metrics && graph && graph.nodes){
+      const cp=CM.Metrics.couplingFor(graph).get(node.id);
+      if(cp){
+        const sec=el('div',{class:'det-section det-coupling'});
+        sec.appendChild(el('h5',{}, I.t('cu.coupling','Sprzężenia')));
+        const row=el('div',{title:I.t('cu.couplingHint','Ca = ile plików spoza jednostki od niej zależy · Ce = od ilu plików spoza jednostki zależy · I = Ce/(Ca+Ce): 0 = stabilny fundament, 1 = liść bez klientów')});
+        row.appendChild(el('span',{class:'tag',text:'Ca '+U.fmtNum(cp.ca)}));
+        row.appendChild(el('span',{class:'tag',text:'Ce '+U.fmtNum(cp.ce)}));
+        const iv=cp.instability;
+        row.appendChild(el('span',{class:'tag'+(iv!=null&&iv>=0.7&&cp.ca>0?' hot':''),text:'I '+(iv==null?'—':iv.toFixed(2))}));
+        sec.appendChild(row); body.appendChild(sec);
+      }
+    }
     if(node.type==='external' && node.version){
       const src={npm:'npm',pip:'PyPI',cargo:'crates.io',go:'Go modules'}[node.depSource]||node.depSource||'';
       body.appendChild(el('div',{class:'det-ver',html:CM.icons.svg('package',{size:13})+` <b>${esc(node.name)}</b> <span>v${esc(node.version.replace(/^v/,''))}</span>${src?` <span class="muted">· ${src}</span>`:''}`}));

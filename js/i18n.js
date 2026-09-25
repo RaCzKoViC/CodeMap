@@ -410,6 +410,8 @@ CM.i18n = (function(){
     "project.exportdot":"Export DOT (Graphviz)","project.exportmermaid":"Export Mermaid","project.exportgraphml":"Export GraphML (yEd)",
     "ca.graphExported":"💾 Graph exported: ","ca.cmdExportDot":"Export graph: DOT (Graphviz)","ca.cmdExportMermaid":"Export graph: Mermaid","ca.cmdExportGraphML":"Export graph: GraphML (yEd)",
     "cb.execExportGraph":"Exporting the visible graph: ","cb.badFormat":"Unknown format: ",
+    /* --- Faza 2: metryki sprzężeń (panel szczegółów) --- */
+    "cu.coupling":"Coupling","cu.couplingHint":"Ca = files outside the unit that depend on it · Ce = files outside the unit it depends on · I = Ce/(Ca+Ce): 0 = stable foundation, 1 = leaf without clients",
   }
   };
 
