@@ -116,8 +116,8 @@ CM.Analysis = (function(){
     });
   }
   function javaDeps(c, d){
-    matchAll(/^[ \t]*import[ \t]+(?:static[ \t]+)?([\w.]+)[ \t]*;?/gm, c, m=>{
-      if(!m[1].endsWith('.*')) add(d, m[1], 'module', 'import');
+    matchAll(/^[ \t]*import[ \t]+(?:static[ \t]+)?([\w.]+?)(\.\*)?[ \t]*;?[ \t]*$/gm, c, m=>{
+      if(!m[2]) add(d, m[1], 'module', 'import');   // wildcard (java.util.*) pomijany; `;` opcjonalne (Kotlin/Scala)
     });
   }
   function csDeps(c, d){
@@ -137,11 +137,15 @@ CM.Analysis = (function(){
   }
   function cssDeps(c, d){
     matchAll(/@import\s+(?:url\()?\s*['"]?([^'")]+)['"]?\s*\)?/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
-    matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'reference'));
+    // url() wewnątrz @import to już import — nie licz go drugi raz jako referencji do zasobu
+    const rest = c.replace(/@import[^;\n]*;?/g, ' ');
+    matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g, rest, m=>add(d,m[1], rel(m[1]), 'reference'));
   }
   function htmlDeps(c, d){
-    matchAll(/<(?:script|img|source|video|audio|iframe|embed)\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi, c, m=>add(d,m[1], rel(m[1]), 'reference'));
-    matchAll(/<link\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi, c, m=>add(d,m[1], rel(m[1]), 'reference'));
+    // W HTML każda ścieżka w src/href bez schematu jest względna (URL-e odrzuca add()) — wcześniej
+    // `src="js/app.js"` bez `./` trafiało do 'bare', nie dawało krawędzi i udawało pakiet zewnętrzny "js".
+    matchAll(/<(?:script|img|source|video|audio|iframe|embed)\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi, c, m=>add(d,m[1], 'rel', 'reference'));
+    matchAll(/<link\b[^>]*\bhref\s*=\s*["']([^"']+)["']/gi, c, m=>add(d,m[1], 'rel', 'reference'));
   }
   function mdDeps(c, d){
     matchAll(/\]\(\s*([^)\s]+)/g, c, m=>{ if(!/^[\w]+:/.test(m[1])) add(d,m[1], 'rel', 'reference'); });
@@ -171,9 +175,9 @@ CM.Analysis = (function(){
         while(i<n){ const d=code[i]; out+=d; i++; if(d==='\\'){ if(i<n){ out+=code[i]; i++; } continue; } if(d===c||d==='\n') break; }
         continue;
       }
-      if(c==='/'&&c2==='*'){ const end=code.indexOf('*/',i+2), stop=end<0?n:end+2; blank(i,stop); i=stop; continue; }
+      if(!html && c==='/'&&c2==='*'){ const end=code.indexOf('*/',i+2), stop=end<0?n:end+2; blank(i,stop); i=stop; continue; }
       if(html && c==='<' && code.substr(i,4)==='<!--'){ const end=code.indexOf('-->',i+4), stop=end<0?n:end+3; blank(i,stop); i=stop; continue; }
-      if(c==='/'&&c2==='/'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }
+      if(!html && c==='/'&&c2==='/'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }   // w HTML/MD `//` to część URL-a
       if(hash && c==='#'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }
       if(dashes && c==='-'&&c2==='-'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }
       out+=c; i++;
@@ -282,7 +286,8 @@ CM.Analysis = (function(){
 
   function expand(base, fam){
     const c = [];
-    if(fam === 'js'){ JS_EXT.forEach(e=>c.push(base+e)); JS_IDX.forEach(e=>c.push(base+e)); }
+    // kolejność: plik z rozszerzeniem → index w katalogu → dopiero goły cel (może być folderem)
+    if(fam === 'js'){ JS_EXT.filter(e=>e).forEach(e=>c.push(base+e)); JS_IDX.forEach(e=>c.push(base+e)); c.push(base); }
     else if(fam === 'css'){
       const dir = dirname(base), nm = basename(base);
       ['.css','.scss','.sass','.less','.styl',''].forEach(e=>{ c.push(base+e); c.push((dir?dir+'/':'')+'_'+nm+e); });
