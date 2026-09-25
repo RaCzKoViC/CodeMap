@@ -261,9 +261,13 @@ CM.Auth = (function(){
   }
 
   // ---------------- init ----------------
+  // Bez backendu (GitHub Pages, sam serve.py) przycisk „Konto" znika: 401 = serwer jest, tylko brak
+  // sesji; 404 / błąd sieci = nie ma API, więc formularz logowania zawsze by zawiódł.
+  function setBackend(on){ const b=$('#btn-account'); if(b) b.classList.toggle('hidden', !on); document.body.classList.toggle('no-backend', !on); }
   async function refresh(){
     if(!navigator.onLine) return;
-    try{ setUser(await api('/api/auth/me')); }catch(e){ /* offline / brak serwera / niezalogowany — cicho */ }
+    try{ setUser(await api('/api/auth/me')); setBackend(true); }
+    catch(e){ setBackend(!!(e&&e.status===401)); }
   }
 
   function init(){

@@ -177,11 +177,16 @@ CM.ChatBot = (function(){
     'installPWA — trigger the install-app prompt',
     'help — list all available actions',
   ];
-  // Actions the model must NOT auto-run: they load external data, discard the user's work, write files
-  // or trigger prompts. A malicious repo's file names flow into the prompt (appState), so a model-emitted
-  // block for any of these is rendered as a CLICK-TO-RUN chip instead of executing. User-typed imperatives
-  // (intentFallback pre-exec) are trusted and still run immediately.
-  const SIDE_EFFECT=new Set(['loadRepo','clearProject','saveMap','snapshot','exportImage','installPWA']);
+  // Actions the model may run ON ITS OWN: view/appearance changes only — reversible with one click and
+  // with no effect outside this tab. Everything else (loading, clearing, saving, exporting, clipboard,
+  // MindMap mutations, paid AI calls, install prompt, language, tutorial, vault) is rendered as a
+  // CLICK-TO-RUN chip. File and folder names from the loaded repo flow into the prompt (appState), so an
+  // ALLOWLIST — not a denylist — is the only safe boundary against prompt injection. User-typed
+  // imperatives (intentFallback pre-exec) are trusted and still run immediately.
+  const AUTO_OK=new Set(['setMode','setLayout','search','focusNode','openNode','fit','zoom','rotate','toggle3D',
+    'collapseAll','toggleImpact','toggleMinimap','setFilter','setMetric','toggleLang','openSettings','openHistory',
+    'openCompare','detectCycles','hotspots','inspect','runInspection','setTheme','setPreset','setAccent','setBackground',
+    'setGlass','setSpacing','setNodeScale','setFontScale','renderOption','togglePanel','help','listActions']);
   function buildSystemPrompt(compact){
     const lang=I.getLang()==='en'?'English':'Polish';
     const st=appState();
@@ -653,9 +658,9 @@ CM.ChatBot = (function(){
       const key=a.action+'|'+JSON.stringify(a.args||{});
       if(actKeys.has(key)){ if(fromStream&&(local||useOllama())) softStop(); return; }
       actKeys.add(key);
-      // model-emitted side-effect action → do NOT run it; offer a click-to-run chip and let the model
-      // keep explaining (no soft-stop). User-typed commands (trusted) run immediately as before.
-      if(!trusted && SIDE_EFFECT.has(a.action)){
+      // model-emitted action outside the view-only allowlist → do NOT run it; offer a click-to-run chip
+      // and let the model keep explaining (no soft-stop). User-typed commands (trusted) run immediately.
+      if(!trusted && !AUTO_OK.has(a.action)){
         const entry={action:a.action, args:a.args, pending:true};
         liveActs.push(entry);
         const chip=el('div',{class:'cb-chip cb-chip-confirm',html:'▶ '+esc(a.action),title:t('clickToRun')});

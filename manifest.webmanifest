@@ -5,7 +5,7 @@
   "lang": "pl",
   "start_url": ".",
   "scope": ".",
-  "id": "/",
+  "id": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "orientation": "any",

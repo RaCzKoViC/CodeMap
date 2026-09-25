@@ -581,6 +581,10 @@
     // Critical for performance: a filter/layer toggle must never leave the force physics churning on
     // the main thread — that is what tanked FPS to a crawl on medium+ graphs and made the panel unusable.
     if(state.sim){ if(state.sim._worker) state.sim.stop(); else state.sim.running=false; }
+    // Mapa wczytana z pliku ('saved') ma pozycje użytkownika — 'saved' nie jest układem, więc każdy
+    // relayout (rozwiń/zwiń wszystko, pokaż różnice) wpadał w default = force i niszczył je.
+    // Zostajemy przy pozycjach; nowo odsłonięte węzły dostają miejsce przez seedUnplaced.
+    if(relayout && state.layout==='saved' && !state.groups.length) relayout=false;
     state.vis=graph.getVisible(filters);
     if(relayout){
       if(state.groups.length){ relayoutGroups(); }   // keep multiple schemas separated side-by-side
@@ -1123,6 +1127,7 @@
     if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return; }
     resetProjectState();
     graph=Graph.fromJSON(obj);
+    for(const n of graph.nodes.values()){ if(Number.isFinite(n.x)&&Number.isFinite(n.y)) n._placed=true; }
     countsInit(); refreshMetricRange(); hideEmpty(); expandMinimap();
     select(null);
     state.layout='saved';
@@ -1345,6 +1350,10 @@
   }
 
   // ---------------- optional AI (Mistral): structure-only summary, never source code ----------------
+  // Nazwy projektu/folderów/plików pochodzą z wczytanego repozytorium i trafiają do promptu modelu.
+  // Przycinamy je i usuwamy znaki sterujące, nowe linie i backticki, żeby nazwa folderu nie mogła
+  // udawać instrukcji ani domykać bloku w prompcie (prompt injection przez treść repo).
+  const _pn=(s)=>String(s||'').replace(/[\u0000-\u001f\u007f`]/g,' ').replace(/\s+/g,' ').trim().slice(0,60);
   function aiStructureSummary(){
     const g=graph, langCount={}, folderMap=new Map();
     let totalSize=0, fileCount=0, folderCount=0, externals=0, maxDepth=0, maxFileKB=0, hasTests=false;
@@ -1366,9 +1375,9 @@
     const localAI=CM.LocalAI&&CM.LocalAI.provider()==='local';
     const languages=Object.entries(langCount).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>k+' ×'+v);
     const folders=[...folderMap.values()].sort((a,b)=>b.files-a.files).slice(0,localAI?12:40).map(f=>({
-      name:f.name, files:f.files, sizeKB:Math.round(f.size/1024),
+      name:_pn(f.name), files:f.files, sizeKB:Math.round(f.size/1024),
       langs:Object.entries(f.langs).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]) }));
-    return { project:g.meta.name||'project', source:g.meta.source||'',
+    return { project:_pn(g.meta.name)||'project', source:_pn(g.meta.source),
       totalFiles:fileCount, totalFolders:folderCount, externals, importEdges,
       totalSizeKB:Math.round(totalSize/1024), avgFileKB:fileCount?Math.round(totalSize/1024/fileCount):0, maxFileKB:Math.round(maxFileKB), maxDepth, hasTests,
       languages, topFolders:folders };
@@ -2078,7 +2087,7 @@
     const out={
       mode: mind?'mindmap':'codemap',
       hasProject: state.counts.nodes>0,
-      project: (graph&&graph.meta&&(graph.meta.name||graph.meta.source))||null,
+      project: _pn(graph&&graph.meta&&(graph.meta.name||graph.meta.source))||null,
       counts:{ nodes:state.counts.nodes, edges:state.counts.edges, visible:state.vis.nodes.length },
       layout: state.layout,
       filters:{ folders:filters.folders, files:filters.files, externals:filters.externals,
@@ -2087,9 +2096,9 @@
       theme: document.body.classList.contains('light')?'light':'dark',
       lang: I.getLang(),
       impactView: !!impactOn,
-      selected: sel?{name:sel.name, path:sel.path||null, type:sel.type}:null,
+      selected: sel?{name:_pn(sel.name), path:_pn(sel.path)||null, type:sel.type}:null,
       availableLayouts: CB_LAYOUTS,
-      mindmap: (CM.MindMap&&CM.MindMap.isActive&&CM.MindMap.isActive())?{nodes:(CM.MindMap.nodeCount?CM.MindMap.nodeCount():0), name:(CM.MindMap.mapName?CM.MindMap.mapName():'')}:null,
+      mindmap: (CM.MindMap&&CM.MindMap.isActive&&CM.MindMap.isActive())?{nodes:(CM.MindMap.nodeCount?CM.MindMap.nodeCount():0), name:_pn(CM.MindMap.mapName?CM.MindMap.mapName():'')}:null,
     };
     if(state.counts.nodes>0){ try{ out.structure=aiStructureSummary(); }catch(e){} }
     return out;
