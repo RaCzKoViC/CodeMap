@@ -146,9 +146,21 @@ js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama,
 js/mindmap.js  js/mmdraw.js  # tryb MindMap + warstwa rysowania
 js/drive.js                # Dysk (File System Access) i Sejf (OPFS + AES-GCM)
 js/auth.js  js/sync.js     # konto i synchronizacja (tylko z backendem)
-js/app.js                  # spięcie całości, tryb demo, most dla ChatBota
+js/app-core.js             # CM.App — wspólny kontekst (graph, renderer, state, filters, handlers) + rdzeń:
+                           #   init/boot, apply, ingest, loadFromJSON, clearAll, zaznaczenie, sesja, tryby, worker
+js/chrome.js               # okablowanie DOM: toolbar, menu, panele, wygląd/ustawienia, filtry, szukaj, DnD, klawiatura, PWA
+js/repo-hosts.js           # GitHub/GitLab/Bitbucket: autorzy, deep-linki, gałęzie, gist, udostępnialny widok (#v=)
+js/compare.js              # porównywanie schematów, cykle, historia migawek i diff, hotspoty/Inspect
+js/navigation.js           # radar okolicy, minimapa, tarcza obrotu, nawigacja WASD, menu kontekstowe, eksport obrazu
+js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec), paleta Ctrl+K, dane demo
+js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)
 sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
 ```
+
+Moduły `app-core` → `ai-bridge` dzielą jeden kontekst `CM.App` (`A`): każdy dopisuje swoje funkcje przez
+`Object.assign(A, …)` i woła pozostałe wyłącznie w czasie działania przez `A.nazwa(…)`, więc poza tym, że
+`app-core.js` ładuje się pierwszy (tworzy `CM.App`), a `app.js` ostatni, ich kolejność nie ma znaczenia.
+`A.graph` jest podmieniany przy każdym wczytaniu — moduły czytają go w momencie wywołania, nie kopiują.
 
 Plan rozwoju i znane długi techniczne: [docs/ROADMAP.md](docs/ROADMAP.md).
 
