@@ -84,7 +84,6 @@ export async function registerSync(app) {
     const size = await handleUpload(req, reply, rel, cur?.size_bytes || 0);
     if (size === null) return;
     q.putSess.run(req.user.id, ts, size, rel);
-    bumpUsage(req.user.id, size - (cur?.size_bytes || 0));
     return { ok: true, size };
   });
 
@@ -109,7 +108,6 @@ export async function registerSync(app) {
     const size = await handleUpload(req, reply, rel, cur?.size_bytes || 0);
     if (size === null) return;
     q.putMap.run(id, req.user.id, kind, S(req.query?.name, 200) || 'mapa', S(req.query?.projectKey) || null, ts, size, rel);
-    bumpUsage(req.user.id, size - (cur?.size_bytes || 0));
     return { ok: true, size };
   });
 
@@ -145,7 +143,6 @@ export async function registerSync(app) {
     if (size === null) return;
     q.putSnap.run(id, req.user.id, S(req.query?.projectKey) || 'projekt', Number(req.query?.ts) || now(),
       S(req.query?.label, 200) || null, S(req.query?.name, 200) || null, S(req.query?.source) || null, null, size, rel);
-    bumpUsage(req.user.id, size);
     return { ok: true, size };
   });
 

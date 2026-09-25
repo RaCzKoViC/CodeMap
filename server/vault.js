@@ -63,7 +63,6 @@ export async function registerVault(app) {
     const size = await handleUpload(req, reply, rel, cur?.size_bytes || 0);
     if (size === null) return;
     q.putFile.run(req.user.id, album, name, size, Number(req.query?.mtime) || now(), rel);
-    bumpUsage(req.user.id, size - (cur?.size_bytes || 0));
     return { ok: true, size };
   });
 

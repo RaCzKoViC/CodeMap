@@ -1,6 +1,7 @@
 /* Konfiguracja ze zmiennych środowiskowych (.env). */
 export const CFG = {
   port: Number(process.env.PORT || 8787),
+  host: process.env.HOST || '127.0.0.1',
   appOrigin: (process.env.APP_ORIGIN || 'http://localhost:8787').replace(/\/$/, ''),
   emailMode: process.env.EMAIL_MODE || 'console',
   resendKey: process.env.RESEND_API_KEY || '',
