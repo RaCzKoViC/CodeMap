@@ -30,6 +30,14 @@ export const FILES = [
   F('web/views/Home.vue', '<template><div/></template>\n'),
   F('web/views/admin/Users.vue', '<template><div/></template>\n'),
   F('web/views/admin/skip.vue', '<template><div/></template>\n'),
+
+  // ---- SCSS: @use / @forward → partiale `_x.scss`, `index.scss` / `_index.scss` w katalogu ----
+  F('sass/main.scss', "@use 'sass:math';\n@use 'partial' as p;\n@use 'lib';\n@forward 'theme' with ($c: red);\n@import 'legacy';\n"),
+  F('sass/_partial.scss', '$p: 1;\n'),
+  F('sass/lib/_index.scss', "@forward 'mixins';\n"),
+  F('sass/lib/_mixins.scss', '@mixin m {}\n'),
+  F('sass/theme.scss', '$c: blue;\n'),
+  F('sass/legacy/index.scss', '.l {}\n'),
 ];
 
 export const META = { name: 'polyglot', source: 'test' };

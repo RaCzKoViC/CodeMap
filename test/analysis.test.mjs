@@ -71,6 +71,16 @@ describe('extractDeps per język', () => {
   test('CSS: @import i url()', () => {
     assert.deepEqual(specs("@import './theme.css';\n@import url(\"vars.css\");\n", 'css'), ['./theme.css', 'vars.css']);
   });
+  test('JS: export … from oznacza reexport:true, zwykły import nie', () => {
+    const d = host(A.extractDeps("import a from './a';\nexport * from './b';\nexport { c as d } from './c';\nexport default from './e';\n", 'js'));
+    assert.deepEqual(d.map((x) => [x.spec, !!x.reexport]), [['./a', false], ['./b', true], ['./c', true], ['./e', true]]);
+  });
+  test('SCSS: @use / @forward (as, with, show) jak @import; sass:* to moduł wbudowany; @forward = reexport', () => {
+    const c = "@use 'sass:math';\n@use 'config' as cfg;\n@use 'theme' with ($primary: red);\n@forward 'mixins' as mx-*;\n@forward 'vars' show $a, $b;\n@import 'legacy';\n.x { background: url('img.png'); }\n";
+    const d = host(A.extractDeps(c, 'scss').map((x) => [x.spec, x.kind, x.etype, !!x.reexport]));
+    assert.deepEqual(d, [['sass:math', 'system', 'import', false], ['config', 'bare', 'import', false], ['theme', 'bare', 'import', false],
+      ['mixins', 'bare', 'import', true], ['vars', 'bare', 'import', true], ['legacy', 'bare', 'import', false], ['img.png', 'bare', 'reference', false]]);
+  });
   test('HTML: src/href jako referencje', () => {
     const d = A.extractDeps('<link href="a.css"><script src="b.js"></script><a href="#top">x</a>', 'html');
     assert.deepEqual(host(d.map((x) => [x.spec, x.etype]).sort()), [['a.css', 'reference'], ['b.js', 'reference']]);

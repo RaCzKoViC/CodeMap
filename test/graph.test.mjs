@@ -230,6 +230,16 @@ describe('dynamiczne odwołania JS', () => {
   });
 });
 
+describe('SCSS @use / @forward', () => {
+  test('partiale, index w katalogu, sass:* bez externala; reexport nie zmienia krawędzi', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'sass/main.scss'), ['sass/_partial.scss', 'sass/legacy/index.scss', 'sass/lib/_index.scss', 'sass/theme.scss']);
+    assert.deepEqual(targetsOf(g, 'sass/lib/_index.scss'), ['sass/lib/_mixins.scss']);
+    assert.ok(![...g.externals.keys()].some((k) => k.startsWith('sass')), 'sass:math nie jest zależnością zewnętrzną');
+    assert.ok(g.nodes.get('sass/main.scss').deps.find((d) => d.spec === 'theme').reexport === true);
+  });
+});
+
 describe('sygnatury i diff', () => {
   test('diffSignatures: dodane, zmienione, usunięte, delty', () => {
     const a = build().signature();

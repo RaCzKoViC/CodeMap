@@ -92,7 +92,8 @@ CM.Analysis = (function(){
   function matchAll(re, str, cb){ let m; re.lastIndex=0; while((m = re.exec(str)) !== null){ cb(m); if(m.index===re.lastIndex) re.lastIndex++; } }
 
   function jsDeps(c, d){
-    matchAll(/(?:import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
+    // `export … from './x'` = reexport (barrel) — ta sama krawędź, flaga dla przyszłego grafu symboli
+    matchAll(/(import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>add(d,m[2], rel(m[2]), 'import', m[1]==='export' ? {reexport:true} : null));
     matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
     matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
     // odwołania dynamiczne: worker / URL względem modułu / importScripts / require.resolve / glob Vite
@@ -164,9 +165,14 @@ CM.Analysis = (function(){
     matchAll(/^[ \t]*use[ \t]+([\w:]+)/gm, c, m=>add(d,m[1], 'rust-use', 'import'));
   }
   function cssDeps(c, d){
-    matchAll(/@import\s+(?:url\()?\s*['"]?([^'")]+)['"]?\s*\)?/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
+    // `@import 'x'` / `@import url(x)`; Sass: `@use 'x' [as y] [with (...)]`, `@forward 'x' [as y-*] [show/hide …]`
+    // — jak @import (partiale, index); `sass:math` itp. to moduły wbudowane (bez krawędzi i externala); @forward = reexport
+    matchAll(/@(import|use|forward)\s+(?:url\()?\s*['"]?([^'")]+)['"]?\s*\)?/g, c, m=>{
+      const s = m[2];
+      add(d, s, s.startsWith('sass:') ? 'system' : rel(s), 'import', m[1]==='forward' ? {reexport:true} : null);
+    });
     // url() wewnątrz @import to już import — nie licz go drugi raz jako referencji do zasobu
-    const rest = c.replace(/@import[^;\n]*;?/g, ' ');
+    const rest = c.replace(/@(?:import|use|forward)[^;\n]*;?/g, ' ');
     matchAll(/url\(\s*['"]?([^'")]+)['"]?\s*\)/g, rest, m=>add(d,m[1], rel(m[1]), 'reference'));
   }
   function htmlDeps(c, d){
@@ -432,7 +438,10 @@ CM.Analysis = (function(){
     if(fam === 'js'){ JS_EXT.filter(e=>e).forEach(e=>c.push(base+e)); JS_IDX.forEach(e=>c.push(base+e)); c.push(base); }
     else if(fam === 'css'){
       const dir = dirname(base), nm = basename(base);
-      ['.css','.scss','.sass','.less','.styl',''].forEach(e=>{ c.push(base+e); c.push((dir?dir+'/':'')+'_'+nm+e); });
+      // plik → partial `_x` → index katalogu (`x/index`, `x/_index`) → goły cel
+      ['.css','.scss','.sass','.less','.styl'].forEach(e=>{ c.push(base+e); c.push((dir?dir+'/':'')+'_'+nm+e); });
+      ['.css','.scss','.sass','.less','.styl'].forEach(e=>{ c.push(base+'/index'+e); c.push(base+'/_index'+e); });
+      c.push(base, (dir?dir+'/':'')+'_'+nm);
     }
     else if(fam === 'py'){ c.push(base+'.py', base+'/__init__.py', base); }
     else if(fam === 'rb'){ c.push(base+'.rb', base); }
