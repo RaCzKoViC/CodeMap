@@ -40,17 +40,17 @@ Publikacja:
 - [x] GitHub Pages przez workflow (`.github/workflows/deploy-pages.yml`), homepage w repo, topics.
 - [x] `CHANGELOG.md`, `SECURITY.md`, tag `v1.0.0` + Release.
 
-## Faza 1 — fundamenty (żeby dało się bezpiecznie zmieniać)
+## Faza 1 — fundamenty (żeby dało się bezpiecznie zmieniać) — W TOKU (stan 2026-09-25)
 
-- Harness testowy w Node (`node:test`) dla czystych modułów: `analysis.js` (parsery importów per język, `stripNonCode`, aliasy tsconfig), `graph.js` (Tarjan, impact, `collapseToBudget`, round-trip JSON, `diffSignatures`), `layouts.js` (determinizm, brak NaN), `sim-worker.js`. Moduły to IIFE → ewaluacja przez `vm` w kolejności `util → languages → analysis → graph → layouts`.
-- CI: `node --check js/*.js`, testy, smoke Playwright ładujący `#demo` i sprawdzający liczbę węzłów.
-- ESLint (flat config, globals `CM`), `.editorconfig`, root `package.json` ze skryptami.
-- Podział `app.js` na 6 modułów: `app-core` (state, apply, ingest, select), `chrome` (toolbar, menu, panele, wygląd, filtry, skróty), `repo-hosts` (GitHub/GitLab/Bitbucket, autorzy, gałęzie, gist, `#v=`), `compare` (grupy schematów, cykle, hotspoty, historia), `navigation` (radar, minimapa, WASD, menu kontekstowe, eksport obrazu), `ai-bridge` (Mistral/Local/Ollama, most ChatBota `exec`, paleta). Warunek: jawny kontekst `CM.App.ctx` zamiast domknięć.
-- Martwy kod: 20 z 33 układów nieosiągalnych z UI (decyzja: przywrócić do menu albo usunąć), ~130 linii starego renderera, 3 checkboxy bez efektu (animowane połączenia, cząsteczki, poświata), duplikaty (`escapeHtml` ×8, klucze Mistral ×3, `bhRepulse` ×2, hash ×4).
-- Wersjonowanie: skrypt bumpu aktualizujący `?v=` w `index.html`, `CACHE` w `sw.js` i `CM.VERSION`.
-- Persystencja: sprawdzanie `version` mapy przy wczytaniu, migracje `codemap_settings` (klucze niezależne od id-ów DOM), usunięcie 17 kluczy-widm z `SYNC_KEYS` (`js/sync.js:28`) albo realne zapisywanie wyglądu pod nimi.
-- Backend: rate limit per konto (backoff po nieudanych logowaniach), limit maili per adres, sprzątanie wygasłych sesji i tokenów, PBKDF2 ≥ 600k iteracji z polem `kdf` w meta Sejfu, minimum 12 znaków hasła albumu synchronizowanego.
-- Autozapis: nie serializować całego grafu po każdym `apply()`; zapis tylko po zmianie struktury lub pozycji.
+- [x] Harness testowy w Node (`node:test`) dla czystych modułów: `analysis.js` (parsery importów per język, `stripNonCode`, aliasy tsconfig), `graph.js` (Tarjan, impact, `collapseToBudget`, round-trip JSON, `diffSignatures`), `layouts.js` (determinizm, brak NaN), `sim-worker.js`. Moduły to IIFE → ewaluacja przez `vm` w kolejności `util → languages → analysis → graph → layouts`.
+- [x] CI: `node --check js/*.js`, testy, smoke (headless Chrome przez CDP zamiast Playwrighta, `tools/smoke.mjs`: demo + 65 akcji `CMApp.exec`) ładujący `#demo` i sprawdzający liczbę węzłów.
+- [x] ESLint (flat config, globals `CM`), `.editorconfig`, root `package.json` ze skryptami (`check/test/lint/smoke/bump/verify`).
+- [ ] Podział `app.js` na 6 modułów (w toku): `app-core` (state, apply, ingest, select), `chrome` (toolbar, menu, panele, wygląd, filtry, skróty), `repo-hosts` (GitHub/GitLab/Bitbucket, autorzy, gałęzie, gist, `#v=`), `compare` (grupy schematów, cykle, hotspoty, historia), `navigation` (radar, minimapa, WASD, menu kontekstowe, eksport obrazu), `ai-bridge` (Mistral/Local/Ollama, most ChatBota `exec`, paleta). Warunek: jawny kontekst `CM.App.ctx` zamiast domknięć.
+- [x] Martwy kod (renderer ~130 linii, 3 checkboxy bez efektu, klucze Mistral ×3 → `U.mistralKeySlots`); POZOSTAŁO: decyzja o 20 układach, `escapeHtml` ×8, hash ×4. Pierwotny opis: 20 z 33 układów nieosiągalnych z UI (decyzja: przywrócić do menu albo usunąć), ~130 linii starego renderera, 3 checkboxy bez efektu (animowane połączenia, cząsteczki, poświata), duplikaty (`escapeHtml` ×8, klucze Mistral ×3, `bhRepulse` ×2, hash ×4).
+- [x] Wersjonowanie: skrypt bumpu (`npm run bump [wersja]`) aktualizujący `?v=` w `index.html`, `CACHE` w `sw.js` i `CM.VERSION`.
+- [x] Persystencja (kontrola `version` mapy, `SYNC_KEYS` = blob `codemap_settings`); POZOSTAŁO: migracja `codemap_settings` na klucze niezależne od id-ów DOM. Pierwotny opis: sprawdzanie `version` mapy przy wczytaniu, migracje `codemap_settings` (klucze niezależne od id-ów DOM), usunięcie 17 kluczy-widm z `SYNC_KEYS` (`js/sync.js:28`) albo realne zapisywanie wyglądu pod nimi.
+- [x] Backend (blokada per konto 30 s → 15 min, 3 maile/h na adres, wysyłka poza ścieżką odpowiedzi, limit współbieżności argon2, GC co godzinę, PBKDF2 600k z polem `kdf`, min. 8 znaków hasła albumu). Pierwotny opis: rate limit per konto (backoff po nieudanych logowaniach), limit maili per adres, sprzątanie wygasłych sesji i tokenów, PBKDF2 ≥ 600k iteracji z polem `kdf` w meta Sejfu, minimum 12 znaków hasła albumu synchronizowanego.
+- [x] Autozapis: nie serializować całego grafu po każdym `apply()`; zapis tylko po zmianie struktury lub pozycji.
 
 ## Faza 2 — wyróżnik: głębsza analiza
 
