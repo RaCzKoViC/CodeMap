@@ -1,0 +1,54 @@
+# CI: składnia, testy jednostkowe czystych modułów, ESLint, smoke w headless Chrome
+# oraz audyt zależności backendu. Bez kroku budowania — aplikacja jest statyczna.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Składnia (node --check)
+        run: npm run check
+      - name: Testy jednostkowe
+        run: npm test
+      - name: ESLint
+        run: npm run lint
+      - name: Smoke w headless Chrome (demo → mapa, 0 wyjątków)
+        run: npm run smoke
+        env:
+          CHROME: /usr/bin/google-chrome
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Audyt zależności (high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Serwer wstaje i odpowiada na /api/health
+        run: |
+          cp .env.example .env
+          node --env-file=.env index.js > server.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8787/api/health && ok=1 && break; sleep 0.5; done
+          cat server.log
+          test "$ok" = "1"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/server/.env)" = "404"

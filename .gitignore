@@ -13,3 +13,7 @@ server/*.log
 # system
 Thumbs.db
 Desktop.ini
+
+# root devDependencies (eslint)
+node_modules/
+_site/
