@@ -3,11 +3,13 @@ import assert from 'node:assert/strict';
 import { loadCM, ALL_FILTERS, host } from './harness.mjs';
 import { FILES, META, EXPECTED_EDGES, EXPECTED_EXTERNALS } from './fixtures/sample-project.mjs';
 import { FILES as MONO_FILES, META as MONO_META } from './fixtures/monorepo.mjs';
+import { FILES as POLY_FILES, META as POLY_META } from './fixtures/polyglot.mjs';
 
 const CM = loadCM();
 const { Graph, diffSignatures } = CM.Graph;
 const build = () => new Graph().build(FILES.map((f) => ({ ...f })), META);
 const buildMono = () => new Graph().build(MONO_FILES.map((f) => ({ ...f })), MONO_META);
+const buildPoly = () => new Graph().build(POLY_FILES.map((f) => ({ ...f })), POLY_META);
 const edgeKeys = (g) => new Set(g.edges.filter((e) => e.type !== 'contains').map((e) => `${e.source}|${e.target}|${e.type}`));
 /** Cele krawędzi import/reference wychodzących z pliku `src` (posortowane). */
 const targetsOf = (g, src) => host(g.edges.filter((e) => e.source === src && e.type !== 'contains').map((e) => e.target).sort());
@@ -208,6 +210,23 @@ describe('workspaces monorepo', () => {
     assert.ok(g.externals.has('left-pad'));
     assert.equal(host(CM.Analysis.manifestEntry('package.json', '{ "name": "@s/p", "main": "x.js" }', 'pk')).name, '@s/p');
     assert.equal(CM.Analysis.manifestEntry('package.json', '{ "private": true }', ''), null, 'bez nazwy nie ma czego mapować');
+  });
+});
+
+describe('dynamiczne odwołania JS', () => {
+  test('Worker / SharedWorker / new URL(import.meta.url) / require.resolve / import.meta.glob → krawędzie import', () => {
+    const g = buildPoly();
+    assert.deepEqual(targetsOf(g, 'web/main.js'), [
+      'web/assets/mod.wasm',        // new URL('./assets/mod.wasm', import.meta.url) — też zasób binarny
+      'web/config.js',              // require.resolve('./config')
+      'web/plugins/p1.js', 'web/plugins/p2.js',          // glob './plugins/*.js' — bez nested/p3.js
+      'web/views/Home.vue', 'web/views/admin/Users.vue', // glob './views/**/*.vue' minus '!./views/**/skip.vue'
+      'web/workers/heavy.js',       // new Worker('./workers/heavy.js', {type:'module'})
+      'web/workers/shared.js',      // new SharedWorker(new URL('./workers/shared.js', import.meta.url))
+    ]);
+    assert.ok(g.edges.filter((e) => e.source === 'web/main.js' && e.type !== 'contains').every((e) => e.type === 'import'));
+    assert.deepEqual(targetsOf(g, 'web/workers/heavy.js'), ['web/workers/b.js', 'web/workers/lib/a.js']);   // importScripts
+    assert.ok(!g.externals.has('api') && !g.externals.has('https'), 'URL-e absolutne i /api nie są zależnościami');
   });
 });
 

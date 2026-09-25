@@ -81,12 +81,13 @@ CM.Analysis = (function(){
   }
 
   // ---------- dependency extraction ----------
-  function add(deps, spec, kind, etype){
+  // extra: dodatkowe pola wpisu (np. {reexport:true}, {exclude:[…]} dla globów)
+  function add(deps, spec, kind, etype, extra){
     spec = (spec||'').trim();
     if(!spec) return;
     if(/^(https?:)?\/\//i.test(spec) || spec.startsWith('data:') || spec.startsWith('#') ||
        spec.startsWith('mailto:') || spec.startsWith('tel:') || spec.startsWith('javascript:')) return;
-    deps.push({spec, kind, etype});
+    deps.push(extra ? Object.assign({spec, kind, etype}, extra) : {spec, kind, etype});
   }
   function matchAll(re, str, cb){ let m; re.lastIndex=0; while((m = re.exec(str)) !== null){ cb(m); if(m.index===re.lastIndex) re.lastIndex++; } }
 
@@ -94,6 +95,33 @@ CM.Analysis = (function(){
     matchAll(/(?:import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
     matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
     matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
+    // odwołania dynamiczne: worker / URL względem modułu / importScripts / require.resolve / glob Vite
+    // (`fetch('./x.json')` celowo NIE — za dużo fałszywych trafień). Ścieżki workerów i URL-i są względne
+    // wobec skryptu, więc także bez `./` traktujemy je jak 'rel'.
+    matchAll(/\bnew\s+(?:Shared)?Worker\(\s*['"]([^'"]+)['"]/g, c, m=>add(d,m[1], 'rel', 'import'));
+    matchAll(/\bnew\s+URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g, c, m=>add(d,m[1], 'rel', 'import'));
+    matchAll(/\bimportScripts\(([^)]*)\)/g, c, m=>matchAll(/['"]([^'"]+)['"]/g, m[1], mm=>add(d,mm[1], 'rel', 'import')));
+    matchAll(/\brequire\.resolve\(\s*['"]([^'"]+)['"]/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
+    matchAll(/\bimport\.meta\.glob(?:Eager)?\(\s*(\[[^\]]*\]|['"][^'"]+['"])/g, c, m=>{
+      const pats = []; matchAll(/['"]([^'"]+)['"]/g, m[1], mm=>pats.push(mm[1]));
+      const exclude = pats.filter(p=>p.startsWith('!')).map(p=>p.slice(1));
+      pats.filter(p=>!p.startsWith('!')).forEach(p=>add(d, p, 'glob', 'import', exclude.length ? {exclude} : null));
+    });
+  }
+  // glob → RegExp na znormalizowanej ścieżce: `*` w obrębie segmentu, `**/` zero lub więcej katalogów, `?`, `{a,b}`
+  function globRegex(g){
+    let re = '';
+    for(let i=0;i<g.length;i++){
+      const c = g[i];
+      if(c === '*'){
+        if(g[i+1] === '*'){ i++; if(g[i+1] === '/'){ i++; re += '(?:.*/)?'; } else re += '.*'; }
+        else re += '[^/]*';
+      }
+      else if(c === '?') re += '[^/]';
+      else if(c === '{'){ const j = g.indexOf('}', i); if(j > i){ re += '(?:' + g.slice(i+1, j).split(',').map(s=>s.replace(/[.+^$()|[\]\\]/g,'\\$&')).join('|') + ')'; i = j; } else re += '\\{'; }
+      else re += c.replace(/[.+^$()|[\]\\]/g,'\\$&');
+    }
+    return new RegExp('^' + re + '$');
   }
   function pyDeps(c, d){
     matchAll(/^[ \t]*import[ \t]+([\w.]+(?:[ \t]*,[ \t]*[\w.]+)*)/gm, c, m=>{
@@ -448,6 +476,11 @@ CM.Analysis = (function(){
         const base = joinPath(dir, spec);
         return tryExact(idx.byPath, expand(base, fam));
       }
+      case 'glob': {   // wszystkie pasujące pliki; `/x` = od korzenia projektu (Vite), inaczej względem pliku
+        const pat = (p) => globRegex(p.startsWith('/') ? normPath(p) : joinPath(dir, p));
+        const re = pat(spec), ex = (dep.exclude||[]).map(pat);
+        return idx.files.filter(n => re.test(n.path) && !ex.some(r => r.test(n.path)));
+      }
       case 'rust-mod': return tryExact(idx.byPath, [joinPath(dir,spec)+'.rs', joinPath(dir,spec)+'/mod.rs'].map(normPath));
       case 'py-rel': {
         const dots = spec.match(/^\.+/)[0].length;
@@ -493,7 +526,7 @@ CM.Analysis = (function(){
       if(n.type === 'folder') folderByPath.set(n.path, n);
     }
     const alias = aliasConfigs(manifests), aliasCache = new Map();
-    const idx = {byPath, byBase, folderByPath, alias, pkgs: packageIndex(manifests),
+    const idx = {byPath, byBase, folderByPath, files: nodes.filter(n => n.type === 'file'), alias, pkgs: packageIndex(manifests),
       aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];
     const seen = new Set();
@@ -506,8 +539,9 @@ CM.Analysis = (function(){
     for(const f of nodes){
       if(f.type!=='file' || !f.deps || !f.deps.length) continue;
       for(const dep of f.deps){
-        const tgt = resolveDep(f, dep, idx);
-        if(tgt){ addEdge(f.id, tgt.id, dep.etype==='reference'?'reference':'import'); }
+        const tgt = resolveDep(f, dep, idx);                       // węzeł, tablica węzłów (glob) albo null
+        const tgts = Array.isArray(tgt) ? tgt : (tgt ? [tgt] : []);
+        if(tgts.length){ for(const t of tgts) addEdge(f.id, t.id, dep.etype==='reference'?'reference':'import'); }
         else if(dep.kind==='bare' || dep.kind==='module' || dep.kind==='cs-ns' || dep.kind==='php-ns'){
           const name = externalName(dep.spec);
           if(!name) continue;

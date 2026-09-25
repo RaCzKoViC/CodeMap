@@ -81,6 +81,24 @@ describe('extractDeps per język', () => {
   test('brak treści → pusta lista', () => {
     assert.deepEqual(host(A.extractDeps(null, 'js')), []);
   });
+  test('JS dynamiczne: Worker, SharedWorker, new URL(…, import.meta.url), importScripts, require.resolve, import.meta.glob (+ negacje); fetch nie', () => {
+    const c = [
+      "new Worker('./w.js', { type: 'module' });",
+      "new SharedWorker(new URL('./s.js', import.meta.url));",
+      "const u = new URL('./a.wasm', import.meta.url);",
+      "new URL('https://cdn.example/x.js'); new URL('/api', location.href);",
+      "importScripts('lib/a.js', \"./b.js\");",
+      "require.resolve('./cfg'); require.resolve('pkg');",
+      "import.meta.glob('./plugins/*.js'); import.meta.globEager(['./views/**/*.vue', '!./views/skip.vue']);",
+      "fetch('./data.json');",
+    ].join('\n');
+    const d = host(A.extractDeps(c, 'js').map((x) => [x.spec, x.kind]));
+    assert.deepEqual(d, [['./w.js', 'rel'], ['./s.js', 'rel'], ['./a.wasm', 'rel'], ['lib/a.js', 'rel'], ['./b.js', 'rel'],
+      ['./cfg', 'rel'], ['pkg', 'bare'], ['./plugins/*.js', 'glob'], ['./views/**/*.vue', 'glob']]);
+    const glob = A.extractDeps(c, 'js').find((x) => x.spec === './views/**/*.vue');
+    assert.deepEqual(host(glob.exclude), ['./views/skip.vue']);
+    assert.ok(A.extractDeps(c, 'js').every((x) => x.etype === 'import'));
+  });
 });
 
 describe('analyzeContent', () => {
