@@ -104,41 +104,29 @@
       languages, topFolders:folders };
   }
   // ---- Mistral API keys: up to 4, used app-wide with round-robin + automatic fallback ----
-  function aiKeyList(){
-    const arr=U.mistralKeySlots().filter(Boolean);   // jedno źródło slotów (util.js), z migracją legacy
-    return arr.filter((k,i)=>arr.indexOf(k)===i);   // de-dupe, keep order
-  }
-  function aiModel(){ return localStorage.getItem('codemap_mistral_model')||'mistral-small-latest'; }
+  // ---- dostawca chmurowy: CM.AI (klucze z wykrytym dostawcą, test, round-robin) ----
+  // aiKeyList/aiModel zostają jako cienkie wrappery dla zgodności (paleta, ChatBot, testy).
+  function aiKeyList(){ return CM.AI?CM.AI.usable().map(e=>e.key):[]; }
+  function aiModel(){ const e=CM.AI&&CM.AI.primary(); return e?CM.AI.modelFor(e):''; }
   function aiConfigured(){
     const prov=CM.LocalAI?CM.LocalAI.provider():'mistral';
     if(prov==='local') return CM.LocalAI.hasWebGPU();
     if(prov==='ollama') return true;   // reachability errors surface with a clear message on use
-    return aiKeyList().length>0;
+    return !!(CM.AI&&CM.AI.hasKey());
   }
   function aiGuard(){
-    if(!aiConfigured()) throw new Error(I.t('ca.aiNeedKey','Podaj klucz Mistral API w Ustawieniach → AI.'));
+    if(!aiConfigured()) throw new Error(I.t('ca.aiNeedKey','Dodaj i przetestuj klucz API w Ustawieniach → AI (albo wybierz tam model lokalny / Ollamę).'));
     if(state.counts.nodes===0) throw new Error(I.t('ca.aiNoProject','Najpierw wczytaj projekt.'));
   }
-  let _aiRot=0;   // round-robin cursor — spreads requests across the configured keys
   async function aiChat(messages, opts){
     // local providers — the whole app's AI runs on-device, no key needed:
     //  'local'  = WebLLM in-browser;  'ollama' = native Ollama server (fastest local option)
     const prov=CM.LocalAI?CM.LocalAI.provider():'mistral';
     if(prov==='local') return CM.LocalAI.chat(messages, opts||{});
-    if(prov==='ollama' && CM.Ollama) return CM.Ollama.chat(messages, opts||{});
-    const keys=aiKeyList();
-    if(!keys.length) throw new Error(I.t('ca.aiNeedKey','Podaj klucz Mistral API w Ustawieniach → AI.'));
-    const model=aiModel(); let lastErr=null;
-    for(let i=0;i<keys.length;i++){
-      const key=keys[(_aiRot+i)%keys.length];
-      try{ const r=await Loaders.mistralChat(messages, Object.assign({}, opts, {key, model}));
-        _aiRot=(_aiRot+i+1)%keys.length; return r; }   // advance cursor only on success
-      catch(e){ lastErr=e;
-        const recoverable=(e&&(e.status===401||e.status===429||e.status>=500));   // bad key / rate / server → try next
-        if(!recoverable) throw e;
-      }
-    }
-    throw lastErr || new Error('Mistral API');
+    if(prov==='ollama' && CM.Ollama) return CM.Ollama.chat(messages, Object.assign({think:false}, opts||{}));   // analiza = zwięzły tekst, bez rozumowania
+    if(!CM.AI) throw new Error('CM.AI');
+    // wszystkie działające klucze rotacyjnie; 401/429/5xx/sieć → następny klucz (jak dawny round-robin Mistral)
+    return CM.AI.chatAny(messages, opts||{});
   }
   async function aiAnalyze(){
     aiGuard();

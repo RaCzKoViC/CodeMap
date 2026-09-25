@@ -68,9 +68,13 @@ głębokie zagnieżdżenie, minifikaty…) z progami statystycznymi, **health sc
 ### AI — opcjonalnie, z zachowaniem prywatności
 - **WebLLM** — modele uruchamiane w przeglądarce (WebGPU), wagi w cache, bez wysyłania czegokolwiek.
 - **Ollama** — lokalny serwer modeli na Twoim komputerze.
-- **Mistral API** — z własnym kluczem (do 4 slotów, round-robin).
+- **Klucze API (chmura)** — dowolna liczba kluczy: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
+  OpenRouter, DeepSeek, xAI, Together. Dostawca jest **wykrywany po formacie klucza** i potwierdzany
+  przyciskiem „Testuj" (lista modeli), model wybierany per klucz; działające klucze używane rotacyjnie.
 - **ChatBot** steruje aplikacją (ok. 50 akcji: układ, filtry, motyw, wyszukiwanie, migawki…). Akcje spoza
   zbioru „tylko widok" wymagają kliknięcia — model nie może sam wczytać, skasować ani wyeksportować.
+  Modele lokalne (WebLLM, Ollama) odpowiadają w **trybie strukturalnym**: JSON `{reply, actions}` wymuszony
+  schematem, więc nawet małe modele niezawodnie wykonują polecenia.
 - **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
 - Do modeli trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików.
 
@@ -111,7 +115,7 @@ na Twoje wyraźne żądanie:
 | Kiedy | Dokąd | Co |
 |---|---|---|
 | wczytanie repozytorium | api.github.com / gitlab.com / api.bitbucket.org | adres repo, opcjonalny token (tylko w pamięci karty) |
-| Mistral | api.mistral.ai | Twój klucz i struktura projektu (nazwy, liczby) |
+| klucz API (chmura) | API wybranego dostawcy (api.mistral.ai, api.openai.com, api.anthropic.com, …) | Twój klucz i struktura projektu (nazwy, liczby) |
 | WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
 | Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
 | Ollama | 127.0.0.1:11434 | lokalnie |

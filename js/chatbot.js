@@ -266,7 +266,19 @@ CM.ChatBot = (function(){
   // niezawodnie domknąć bloku ```action``` w prozie, ale gramatyka nie pozwala im wyjść poza schemat —
   // każda odpowiedź parsuje się, a akcje trafiają do tej samej allowlisty co dotąd.
   const ACT_SCHEMA={type:'object',properties:{reply:{type:'string'},actions:{type:'array',items:{type:'object',
-    properties:{action:{type:'string'},args:{type:'object'}},required:['action','args']}}},required:['reply','actions']};
+    properties:{action:{type:'string'},args:{type:'object',additionalProperties:true}},required:['action','args']}}},required:['reply','actions']};
+  // Małe modele mylą nazwy argumentów ({"name":"treemap"} zamiast {"layout":"treemap"}) — gdy brakuje
+  // klucza głównego akcji, a args ma dokładnie jedną wartość, przepisujemy ją pod właściwy klucz.
+  const PRIMARY_ARG={setLayout:'layout',search:'query',focusNode:'query',openNode:'query',zoom:'dir',rotate:'dir',setTheme:'theme',
+    setPreset:'name',setAccent:'color',setBackground:'color',setSpacing:'percent',setNodeScale:'percent',setFontScale:'percent',
+    setLang:'lang',toggleLang:'lang',setMode:'mode',startTutorial:'mode',togglePanel:'side',openSettings:'tab',openDrive:'tab',loadRepo:'url',mindmap:'action',setMetric:'metric'};
+  function normalizeArgs(action, args){
+    args=(args&&typeof args==='object')?Object.assign({}, args):{};
+    const key=PRIMARY_ARG[action]; if(!key || args[key]!=null) return args;
+    const vals=Object.entries(args).filter(([k,v])=>v!=null&&(typeof v==='string'||typeof v==='number'));
+    if(vals.length===1) args[key]=vals[0][1];
+    return args;
+  }
   let localJsonOk=true;   // wyłączany na sesję, gdy silnik odrzuci gramatykę (starszy WebLLM/Ollama)
   // podgląd na żywo: wartość "reply" z NIEDOMKNIĘTEGO jeszcze JSON-a (strumień)
   function jsonReplyPrefix(s){ const m=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(String(s)); if(!m) return '';
@@ -275,7 +287,7 @@ CM.ChatBot = (function(){
   function parseStructured(s){ s=stripThink(String(s)).trim(); let o=null;
     try{ o=JSON.parse(s); }catch(e){ const m=s.match(/\{[\s\S]*\}/); if(m){ try{ o=JSON.parse(m[0]); }catch(_){} } }
     if(!o||typeof o!=='object'||typeof o.reply!=='string') return null;
-    const actions=Array.isArray(o.actions)?o.actions.filter(a=>a&&typeof a.action==='string').map(a=>({action:a.action, args:(a.args&&typeof a.args==='object')?a.args:{}})):[];
+    const actions=Array.isArray(o.actions)?o.actions.filter(a=>a&&typeof a.action==='string').map(a=>({action:a.action, args:normalizeArgs(a.action, a.args)})):[];
     return {reply:o.reply.trim(), actions}; }
   function extractActions(text){ const out=[]; const re=/```action\s*([\s\S]*?)```/g; let m;
     while((m=re.exec(text))){ try{ const o=JSON.parse(m[1].trim()); if(o&&o.action) out.push(o); }catch(e){} } return out; }
@@ -683,7 +695,9 @@ CM.ChatBot = (function(){
         chipsBox().appendChild(chip); scrollBottom();
         return;
       }
-      const entry={action:a.action}; liveActs.push(entry);
+      // BUG (naprawiony): wpis bez args → CMApp.exec(action, undefined) → każda auto-akcja szła z pustymi
+      // argumentami (setLayout „Nieznany układ: ''", setTheme zawsze 'dark'). Ścieżka z chipem miała args.
+      const entry={action:a.action, args:a.args||{}}; liveActs.push(entry);
       const chip=el('div',{class:'cb-chip cb-chip-run',html:'⏳ '+esc(a.action)});
       chipsBox().appendChild(chip); scrollBottom();
       runInto(entry, chip);
