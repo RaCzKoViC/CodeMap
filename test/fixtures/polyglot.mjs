@@ -54,6 +54,47 @@ export const FILES = [
   F('rs/src/a/b.rs', 'pub mod c;\nuse super::super::util;\nuse super::*;\n'),
   F('rs/src/a/b/c.rs', 'use crate::util::helper;\npub fn run() { helper(); }\n'),
   F('rs/src/util.rs', 'pub fn helper() {}\n'),
+
+  // ---- Swift: import Module → folder Sources/<Module> (SwiftPM) albo folder najwyższego poziomu; inaczej zewnętrzny ----
+  F('swift/Sources/App/main.swift', 'import Foundation\nimport Core\n@testable import Helpers\n'),
+  F('swift/Sources/Core/Core.swift', 'public struct Core {}\n'),
+  F('swift/Tests/CoreTests/CoreTests.swift', '@testable import Core\nimport XCTest\n'),
+
+  // ---- Dart: package:<name>/x.dart → lib/x.dart pakietu z pubspec.yaml; względne; part; export ----
+  F('dart/pubspec.yaml', 'name: myapp\ndescription: x\n'),
+  F('dart/lib/main.dart', "import 'dart:io';\nimport 'package:myapp/src/util.dart';\nimport 'package:flutter/material.dart';\nimport 'widgets/home.dart';\nexport 'src/api.dart';\npart 'main.g.dart';\n"),
+  F('dart/lib/src/util.dart', 'int u() => 1;\n'),
+  F('dart/lib/src/api.dart', 'int api() => 1;\n'),
+  F('dart/lib/widgets/home.dart', 'class Home {}\n'),
+  F('dart/lib/main.g.dart', "part of 'main.dart';\n"),
+
+  // ---- Elixir: alias/import/use → defmodule w projekcie (indeks) albo lib/a/b/c.ex po snake_case ----
+  F('ex/lib/my_app_web.ex', 'defmodule MyAppWeb do\nend\n'),
+  F('ex/lib/my_app/repo.ex', 'defmodule MyApp.Repo do\n  use Ecto.Repo, otp_app: :my_app\nend\n'),
+  F('ex/lib/my_app/accounts/user.ex', 'defmodule MyApp.Accounts.User do\nend\n'),
+  F('ex/lib/legacy.ex', 'defmodule Legacy.Thing do\nend\n'),
+  F('ex/lib/my_app_web/controllers/user_controller.ex', 'defmodule MyAppWeb.UserController do\n  use MyAppWeb, :controller\n  alias MyApp.{Repo, Accounts.User}\n  alias Legacy.Thing\n  import Ecto.Query\n  require Logger\nend\n'),
+
+  // ---- Lua: require('a.b') → a/b.lua | a/b/init.lua ----
+  F('lua/main.lua', "local a = require('lib.a')\nlocal b = require \"lib.b\"\nlocal s = require('socket')\n"),
+  F('lua/lib/a.lua', 'return {}\n'),
+  F('lua/lib/b/init.lua', 'return {}\n'),
+
+  // ---- Zig: @import("x.zig") względne; std systemowe; pakiet zewnętrzny ----
+  F('zig/src/main.zig', 'const std = @import("std");\nconst util = @import("util.zig");\nconst thing = @import("sub/thing.zig");\nconst zap = @import("zap");\n'),
+  F('zig/src/util.zig', 'pub const x = 1;\n'),
+  F('zig/src/sub/thing.zig', 'pub const y = 1;\n'),
+
+  // ---- Haskell: import Data.Map → src/Data/Map.hs | Data/Map.hs ----
+  F('hs/src/Main.hs', "{-# LANGUAGE OverloadedStrings #-}\nmodule Main where\nimport qualified Data.Map as M\nimport Lib.Util\nimport {-# SOURCE #-} Lib.Core (core)\n"),
+  F('hs/src/Lib/Util.hs', 'module Lib.Util where\n'),
+  F('hs/src/Lib/Core.hs', 'module Lib.Core where\n'),
+
+  // ---- Shell: source ./x.sh | . x.sh — względem skryptu, awaryjnie od korzenia projektu ----
+  F('sh/run.sh', '#!/bin/bash\nsource ./lib/common.sh\n. "$HOME/.profile"\n. lib/colors.sh\nsource scripts/env.sh\n'),
+  F('sh/lib/common.sh', 'common() { :; }\n'),
+  F('sh/lib/colors.sh', 'RED=1\n'),
+  F('scripts/env.sh', 'export X=1\n'),
 ];
 
 export const META = { name: 'polyglot', source: 'test' };

@@ -89,6 +89,37 @@ describe('extractDeps per język', () => {
     assert.deepEqual(host(A.manifestEntry('Cargo.toml', '[dependencies]\nname = "zly"\n\n[package]\nname = "demo"\nversion = "0.1.0"\n', 'rs')), { kind: 'package', eco: 'cargo', dir: 'rs', name: 'demo' });
     assert.equal(A.manifestEntry('Cargo.toml', '[workspace]\nmembers = ["a"]\n', ''), null);
   });
+  test('Swift: import [@testable] [struct] Module.Sub → moduł', () => {
+    assert.deepEqual(specs('import Foundation\n@testable import Core\nimport struct Helpers.Point\n// import Ghost\n', 'swift'), ['Foundation', 'Core', 'Helpers']);
+  });
+  test('Dart: dart: = system, package: = dart-pkg, względne import/export/part; export = reexport', () => {
+    const c = "import 'dart:io';\nimport 'package:myapp/src/util.dart' as u;\nimport 'widgets/home.dart' show Home;\nexport 'src/api.dart';\npart 'main.g.dart';\npart of my.lib;\n";
+    assert.deepEqual(host(A.extractDeps(c, 'dart').map((x) => [x.spec, x.kind, !!x.reexport])),
+      [['dart:io', 'system', false], ['myapp/src/util.dart', 'dart-pkg', false], ['widgets/home.dart', 'rel', false], ['src/api.dart', 'rel', true], ['main.g.dart', 'rel', false]]);
+  });
+  test('Elixir: alias/import/use/require (+ grupy {A, B.C}, as:), defmodule jako decl, moduły stdlib jako ex-std', () => {
+    const c = 'defmodule MyAppWeb.UserController do\n  use MyAppWeb, :controller\n  alias MyApp.{Repo, Accounts.User}\n  alias Legacy.Thing, as: T\n  import Ecto.Query, only: [from: 2]\n  require Logger\n  alias __MODULE__.Inner\nend\n';
+    assert.deepEqual(host(A.extractDeps(c, 'ex').map((x) => [x.spec, x.kind])), [['MyAppWeb.UserController', 'decl'], ['MyAppWeb', 'module'], ['MyApp.Repo', 'module'],
+      ['MyApp.Accounts.User', 'module'], ['Legacy.Thing', 'module'], ['Ecto.Query', 'module'], ['Logger', 'ex-std']]);
+  });
+  test('Lua: require z nawiasami i bez, kropki; komentarz blokowy --[[ ]] pomijany', () => {
+    assert.deepEqual(specs("local a = require('lib.a')\nlocal b = require \"lib/b\"\n--[[ require('ghost')\n]] local s = require('socket')\n", 'lua'), ['lib.a', 'lib/b', 'socket']);
+  });
+  test('Zig: @import("x.zig") względne, std/builtin/root systemowe, inne = pakiet', () => {
+    assert.deepEqual(host(A.extractDeps('const std = @import("std");\nconst u = @import("util.zig");\nconst s = @import("sub/thing.zig");\nconst z = @import("zap");\n', 'zig').map((x) => [x.spec, x.kind])),
+      [['std', 'system'], ['util.zig', 'rel'], ['sub/thing.zig', 'rel'], ['zap', 'bare']]);
+  });
+  test('Haskell: import [qualified] [safe] ["pkg"] Mod.Name; pragmy {-# #-} i {- -} pomijane', () => {
+    const c = "{-# LANGUAGE OverloadedStrings #-}\nmodule Main where\nimport qualified Data.Map as M\nimport Data.List (foldl')\nimport {-# SOURCE #-} Lib.Core (core)\nimport safe \"base\" Prelude hiding (id)\n{- import Ghost -}\n-- import Ghost2\n";
+    assert.deepEqual(specs(c, 'hs'), ['Data.Map', 'Data.List', 'Lib.Core', 'Prelude']);
+  });
+  test('Shell: source / . ze ścieżką (cudzysłowy, bez zmiennych)', () => {
+    assert.deepEqual(specs('#!/bin/bash\nsource ./lib/common.sh\n. "$HOME/.profile"\n. lib/colors.sh; echo x\nsource "scripts/env.sh"\n', 'sh'), ['./lib/common.sh', 'lib/colors.sh', 'scripts/env.sh']);
+  });
+  test('family: nowe rodziny', () => {
+    assert.deepEqual(host(['swift', 'dart', 'ex', 'exs', 'lua', 'zig', 'hs', 'lhs', 'sh', 'bash', 'zsh', 'fish'].map((k) => A.family(k))),
+      ['swift', 'dart', 'elixir', 'elixir', 'lua', 'zig', 'hs', 'hs', 'sh', 'sh', 'sh', 'sh']);
+  });
   test('JS: export … from oznacza reexport:true, zwykły import nie', () => {
     const d = host(A.extractDeps("import a from './a';\nexport * from './b';\nexport { c as d } from './c';\nexport default from './e';\n", 'js'));
     assert.deepEqual(d.map((x) => [x.spec, !!x.reexport]), [['./a', false], ['./b', true], ['./c', true], ['./e', true]]);

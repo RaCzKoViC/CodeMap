@@ -30,6 +30,13 @@ CM.Analysis = (function(){
     if(['css','scss','sass','less','styl'].includes(key)) return 'css';
     if(['html','htm','xhtml'].includes(key)) return 'html';
     if(['md','markdown','mdx'].includes(key)) return 'md';
+    if(['swift'].includes(key)) return 'swift';
+    if(['dart'].includes(key)) return 'dart';
+    if(['ex','exs'].includes(key)) return 'elixir';
+    if(['lua'].includes(key)) return 'lua';
+    if(['zig'].includes(key)) return 'zig';
+    if(['hs','lhs'].includes(key)) return 'hs';
+    if(['sh','bash','zsh','fish'].includes(key)) return 'sh';
     return 'other';
   }
 
@@ -38,7 +45,7 @@ CM.Analysis = (function(){
     const slash = {line:['//'], blockStart:'/*', blockEnd:'*/'};
     const hash  = {line:['#'], blockStart:null, blockEnd:null};
     const fam = family(key);
-    if(['js','c','java','cs','go','rust','css'].includes(fam)) return slash;
+    if(['js','c','java','cs','go','rust','css','swift','dart','zig'].includes(fam)) return slash;
     if(['py','rb'].includes(fam)) return {line:['#'], blockStart:'"""', blockEnd:'"""'};
     if(['sh','yaml','toml','ps1','psm1','psd1','dockerfile','makefile','mk','cmake','r','rmd','pl','pm','jl','ini','cfg','conf','properties','env','elixir','ex','exs'].includes(key)||fam==='other'&&['sh','yaml','yml','toml'].includes(key)) return hash;
     if(['html','md','xml'].includes(fam) || ['html','htm','xhtml','xml','svg','vue','svelte','md','markdown','mdx'].includes(key))
@@ -198,7 +205,52 @@ CM.Analysis = (function(){
   function mdDeps(c, d){
     matchAll(/\]\(\s*([^)\s]+)/g, c, m=>{ if(!/^[\w]+:/.test(m[1])) add(d,m[1], 'rel', 'reference'); });
   }
+  // ---- nowe rodziny (Faza 2) ----
+  function swiftDeps(c, d){   // `import Foo`, `@testable import Foo`, `import struct Foo.Bar` → moduł Foo
+    matchAll(/^[ \t]*(?:@testable[ \t]+)?import[ \t]+(?:(?:struct|class|enum|protocol|typealias|func|var|let)[ \t]+)?([A-Za-z_]\w*)/gm, c, m=>add(d,m[1], 'module', 'import'));
+  }
+  function dartDeps(c, d){    // `dart:io` systemowe; `package:app/x.dart` → pakiet; reszta względna; `part of 'x'` też; export = reexport
+    matchAll(/^[ \t]*(import|export|part(?:[ \t]+of)?)[ \t]+['"]([^'"]+)['"]/gm, c, m=>{
+      const s = m[2], extra = m[1]==='export' ? {reexport:true} : null;
+      if(s.startsWith('dart:')) add(d, s, 'system', 'import');
+      else if(s.startsWith('package:')) add(d, s.slice(8), 'dart-pkg', 'import', extra);
+      else add(d, s, 'rel', 'import', extra);
+    });
+  }
+  // moduły biblioteki standardowej Elixira: bez krawędzi (chyba że projekt je definiuje) i bez externala
+  const ELIXIR_STD = new Set(['Kernel','Enum','Map','List','String','Integer','Float','IO','File','Path','Agent','Task','GenServer','Supervisor',
+    'DynamicSupervisor','PartitionSupervisor','Application','Logger','Process','Keyword','Access','Stream','Tuple','Atom','Base','Bitwise','Code',
+    'Date','DateTime','NaiveDateTime','Time','Calendar','Regex','Registry','System','URI','Version','Exception','Macro','Module','Node','Port',
+    'Protocol','Record','Range','MapSet','Function','Inspect','ExUnit','Mix','Behaviour','Config','Enumerable','Collectable','StringIO','OptionParser']);
+  function elixirDeps(c, d){
+    matchAll(/^[ \t]*defmodule[ \t]+([A-Z][\w.]*)/gm, c, m=>add(d,m[1], 'decl', 'decl'));
+    // `alias A.B`, `alias A.{B, C.D}`, `alias A.B, as: X`, `import A.B, only: […]`, `use A.B, opts`, `require A`
+    matchAll(/^[ \t]*(?:alias|import|use|require)[ \t]+([A-Z][\w.]*?)(?:\.\{([^}]*)\})?(?=[\s,]|$)/gm, c, m=>{
+      const mods = m[2] != null ? m[2].split(',').map(s=>s.trim()).filter(Boolean).map(s=>m[1]+'.'+s) : [m[1]];
+      for(const mod of mods) add(d, mod, ELIXIR_STD.has(mod.split('.')[0]) ? 'ex-std' : 'module', 'import');
+    });
+  }
+  function luaDeps(c, d){     // `require('a.b')` / `require "a/b"` → moduł
+    matchAll(/\brequire[ \t]*\(?[ \t]*['"]([^'"]+)['"]/g, c, m=>add(d,m[1], 'module', 'import'));
+  }
+  function zigDeps(c, d){     // `@import("x.zig")` względne; std/builtin/root systemowe; inne = pakiet z build.zig
+    matchAll(/@import\(\s*"([^"]+)"\s*\)/g, c, m=>{
+      const s = m[1];
+      add(d, s, /\.zig$/.test(s) || s.includes('/') ? 'rel' : (['std','builtin','root'].includes(s) ? 'system' : 'bare'), 'import');
+    });
+  }
+  function hsDeps(c, d){      // `import [safe] [qualified] ["pkg"] Data.Map [qualified] [as M] [(…)]`
+    matchAll(/^[ \t]*import[ \t]+(?:safe[ \t]+)?(?:qualified[ \t]+)?(?:"[^"]*"[ \t]+)?([A-Z][\w.']*)/gm, c, m=>add(d,m[1], 'module', 'import'));
+  }
+  function shDeps(c, d){      // `source x.sh` / `. x.sh` — ścieżki ze zmiennymi ($HOME, `cmd`) pomijane
+    matchAll(/^[ \t]*(?:source|\.)[ \t]+(?:"([^"]*)"|'([^']*)'|([^\s;|&<>()"']+))/gm, c, m=>{
+      const s = m[1] != null ? m[1] : (m[2] != null ? m[2] : m[3]);
+      if(s && !/[$`]/.test(s)) add(d, s, 'rel', 'import');
+    });
+  }
   function rel(spec){ return (spec.startsWith('.') || spec.startsWith('/')) ? 'rel' : 'bare'; }
+  // CamelCase → snake_case jak Macro.underscore w Elixirze (HTTPClient → http_client)
+  function snakeCase(s){ return s.replace(/([A-Z]+)([A-Z][a-z])/g,'$1_$2').replace(/([a-z\d])([A-Z])/g,'$1_$2').toLowerCase(); }
 
   // languages where '#' starts a line comment (NOT C/JS/… where it's a preprocessor/anchor)
   const HASH_LANG = new Set(['py','pyw','pyi','rb','erb','rake','sh','bash','zsh','fish','yaml','yml','toml',
@@ -227,6 +279,8 @@ CM.Analysis = (function(){
       if(html && c==='<' && code.substr(i,4)==='<!--'){ const end=code.indexOf('-->',i+4), stop=end<0?n:end+3; blank(i,stop); i=stop; continue; }
       if(!html && c==='/'&&c2==='/'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }   // w HTML/MD `//` to część URL-a
       if(hash && c==='#'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }
+      if(key==='lua' && code.substr(i,4)==='--[['){ const end=code.indexOf(']]',i+4), stop=end<0?n:end+2; blank(i,stop); i=stop; continue; }   // Lua --[[ ]]
+      if((key==='hs'||key==='lhs') && c==='{'&&c2==='-'){ const end=code.indexOf('-}',i+2), stop=end<0?n:end+2; blank(i,stop); i=stop; continue; } // Haskell {- -} i pragmy {-# #-}
       if(dashes && c==='-'&&c2==='-'){ let j=i; while(j<n&&code[j]!=='\n') j++; blank(i,j); i=j; continue; }
       out+=c; i++;
     }
@@ -254,6 +308,9 @@ CM.Analysis = (function(){
         if(!(co.paths || co.baseUrl != null || j.extends)) return null;
         return {kind:'alias', dir, file: joinPath(dir, name), primary: n === 'tsconfig.json' || n === 'jsconfig.json',
                 baseUrl: co.baseUrl != null ? String(co.baseUrl) : null, paths: co.paths || null, extends: j.extends || null};
+      }
+      if(n === 'pubspec.yaml' || n === 'pubspec.yml'){   // name: app → `package:app/x.dart` → lib/x.dart
+        const m = /^name:[ \t]*["']?([\w-]+)/m.exec(content); return m ? {kind:'package', eco:'dart', dir, name:m[1]} : null;
       }
       if(n === 'cargo.toml'){   // [package] name = "x" → `use x::…` i korzeń src/ dla `crate::`
         let sec = '';
@@ -396,6 +453,13 @@ CM.Analysis = (function(){
     if(fam === 'css') cssDeps(content, d);
     if(fam === 'html' || ['vue','svelte','astro'].includes(key)) htmlDeps(content, d);
     if(fam === 'md') mdDeps(content, d);
+    if(fam === 'swift') swiftDeps(content, d);
+    if(fam === 'dart') dartDeps(content, d);
+    if(fam === 'elixir') elixirDeps(content, d);
+    if(fam === 'lua') luaDeps(content, d);
+    if(fam === 'zig') zigDeps(content, d);
+    if(fam === 'hs') hsDeps(content, d);
+    if(fam === 'sh') shDeps(content, d);
     return d;
   }
 
@@ -546,8 +610,16 @@ CM.Analysis = (function(){
       case 'rust-use': return rustUse(file, spec, idx);
       case 'rel': {
         const base = joinPath(dir, spec);
-        return tryExact(idx.byPath, expand(base, fam));
+        const hit = tryExact(idx.byPath, expand(base, fam));
+        if(!hit && fam === 'sh') return tryExact(idx.byPath, [normPath(spec)]);   // skrypty często `source`'ują od korzenia repo
+        return hit;
       }
+      case 'dart-pkg': {   // `app/x/y.dart` → <dir pubspec z name: app>/lib/x/y.dart
+        const i = spec.indexOf('/'); if(i < 0) return null;
+        const pkg = idx.dart.get(spec.slice(0, i)); if(!pkg) return null;
+        return tryExact(idx.byPath, [normPath(joinPath(pkg.dir, 'lib/' + spec.slice(i+1)))]);
+      }
+      case 'ex-std': return idx.decl.get('elixir:'+spec) || null;   // stdlib: krawędź tylko, gdy projekt sam definiuje taki moduł
       case 'glob': {   // wszystkie pasujące pliki; `/x` = od korzenia projektu (Vite), inaczej względem pliku
         const pat = (p) => globRegex(p.startsWith('/') ? normPath(p) : joinPath(dir, p));
         const re = pat(spec), ex = (dep.exclude||[]).map(pat);
@@ -565,6 +637,24 @@ CM.Analysis = (function(){
         if(fam==='py'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.py', p+'/__init__.py']); }
         if(fam==='java'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.java', p+'.kt', p+'.scala', p+'.groovy']); }
         if(fam==='go'){ return suffixFolder(idx, spec); }
+        if(fam==='hs'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.hs', p+'.lhs']); }
+        if(fam==='lua'){   // a/b.lua | a/b/init.lua: od korzenia projektu (package.path), względem pliku, potem gdziekolwiek
+          const p = spec.replace(/\./g,'/'); const c = [p+'.lua', p+'/init.lua'];
+          return tryExact(idx.byPath, c.map(normPath)) || tryExact(idx.byPath, c.map(x=>joinPath(dir, x))) || suffixFind(idx, c);
+        }
+        if(fam==='swift'){   // moduł = target: Sources/<Moduł> lub Tests/<Moduł> (SwiftPM) albo folder najwyższego poziomu (Xcode)
+          for(const [p,f] of idx.folderByPath){
+            if(p === 'Sources/'+spec || p.endsWith('/Sources/'+spec) || p === 'Tests/'+spec || p.endsWith('/Tests/'+spec) || p === spec) return f;
+          }
+          return null;
+        }
+        if(fam==='elixir'){   // defmodule w projekcie → ścieżka snake_case (lib/my_app/repo.ex) → jedyny plik o tej nazwie
+          const decl = idx.decl.get('elixir:'+spec); if(decl) return decl;
+          const p = spec.split('.').map(snakeCase).join('/');
+          const hit = suffixFind(idx, [p+'.ex', p+'.exs']); if(hit) return hit;
+          const same = (idx.byBase.get(basename(p)+'.ex')||[]).filter(n=>n.type==='file');
+          return same.length === 1 ? same[0] : null;
+        }
         return null;
       }
       case 'php-ns': { const cls = spec.split('\\').pop(); return suffixFind(idx, [cls+'.php']); }
@@ -587,7 +677,7 @@ CM.Analysis = (function(){
     return spec.split('/')[0].split('.')[0] || spec;
   }
   // nierozwiązany wpis, który reprezentuje pakiet/moduł spoza projektu (→ węzeł zależności zewnętrznej)
-  const EXTERNAL_KINDS = new Set(['bare','module','cs-ns','php-ns']);
+  const EXTERNAL_KINDS = new Set(['bare','module','cs-ns','php-ns','dart-pkg']);
   function isExternal(dep){
     if(EXTERNAL_KINDS.has(dep.kind)) return true;
     if(dep.kind === 'rust-use') return !/^(crate|self|super)(::|$)/.test(dep.spec);   // std, serde, … ale nie ścieżki lokalne
@@ -611,8 +701,9 @@ CM.Analysis = (function(){
     const decl = new Map();
     for(const f of files){ if(!f.deps) continue; for(const d of f.deps){ if(d.kind !== 'decl') continue;
       const k = family(f.lang)+':'+d.spec; if(!decl.has(k)) decl.set(k, []); if(!decl.get(k).includes(f)) decl.get(k).push(f); } }
+    const pkgsOf = (eco) => (manifests||[]).filter(m => m && m.kind === 'package' && m.eco === eco && m.name).map(m => ({...m, dir: normPath(m.dir||'')}));
     const idx = {byPath, byBase, folderByPath, files, alias, decl, pkgs: packageIndex(manifests),
-      cargo: (manifests||[]).filter(m => m && m.kind === 'package' && m.eco === 'cargo' && m.name).map(m => ({...m, dir: normPath(m.dir||'')})),
+      cargo: pkgsOf('cargo'), dart: new Map(pkgsOf('dart').map(p => [p.name, p])),
       aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];
     const seen = new Set();

@@ -259,6 +259,38 @@ describe('C# namespace i Rust use', () => {
   });
 });
 
+describe('nowe parsery: Swift, Dart, Elixir, Lua, Zig, Haskell, Shell', () => {
+  let g;
+  beforeEach(() => { g = buildPoly(); });
+  test('Swift: import Core → folder Sources/Core; Foundation/Helpers zewnętrzne', () => {
+    assert.deepEqual(targetsOf(g, 'swift/Sources/App/main.swift'), ['ext:Foundation', 'ext:Helpers', 'swift/Sources/Core']);
+    assert.deepEqual(targetsOf(g, 'swift/Tests/CoreTests/CoreTests.swift'), ['ext:XCTest', 'swift/Sources/Core']);
+  });
+  test('Dart: package:myapp/… → lib/ z pubspec.yaml, względne, export, part; dart:io bez externala, flutter zewnętrzny', () => {
+    assert.deepEqual(targetsOf(g, 'dart/lib/main.dart'), ['dart/lib/main.g.dart', 'dart/lib/src/api.dart', 'dart/lib/src/util.dart', 'dart/lib/widgets/home.dart', 'ext:flutter']);
+    assert.deepEqual(targetsOf(g, 'dart/lib/main.g.dart'), ['dart/lib/main.dart']);
+    assert.ok(!g.externals.has('dart') && !g.externals.has('myapp'));
+  });
+  test('Elixir: defmodule w projekcie (także gdy ścieżka nie pasuje), snake_case ścieżka, stdlib bez externala, Ecto zewnętrzne', () => {
+    assert.deepEqual(targetsOf(g, 'ex/lib/my_app_web/controllers/user_controller.ex'),
+      ['ex/lib/legacy.ex', 'ex/lib/my_app/accounts/user.ex', 'ex/lib/my_app/repo.ex', 'ex/lib/my_app_web.ex', 'ext:Ecto']);
+    assert.ok(!g.externals.has('Logger') && !g.externals.has('MyApp'));
+  });
+  test('Lua: a/b.lua i a/b/init.lua; socket zewnętrzny', () => {
+    assert.deepEqual(targetsOf(g, 'lua/main.lua'), ['ext:socket', 'lua/lib/a.lua', 'lua/lib/b/init.lua']);
+  });
+  test('Zig: względne .zig; std bez externala; zap zewnętrzny', () => {
+    assert.deepEqual(targetsOf(g, 'zig/src/main.zig'), ['ext:zap', 'zig/src/sub/thing.zig', 'zig/src/util.zig']);
+    assert.ok(!g.externals.get('std').importers.includes('zig/src/main.zig'), 'std Ziga nie jest externalem (std Rusta z rs/ jest)');
+  });
+  test('Haskell: Lib.Util → src/Lib/Util.hs; Data.Map zewnętrzne', () => {
+    assert.deepEqual(targetsOf(g, 'hs/src/Main.hs'), ['ext:Data', 'hs/src/Lib/Core.hs', 'hs/src/Lib/Util.hs']);
+  });
+  test('Shell: source względem skryptu i od korzenia; $HOME pomijane', () => {
+    assert.deepEqual(targetsOf(g, 'sh/run.sh'), ['scripts/env.sh', 'sh/lib/colors.sh', 'sh/lib/common.sh']);
+  });
+});
+
 describe('sygnatury i diff', () => {
   test('diffSignatures: dodane, zmienione, usunięte, delty', () => {
     const a = build().signature();
