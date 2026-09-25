@@ -184,7 +184,7 @@ CM.ChatBot = (function(){
   function buildSystemPrompt(compact, json){
     const lang=I.getLang()==='en'?'English':'Polish';
     const st=appState();
-    const JSON_RULE='Answer ONLY with one JSON object: {"reply":"<1-3 short plain sentences in '+lang+'>","actions":[{"action":"<name>","args":{...}}]}. "actions" is [] unless the user COMMANDS an app change. No markdown, no code fences, no JSON inside reply.';
+    const JSON_RULE='Answer ONLY with one JSON object: {"actions":[{"action":"<name>","args":{...}}],"reply":"<1-2 short plain sentences in '+lang+'>"}. "actions" is [] unless the user asks for an app change. Never repeat yourself. No markdown, no code fences, no JSON inside reply.';
     if(compact){
       // SMALL LOCAL MODELS: a long prompt means slow prefill on WebGPU and a confused model that
       // parrots JSON. Keep it tight: short catalog (signatures only), state WITHOUT the structure
@@ -192,7 +192,7 @@ CM.ChatBot = (function(){
       // PREFILL IS THE COST on iGPUs (~20-40 tok/s): every character here is paid on EVERY message.
       // Keep the whole prompt ~250 tokens: one-line persona, one-line protocol, bare action names,
       // and a MINIMAL state (no availableLayouts/filters/structure dumps).
-      const slim={mode:st.mode, project:st.hasProject?(st.project||'yes'):null, layout:st.layout, theme:st.theme, lang:st.lang};
+      const slim={mode:st.mode, project:st.hasProject?(st.project||'yes'):null, layout:st.layout, layouts:(st.availableLayouts||[]).join('|'), theme:st.theme, lang:st.lang};
       const cat=ACTION_CATALOG.map(a=>a.split(' — ')[0]);
       return [
         'You are ChatBot inside CodeMap (a code-map web app). Reply in '+lang+', 1-3 short plain-text sentences.',
@@ -265,13 +265,25 @@ CM.ChatBot = (function(){
   // WYMUSZONY schematem (Ollama `format`, WebLLM response_format z gramatyką). Małe modele nie potrafią
   // niezawodnie domknąć bloku ```action``` w prozie, ale gramatyka nie pozwala im wyjść poza schemat —
   // każda odpowiedź parsuje się, a akcje trafiają do tej samej allowlisty co dotąd.
-  const ACT_SCHEMA={type:'object',properties:{reply:{type:'string'},actions:{type:'array',items:{type:'object',
-    properties:{action:{type:'string'},args:{type:'object',additionalProperties:true}},required:['action','args']}}},required:['reply','actions']};
+  // Kolejność pól = kolejność generowania (gramatyka): NAJPIERW actions, potem reply — mały model
+  // decyduje o akcjach zanim „rozpisze się" w tekście (Llama 1B wpadała w pętlę powtórzeń w reply
+  // i nigdy nie domykała JSON-a). reply ograniczone do 280 znaków.
+  const ACT_SCHEMA={type:'object',properties:{actions:{type:'array',items:{type:'object',
+    properties:{action:{type:'string'},args:{type:'object',additionalProperties:true}},required:['action','args']}},
+    reply:{type:'string',maxLength:280}},required:['actions','reply']};
   // Małe modele mylą nazwy argumentów ({"name":"treemap"} zamiast {"layout":"treemap"}) — gdy brakuje
   // klucza głównego akcji, a args ma dokładnie jedną wartość, przepisujemy ją pod właściwy klucz.
   const PRIMARY_ARG={setLayout:'layout',search:'query',focusNode:'query',openNode:'query',zoom:'dir',rotate:'dir',setTheme:'theme',
     setPreset:'name',setAccent:'color',setBackground:'color',setSpacing:'percent',setNodeScale:'percent',setFontScale:'percent',
     setLang:'lang',toggleLang:'lang',setMode:'mode',startTutorial:'mode',togglePanel:'side',openSettings:'tab',openDrive:'tab',loadRepo:'url',mindmap:'action',setMetric:'metric'};
+  // małe modele potrafią wysłać nazwę układu lub motywu jako NAZWĘ akcji ({"action":"force"}) —
+  // przepisujemy na właściwą akcję zamiast zgłaszać „nieznana akcja"
+  function normalizeAction(a){
+    const name=String(a.action||'').trim(); const st=(window.CMApp&&CMApp.appState)?CMApp.appState():{};
+    if((st.availableLayouts||[]).includes(name.toLowerCase())) return {action:'setLayout', args:{layout:name.toLowerCase()}};
+    if(/^(light|dark)$/i.test(name)) return {action:'setTheme', args:{theme:name.toLowerCase()}};
+    return {action:name, args:normalizeArgs(name, a.args)};
+  }
   function normalizeArgs(action, args){
     args=(args&&typeof args==='object')?Object.assign({}, args):{};
     const key=PRIMARY_ARG[action]; if(!key || args[key]!=null) return args;
@@ -286,8 +298,15 @@ CM.ChatBot = (function(){
     try{ return JSON.parse('"'+raw+'"'); }catch(e){ return raw.replace(/\\n/g,'\n').replace(/\\"/g,'"'); } }
   function parseStructured(s){ s=stripThink(String(s)).trim(); let o=null;
     try{ o=JSON.parse(s); }catch(e){ const m=s.match(/\{[\s\S]*\}/); if(m){ try{ o=JSON.parse(m[0]); }catch(_){} } }
-    if(!o||typeof o!=='object'||typeof o.reply!=='string') return null;
-    const actions=Array.isArray(o.actions)?o.actions.filter(a=>a&&typeof a.action==='string').map(a=>({action:a.action, args:normalizeArgs(a.action, a.args)})):[];
+    if(!o||typeof o!=='object'||typeof o.reply!=='string'){
+      // niedomknięty JSON (limit tokenów / pętla powtórzeń): wyłuskaj domknięte akcje i początek reply
+      const acts=[]; const re=/\{\s*"action"\s*:\s*"([^"]+)"\s*,\s*"args"\s*:\s*(\{[^{}]*\})\s*\}/g; let m;
+      while((m=re.exec(s))){ try{ acts.push(normalizeAction({action:m[1], args:JSON.parse(m[2])})); }catch(e){} }
+      const pre=jsonReplyPrefix(s).replace(/(.{20,}?)\1{1,}/g,'$1').trim();   // utnij zapętlone powtórki
+      if(!acts.length && !pre) return null;
+      return {reply:pre||'', actions:acts, partial:true};
+    }
+    const actions=Array.isArray(o.actions)?o.actions.filter(a=>a&&typeof a.action==='string').map(normalizeAction):[];
     return {reply:o.reply.trim(), actions}; }
   function extractActions(text){ const out=[]; const re=/```action\s*([\s\S]*?)```/g; let m;
     while((m=re.exec(text))){ try{ const o=JSON.parse(m[1].trim()); if(o&&o.action) out.push(o); }catch(e){} } return out; }
@@ -638,9 +657,9 @@ CM.ChatBot = (function(){
     const pl=I.getLang()!=='en';
     const FEWSHOT=(local&&!think)?[
       {role:'user',content:pl?'cześć':'hi'},
-      {role:'assistant',content:structured?JSON.stringify({reply:pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?',actions:[]}):(pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?')},
+      {role:'assistant',content:structured?JSON.stringify({actions:[],reply:pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?'}):(pl?'Cześć! Jak mogę pomóc w CodeMap?':'Hi! How can I help you in CodeMap?')},
       {role:'user',content:pl?'włącz jasny motyw':'switch to the light theme'},
-      {role:'assistant',content:structured?JSON.stringify({reply:pl?'Już się robi!':'On it!',actions:[{action:'setTheme',args:{theme:'light'}}]}):((pl?'Już się robi!':'On it!')+'\n```action\n{"action":"setTheme","args":{"theme":"light"}}\n```')},
+      {role:'assistant',content:structured?JSON.stringify({actions:[{action:'setTheme',args:{theme:'light'}}],reply:pl?'Już się robi!':'On it!'}):((pl?'Już się robi!':'On it!')+'\n```action\n{"action":"setTheme","args":{"theme":"light"}}\n```')},
     ]:[];
     const mapped=hist.map(m=>({role:m.role, content:m.role==='assistant'?stripActions(stripThink(m.content)):m.content}));
     let messages;
@@ -746,14 +765,14 @@ CM.ChatBot = (function(){
         // engine download/load progress lives in the stage label (dots keep animating)
         const off=CM.LocalAI.onProgress(p=>{ if(p&&p.text) setStage(p.text+(p.pct?(' '+p.pct+'%'):'')); });
         setStage(CM.LocalAI.status()!=='ready'?t('stLoading'):'');
-        if(structured) streamOpts.responseFormat={type:'json_object', schema:JSON.stringify(ACT_SCHEMA)};
+        if(structured){ streamOpts.responseFormat={type:'json_object', schema:JSON.stringify(ACT_SCHEMA)}; streamOpts.temperature=0.3; streamOpts.frequencyPenalty=0.6; }
         try{ acc=await CM.LocalAI.chat(messages, streamOpts); }
         catch(e){ if(structured && e && e.name!=='AbortError' && /schema|grammar|json|format/i.test(String(e.message||''))){ localJsonOk=false; }
           throw e; }
         finally{ off(); updateSub(); }
       } else if(useOllama()){
         streamOpts.maxTokens=900;   // native speed — roomy but bounded
-        if(structured){ streamOpts.format=ACT_SCHEMA; streamOpts.think=false; }
+        if(structured){ streamOpts.format=ACT_SCHEMA; streamOpts.think=false; streamOpts.temperature=0.3; streamOpts.repeatPenalty=1.15; }
         try{ acc=await CM.Ollama.chat(messages, streamOpts); }
         catch(e){ if(structured && e && e.name!=='AbortError' && /schema|grammar|json|format/i.test(String(e.message||''))){ localJsonOk=false; }
           throw e; }
@@ -763,7 +782,7 @@ CM.ChatBot = (function(){
       _runDone=true;
       if(structured){
         const o=parseStructured(acc);
-        if(o){ acc=o.reply; for(const a of o.actions) execLive(a, false, false); }   // model output → untrusted (allowlista)
+        if(o){ acc=o.reply||(o.actions.length?t('done'):''); for(const a of o.actions) execLive(a, false, false); }   // model output → untrusted (allowlista)
       }
       if(_paintT){ clearTimeout(_paintT); _paintT=null; }
       if(typing.parentNode) typing.remove();

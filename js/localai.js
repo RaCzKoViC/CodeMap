@@ -232,6 +232,7 @@ CM.LocalAI = (function(){
     const params={messages, temperature:opts.temperature==null?0.6:opts.temperature};
     if(opts.maxTokens) params.max_tokens=opts.maxTokens;
     if(opts.responseFormat) params.response_format=opts.responseFormat;   // {type:'json_object', schema} — gramatyka WebLLM
+    if(opts.frequencyPenalty!=null) params.frequency_penalty=opts.frequencyPenalty;   // małe modele: przeciw pętlom powtórzeń
     _genActive=true; _curSig=opts.signal||null;
     const engineGone=new Promise(res=>{ _engineGoneRes=res; });
     try{

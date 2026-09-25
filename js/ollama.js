@@ -49,6 +49,7 @@ CM.Ollama = (function(){
       options:Object.assign({ temperature:opts.temperature==null?0.6:opts.temperature },
                             opts.maxTokens?{num_predict:opts.maxTokens}:{}) };
     if(opts.format) body.format=opts.format;          // 'json' albo schemat JSON (Ollama ≥ 0.5) — wymusza strukturę
+    if(opts.repeatPenalty!=null) body.options.repeat_penalty=opts.repeatPenalty;
     if(opts.think===false) body.think=false;          // modele myślące (qwen3, deepseek-r1): bez rozumowania (Ollama ≥ 0.9)
     let r;
     try{
