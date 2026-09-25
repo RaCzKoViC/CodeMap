@@ -135,10 +135,13 @@ CM.Analysis = (function(){
     matchAll(/^[ \t]*import[ \t]+([\w.]+(?:[ \t]*,[ \t]*[\w.]+)*)/gm, c, m=>{
       m[1].split(',').forEach(s=>add(d, s.trim().split(/\s+as\s+/)[0], 'module', 'import'));
     });
-    matchAll(/^[ \t]*from[ \t]+(\.*[\w.]*)[ \t]+import\b/gm, c, m=>{
+    // `from X import a, b as c, (d,\n e)` — nazwy mogą być podmodułami pakietu X (X/a.py), więc trafiają do `names`
+    matchAll(/^[ \t]*from[ \t]+(\.*[\w.]*)[ \t]+import[ \t]*(\([^)]*\)|[^\n]*)/gm, c, m=>{
       const s = m[1];
-      if(s.startsWith('.')) add(d, s, 'py-rel', 'import');
-      else if(s) add(d, s, 'module', 'import');
+      const names = m[2].replace(/[()]/g,' ').split(',').map(x=>x.trim().split(/\s+/)[0]).filter(x=>/^\w+$/.test(x));
+      const extra = names.length ? {names} : null;
+      if(s.startsWith('.')) add(d, s, 'py-rel', 'import', extra);
+      else if(s) add(d, s, 'module', 'import', extra);
     });
   }
   function cDeps(c, d){
@@ -537,19 +540,36 @@ CM.Analysis = (function(){
 
   function tryExact(byPath, cands){ for(const c of cands){ const n = byPath.get(c); if(n) return n; } return null; }
 
-  function suffixFind(idx, cands){
+  // plik, którego ścieżka KOŃCZY się na kandydata (a/b/c.py dla a.b.c): dokładny od korzenia, potem — przy kilku
+  // trafieniach — ten o najdłuższym wspólnym prefiksie katalogów z `fromDir` (bliższy pakiet), na końcu najkrótszy
+  function suffixFind(idx, cands, fromDir){
     const exact = tryExact(idx.byPath, cands.map(normPath)); if(exact) return exact;
-    let best=null, bestLen=Infinity;
+    const from = fromDir != null ? fromDir.split('/') : null;
+    const common = (p) => { if(!from) return 0; const a = dirname(p).split('/'); let i=0; while(i<a.length && i<from.length && a[i]===from[i]) i++; return i; };
+    let best=null, bestScore=-1, bestLen=Infinity;
     for(let c of cands){
       c = normPath(c);
       const base = basename(c).toLowerCase();
       const arr = idx.byBase.get(base); if(!arr) continue;
       for(const n of arr){
         if(n.type!=='file') continue;
-        if(n.path === c || n.path.endsWith('/'+c)){ if(n.path.length < bestLen){ best=n; bestLen=n.path.length; } }
+        if(n.path === c || n.path.endsWith('/'+c)){
+          const s = common(n.path);
+          if(s > bestScore || (s === bestScore && n.path.length < bestLen)){ best=n; bestScore=s; bestLen=n.path.length; }
+        }
       }
     }
     return best;
+  }
+  // Python: moduł + podmoduły z `names` (`from pkg import a` → pkg/a.py), gdy celem jest pakiet (__init__.py)
+  function pyWithNames(base, dep, idx){
+    if(!base || !dep.names || basename(base.path) !== '__init__.py') return base;
+    const out = [base], pkgDir = dirname(base.path);
+    for(const nm of dep.names){
+      const h = tryExact(idx.byPath, [pkgDir+'/'+nm+'.py', pkgDir+'/'+nm+'/__init__.py'].map(normPath));
+      if(h && !out.includes(h)) out.push(h);
+    }
+    return out;
   }
 
   function suffixFolder(idx, spec){
@@ -631,13 +651,16 @@ CM.Analysis = (function(){
         let up = dir; for(let i=1;i<dots;i++) up = dirname(up);
         const rest = spec.slice(dots).replace(/\./g,'/');
         const base = joinPath(up, rest);
-        return tryExact(idx.byPath, [base+'.py', base+'/__init__.py', base].map(normPath));
+        return pyWithNames(tryExact(idx.byPath, [base+'.py', base+'/__init__.py', base].map(normPath)), dep, idx);
       }
       case 'module': {
-        if(fam==='py'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.py', p+'/__init__.py']); }
-        if(fam==='java'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.java', p+'.kt', p+'.scala', p+'.groovy']); }
+        if(fam==='py'){   // katalog importera (uruchomienie jako skrypt) → korzeń → bliższy pakiet → najkrótsza ścieżka
+          const p = spec.replace(/\./g,'/'); const c = [p+'.py', p+'/__init__.py'];
+          return pyWithNames(tryExact(idx.byPath, c.map(x=>joinPath(dir, x))) || suffixFind(idx, c, dir), dep, idx);
+        }
+        if(fam==='java'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.java', p+'.kt', p+'.scala', p+'.groovy'], dir); }
         if(fam==='go'){ return suffixFolder(idx, spec); }
-        if(fam==='hs'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.hs', p+'.lhs']); }
+        if(fam==='hs'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.hs', p+'.lhs'], dir); }
         if(fam==='lua'){   // a/b.lua | a/b/init.lua: od korzenia projektu (package.path), względem pliku, potem gdziekolwiek
           const p = spec.replace(/\./g,'/'); const c = [p+'.lua', p+'/init.lua'];
           return tryExact(idx.byPath, c.map(normPath)) || tryExact(idx.byPath, c.map(x=>joinPath(dir, x))) || suffixFind(idx, c);
@@ -651,13 +674,13 @@ CM.Analysis = (function(){
         if(fam==='elixir'){   // defmodule w projekcie → ścieżka snake_case (lib/my_app/repo.ex) → jedyny plik o tej nazwie
           const decl = idx.decl.get('elixir:'+spec); if(decl) return decl;
           const p = spec.split('.').map(snakeCase).join('/');
-          const hit = suffixFind(idx, [p+'.ex', p+'.exs']); if(hit) return hit;
+          const hit = suffixFind(idx, [p+'.ex', p+'.exs'], dir); if(hit) return hit;
           const same = (idx.byBase.get(basename(p)+'.ex')||[]).filter(n=>n.type==='file');
           return same.length === 1 ? same[0] : null;
         }
         return null;
       }
-      case 'php-ns': { const cls = spec.split('\\').pop(); return suffixFind(idx, [cls+'.php']); }
+      case 'php-ns': { const cls = spec.split('\\').pop(); return suffixFind(idx, [cls+'.php'], dir); }
       case 'bare': {
         if(fam==='css'){ const base = joinPath(dir, spec); return tryExact(idx.byPath, expand(base,'css')); }
         if(fam==='js'){

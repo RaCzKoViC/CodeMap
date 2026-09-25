@@ -291,6 +291,24 @@ describe('nowe parsery: Swift, Dart, Elixir, Lua, Zig, Haskell, Shell', () => {
   });
 });
 
+describe('Python: rozwiązywanie modułów', () => {
+  let g;
+  beforeEach(() => { g = buildPoly(); });
+  test('import utils → utils.py z katalogu importera, nie najkrótsza ścieżka o tej nazwie', () => {
+    assert.deepEqual(targetsOf(g, 'py2/pkg_b/sub/mod.py'), ['py2/pkg_b/__init__.py', 'py2/pkg_b/shared.py', 'py2/pkg_b/sub/__init__.py', 'py2/pkg_b/sub/utils.py']);
+    assert.deepEqual(targetsOf(g, 'py2/pkg_a/core.py'), ['py2/pkg_a/utils.py', 'py2/pkg_b/sub/__init__.py', 'py2/pkg_b/sub/utils.py']);
+  });
+  test('poza katalogiem: bliższy pakiet (wspólny prefiks ścieżki) przed najkrótszą ścieżką; brak wspólnego → najkrótsza', () => {
+    assert.deepEqual(targetsOf(g, 'py2/pkg_b/tools/run.py'), ['py2/pkg_b/sub/utils.py']);
+    assert.deepEqual(targetsOf(g, 'py2/other/deep/x/mod2.py'), ['py2/pkg_a/utils.py']);
+  });
+  test('from pkg import a, b → także podmoduły pkg/a.py (nieistniejące nazwy = zwykłe symbole)', () => {
+    assert.ok(!g.externals.has('missing') && !g.externals.has('utils'));
+    const s = build();   // sample-project: `from . import helpers` w __init__.py — dawne „znane ograniczenie"
+    assert.ok(edgeKeys(s).has('py/pkg/__init__.py|py/pkg/helpers.py|import'));
+  });
+});
+
 describe('sygnatury i diff', () => {
   test('diffSignatures: dodane, zmienione, usunięte, delty', () => {
     const a = build().signature();

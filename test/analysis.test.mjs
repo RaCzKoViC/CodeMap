@@ -58,6 +58,10 @@ describe('extractDeps per język', () => {
     const d = A.extractDeps('import os, sys as system\nfrom .helpers import x\nfrom pkg.sub import y\n', 'py');
     assert.deepEqual(host(d.map((x) => [x.spec, x.kind])), [['os', 'module'], ['sys', 'module'], ['.helpers', 'py-rel'], ['pkg.sub', 'module']]);
   });
+  test('Python: nazwy po `from X import` (as, nawiasy wieloliniowe, *)', () => {
+    const d = A.extractDeps('from .helpers import x, y as z\nfrom pkg import (a,\n    b as c)\nfrom m import *\nimport os\n', 'py');
+    assert.deepEqual(host(d.map((x) => [x.spec, x.names || null])), [['os', null], ['.helpers', ['x', 'y']], ['pkg', ['a', 'b']], ['m', null]]);   // `import` skanowane przed `from`
+  });
   test('C: "local.h" jest względne, <system> jest systemowe', () => {
     const d = A.extractDeps('#include "util.h"\n#include <stdio.h>\n', 'c');
     assert.deepEqual(host(d.map((x) => [x.spec, x.kind])), [['util.h', 'rel'], ['stdio.h', 'system']]);

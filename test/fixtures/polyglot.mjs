@@ -95,6 +95,18 @@ export const FILES = [
   F('sh/lib/common.sh', 'common() { :; }\n'),
   F('sh/lib/colors.sh', 'RED=1\n'),
   F('scripts/env.sh', 'export X=1\n'),
+
+  // ---- Python: dwa utils.py w różnych pakietach — `import utils` z katalogu pliku, potem bliższy pakiet, potem najkrótsza ścieżka ----
+  F('py2/pkg_a/__init__.py', ''),
+  F('py2/pkg_a/utils.py', 'A = 1\n'),
+  F('py2/pkg_a/core.py', 'import utils\nfrom pkg_b.sub import utils as u2\n'),
+  F('py2/pkg_b/__init__.py', ''),
+  F('py2/pkg_b/shared.py', 'S = 1\n'),
+  F('py2/pkg_b/sub/__init__.py', ''),
+  F('py2/pkg_b/sub/utils.py', 'B = 1\n'),
+  F('py2/pkg_b/sub/mod.py', 'import utils\nfrom . import utils as u\nfrom .. import shared, missing\n'),
+  F('py2/pkg_b/tools/run.py', 'import utils\n'),
+  F('py2/other/deep/x/mod2.py', 'import utils\n'),
 ];
 
 export const META = { name: 'polyglot', source: 'test' };

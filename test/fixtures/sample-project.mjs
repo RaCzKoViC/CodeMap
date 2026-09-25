@@ -58,8 +58,7 @@ export const EXPECTED_EDGES = [
   ['src/store/index.js', 'src/store/reducer.js', 'import'],
   ['py/pkg/mod.py', 'py/pkg/helpers.py', 'import'],
   ['py/pkg/mod.py', 'py/pkg/__init__.py', 'import'],
-  // UWAGA: `from . import helpers` w __init__.py NIE daje krawędzi do helpers.py — parser nie czyta
-  // nazw po `import` (znane ograniczenie, faza 2 planu); z mod.py ten sam zapis wskazuje __init__.py.
+  ['py/pkg/__init__.py', 'py/pkg/helpers.py', 'import'],   // `from . import helpers` — nazwy po `import` to podmoduły (Faza 2)
   ['styles/main.css', 'styles/theme.css', 'import'],
   ['styles/main.css', 'styles/vars.css', 'import'],
   ['index.html', 'src/index.js', 'reference'],
