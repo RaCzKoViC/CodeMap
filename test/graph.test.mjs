@@ -188,6 +188,29 @@ describe('aliasy tsconfig/jsconfig per katalog', () => {
   });
 });
 
+describe('workspaces monorepo', () => {
+  test('import po nazwie pakietu → main / exports["."] / exports subpath + wzorzec / string exports / folder', () => {
+    const g = buildMono();
+    assert.deepEqual(targetsOf(g, 'packages/a/src/uses.ts'), [
+      'ext:left-pad',
+      'packages/b/lib/feat/one.ts',      // exports["./feat/*"]
+      'packages/b/lib/index.mjs',        // exports["."].import
+      'packages/b/lib/x.ts',             // exports["./x"]
+      'packages/c/c.ts',                 // exports jako string
+      'packages/shared/src/index.ts',    // main
+      'packages/util',                   // brak main/index → folder pakietu
+      'packages/util/helper.ts',         // podścieżka bez exports → plik w pakiecie
+    ]);
+  });
+  test('pakiety workspace nie są zależnościami zewnętrznymi; nieznany pakiet nadal jest', () => {
+    const g = buildMono();
+    for (const name of ['@mono/shared', '@mono/b', '@mono/c', 'util-pkg']) assert.ok(!g.externals.has(name), `${name} nie może być external`);
+    assert.ok(g.externals.has('left-pad'));
+    assert.equal(host(CM.Analysis.manifestEntry('package.json', '{ "name": "@s/p", "main": "x.js" }', 'pk')).name, '@s/p');
+    assert.equal(CM.Analysis.manifestEntry('package.json', '{ "private": true }', ''), null, 'bez nazwy nie ma czego mapować');
+  });
+});
+
 describe('sygnatury i diff', () => {
   test('diffSignatures: dodane, zmienione, usunięte, delty', () => {
     const a = build().signature();

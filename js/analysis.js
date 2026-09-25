@@ -255,6 +255,58 @@ CM.Analysis = (function(){
     for(const c of cfgs){ if(c.dir === '' || dir === c.dir || dir.startsWith(c.dir + '/')) return c; }
     return null;
   }
+  // ---------- workspaces: `import x from '@scope/pkg[/sub]'` → pakiet z package.json w projekcie ----------
+  function packageIndex(manifests){
+    const m = new Map();
+    for(const p of (manifests||[])){
+      if(!p || p.kind !== 'package' || (p.eco && p.eco !== 'npm') || !p.name) continue;
+      const cur = m.get(p.name);                       // duplikat nazwy: płytszy katalog wygrywa
+      if(!cur || normPath(p.dir||'').length < cur.dir.length) m.set(p.name, {...p, dir: normPath(p.dir||'')});
+    }
+    return m;
+  }
+  // cel z pola `exports`: string | tablica | obiekt warunków {import, require, default, …}
+  function exportTarget(ex){
+    if(typeof ex === 'string') return ex;
+    if(Array.isArray(ex)){ for(const e of ex){ const t = exportTarget(e); if(t) return t; } return null; }
+    if(ex && typeof ex === 'object'){
+      for(const k of ['import','module','default','require','node','browser']) if(k in ex){ const t = exportTarget(ex[k]); if(t) return t; }
+      for(const k in ex){ if(k.startsWith('.')) continue; const t = exportTarget(ex[k]); if(t) return t; }
+    }
+    return null;
+  }
+  // wpis exports dla podścieżki `.` / `./x` (dokładny klucz, potem wzorce `./feat/*`)
+  function exportFor(exports, sub){
+    if(!exports || typeof exports !== 'object' || Array.isArray(exports)) return sub === '.' ? exportTarget(exports) : null;
+    const keys = Object.keys(exports);
+    if(!keys.some(k => k.startsWith('.'))) return sub === '.' ? exportTarget(exports) : null;   // sam obiekt warunków = "."
+    if(sub in exports) return exportTarget(exports[sub]);
+    for(const k of keys){
+      const star = k.indexOf('*'); if(star < 0) continue;
+      const pre = k.slice(0,star), suf = k.slice(star+1);
+      if(sub.startsWith(pre) && sub.endsWith(suf) && sub.length >= pre.length+suf.length){
+        const t = exportTarget(exports[k]); if(t) return t.replace('*', sub.slice(pre.length, sub.length-suf.length));
+      }
+    }
+    return null;
+  }
+  function packageResolve(spec, idx){
+    if(!idx.pkgs.size) return null;
+    const name = externalName(spec); const pkg = idx.pkgs.get(name);
+    if(!pkg || spec.length < name.length) return null;
+    const sub = spec.slice(name.length);                 // '' albo '/x/y'
+    const dir = pkg.dir;
+    const hit = (p) => tryExact(idx.byPath, expand(normPath(joinPath(dir, p)), 'js'));
+    if(sub){
+      const t = exportFor(pkg.exports, '.' + sub);
+      return (t && hit(t)) || hit(sub);
+    }
+    const cands = [exportFor(pkg.exports, '.'), pkg.module, pkg.main].filter(x => typeof x === 'string' && x);
+    for(const c of cands){ const h = hit(c); if(h) return h; }
+    const index = tryExact(idx.byPath, JS_IDX.map(e => normPath(dir + e))); if(index) return index;
+    return dir ? (idx.folderByPath.get(dir) || null) : null;   // pakiet bez main/index → folder pakietu (root projektu nie)
+  }
+
   // rozwiązanie importu JS przez paths + baseUrl JEDNEJ (najbliższej) konfiguracji
   function aliasResolve(spec, cfg, idx){
     if(!cfg) return null;
@@ -413,7 +465,10 @@ CM.Analysis = (function(){
       case 'php-ns': { const cls = spec.split('\\').pop(); return suffixFind(idx, [cls+'.php']); }
       case 'bare': {
         if(fam==='css'){ const base = joinPath(dir, spec); return tryExact(idx.byPath, expand(base,'css')); }
-        if(fam==='js' && idx.alias.length){ const a = aliasResolve(spec, idx.aliasFor(file.path), idx); if(a) return a; }
+        if(fam==='js'){
+          if(idx.alias.length){ const a = aliasResolve(spec, idx.aliasFor(file.path), idx); if(a) return a; }
+          const p = packageResolve(spec, idx); if(p) return p;
+        }
         return null;
       }
       default: return null;
@@ -438,7 +493,7 @@ CM.Analysis = (function(){
       if(n.type === 'folder') folderByPath.set(n.path, n);
     }
     const alias = aliasConfigs(manifests), aliasCache = new Map();
-    const idx = {byPath, byBase, folderByPath, alias,
+    const idx = {byPath, byBase, folderByPath, alias, pkgs: packageIndex(manifests),
       aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];
     const seen = new Set();
