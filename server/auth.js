@@ -31,7 +31,74 @@ const q = {
   deleteSess: db.prepare('DELETE FROM sessions WHERE id = ?'),
   deleteUserSess: db.prepare('DELETE FROM sessions WHERE user_id = ?'),
   deleteOtherSess: db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?'),
+
+  attempt: db.prepare('SELECT fails, locked_until FROM login_attempts WHERE email = ?'),
+  attemptFail: db.prepare(`INSERT INTO login_attempts (email, fails, locked_until, updated_at) VALUES (?, 1, 0, ?)
+    ON CONFLICT(email) DO UPDATE SET fails = fails + 1, updated_at = excluded.updated_at`),
+  attemptLock: db.prepare('UPDATE login_attempts SET locked_until = ? WHERE email = ?'),
+  attemptClear: db.prepare('DELETE FROM login_attempts WHERE email = ?'),
+  mailCount: db.prepare('SELECT COUNT(*) AS n FROM mail_log WHERE email = ? AND sent_at > ?'),
+  mailLog: db.prepare('INSERT INTO mail_log (email, kind, sent_at) VALUES (?,?,?)'),
+
+  gcSessions: db.prepare('DELETE FROM sessions WHERE expires_at < ?'),
+  gcTokens: db.prepare('DELETE FROM email_tokens WHERE expires_at < ? OR used_at IS NOT NULL'),
+  gcAttempts: db.prepare('DELETE FROM login_attempts WHERE updated_at < ? AND locked_until < ?'),
+  gcMail: db.prepare('DELETE FROM mail_log WHERE sent_at < ?'),
 };
+
+const MAIL_PER_HOUR = 3;           // maile na adres na godzinę (verify + reset + "konto istnieje")
+const LOCK_AFTER = 5;              // nieudane logowania, po których zaczyna się blokada
+const LOCK_MAX_MS = 15 * 60 * 1000;
+
+/* Limit maili per ADRES (rate-limit Fastify działa per IP, więc sam nie chroni ofiary). */
+function mailAllowed(email, kind) {
+  const n = q.mailCount.get(email, now() - 3600 * 1000).n;
+  if (n >= MAIL_PER_HOUR) return false;
+  q.mailLog.run(email, kind, now());
+  return true;
+}
+
+/* Wysyłka poza ścieżką odpowiedzi: czas odpowiedzi nie zdradza, czy konto istnieje (SMTP/HTTPS
+   do Resend trwa setki ms tylko wtedy, gdy mail faktycznie idzie). */
+function mailLater(promiseFactory, log) {
+  setImmediate(() => { mailSafe(promiseFactory(), log); });
+}
+
+/* argon2id z 64 MB pamięci na próbę: ograniczamy współbieżność, żeby fala logowań nie zjadła RAM-u. */
+const ARGON_MAX_PARALLEL = 2;
+let argonBusy = 0; const argonQueue = [];
+async function argonSlot(fn) {
+  if (argonBusy >= ARGON_MAX_PARALLEL) await new Promise((r) => argonQueue.push(r));
+  argonBusy++;
+  try { return await fn(); }
+  finally { argonBusy--; const next = argonQueue.shift(); if (next) next(); }
+}
+const hashPass = (pw) => argonSlot(() => argon2.hash(pw, ARGON));
+const verifyPass = (hash, pw) => argonSlot(() => argon2.verify(hash, pw));
+
+/* Blokada logowania per konto: po LOCK_AFTER porażkach czas blokady podwaja się od 30 s do 15 min. */
+function loginLock(email) {
+  const a = q.attempt.get(email);
+  if (!a || a.locked_until <= now()) return 0;
+  return Math.ceil((a.locked_until - now()) / 1000);
+}
+function loginFailed(email) {
+  q.attemptFail.run(email, now());
+  const a = q.attempt.get(email);
+  if (a.fails >= LOCK_AFTER) {
+    const ms = Math.min(LOCK_MAX_MS, 30 * 1000 * 2 ** (a.fails - LOCK_AFTER));
+    q.attemptLock.run(now() + ms, email);
+  }
+}
+
+/* Sprzątanie: wygasłe sesje/tokeny nigdy nie były usuwane (tabela rosła, IP/UA leżały bezterminowo). */
+export function gcAuth() {
+  const t = now();
+  q.gcSessions.run(t);
+  q.gcTokens.run(t);
+  q.gcAttempts.run(t - 24 * 3600 * 1000, t);
+  q.gcMail.run(t - 24 * 3600 * 1000);
+}
 
 // Wyrównanie czasu odpowiedzi logowania, gdy konto nie istnieje.
 const DUMMY_HASH = await argon2.hash('dummy-password-for-timing', ARGON);
@@ -80,13 +147,13 @@ export async function registerAuth(app) {
     const existing = q.userByEmail.get(email);
     if (existing) {
       // Odporność na enumerację: ta sama odpowiedź, a właściciel konta dostaje powiadomienie.
-      await mailSafe(sendExistsMail(existing.email, existing.lang), req.log);
+      if (mailAllowed(existing.email, 'exists')) mailLater(() => sendExistsMail(existing.email, existing.lang), req.log);
       return { ok: true };
     }
-    const hash = await argon2.hash(password, ARGON);
+    const hash = await hashPass(password);
     const { lastInsertRowid: id } = q.insertUser.run(email, hash, normLang(lang), CFG.defaultQuota, now());
     const token = issueEmailToken(id, 'verify', VERIFY_TTL);
-    await mailSafe(sendVerifyMail(email, normLang(lang), token), req.log);
+    if (mailAllowed(email, 'verify')) mailLater(() => sendVerifyMail(email, normLang(lang), token), req.log);
     return { ok: true };
   });
 
@@ -103,19 +170,23 @@ export async function registerAuth(app) {
   app.post('/api/auth/resend-verification', { config: { rateLimit: { max: 3, timeWindow: '1 hour' } } }, async (req) => {
     const { email } = req.body || {};
     const user = validEmail(email) ? q.userByEmail.get(email) : null;
-    if (user && !user.verified_at) {
+    if (user && !user.verified_at && mailAllowed(user.email, 'verify')) {
       const token = issueEmailToken(user.id, 'verify', VERIFY_TTL);
-      await mailSafe(sendVerifyMail(user.email, user.lang, token), req.log);
+      mailLater(() => sendVerifyMail(user.email, user.lang, token), req.log);
     }
     return { ok: true };
   });
 
   app.post('/api/auth/login', { config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (req, reply) => {
     const { email, password } = req.body || {};
-    const user = validEmail(email) ? q.userByEmail.get(email) : null;
-    const ok = await argon2.verify(user ? user.pass_hash : DUMMY_HASH, String(password || ''));
-    if (!user || !ok || user.disabled) return reply.code(401).send({ error: 'credentials' });
+    const key = validEmail(email) ? String(email).toLowerCase() : '';
+    const wait = key ? loginLock(key) : 0;
+    if (wait) return reply.code(429).header('retry-after', String(wait)).send({ error: 'rate', retryAfter: wait });
+    const user = key ? q.userByEmail.get(email) : null;
+    const ok = await verifyPass(user ? user.pass_hash : DUMMY_HASH, String(password || ''));
+    if (!user || !ok || user.disabled) { if (key) loginFailed(key); return reply.code(401).send({ error: 'credentials' }); }
     if (!user.verified_at) return reply.code(403).send({ error: 'unverified' });
+    q.attemptClear.run(key);
     createSession(reply, user, req);
     return userInfo(user);
   });
@@ -132,9 +203,9 @@ export async function registerAuth(app) {
   app.post('/api/auth/request-reset', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req) => {
     const { email } = req.body || {};
     const user = validEmail(email) ? q.userByEmail.get(email) : null;
-    if (user) {
+    if (user && mailAllowed(user.email, 'reset')) {
       const token = issueEmailToken(user.id, 'reset', RESET_TTL);
-      await mailSafe(sendResetMail(user.email, user.lang, token), req.log);
+      mailLater(() => sendResetMail(user.email, user.lang, token), req.log);
     }
     return { ok: true };
   });
@@ -145,7 +216,7 @@ export async function registerAuth(app) {
     const t = token ? q.tokenByHash.get(sha256hex(String(token))) : null;
     if (!t || t.kind !== 'reset' || t.used_at || t.expires_at < now()) return reply.code(400).send({ error: 'token' });
     q.useToken.run(now(), t.id);
-    q.setPass.run(await argon2.hash(password, ARGON), t.user_id);
+    q.setPass.run(await hashPass(password), t.user_id);
     q.deleteUserSess.run(t.user_id);
     return { ok: true };
   });
@@ -153,15 +224,15 @@ export async function registerAuth(app) {
   app.post('/api/auth/change-password', { preHandler: app.requireAuth }, async (req, reply) => {
     const { current, next } = req.body || {};
     if (!validPassword(next)) return reply.code(400).send({ error: 'password' });
-    if (!await argon2.verify(req.user.pass_hash, String(current || ''))) return reply.code(401).send({ error: 'credentials' });
-    q.setPass.run(await argon2.hash(next, ARGON), req.user.id);
+    if (!await verifyPass(req.user.pass_hash, String(current || ''))) return reply.code(401).send({ error: 'credentials' });
+    q.setPass.run(await hashPass(next), req.user.id);
     q.deleteOtherSess.run(req.user.id, req.sessId);
     return { ok: true };
   });
 
   app.delete('/api/auth/account', { preHandler: app.requireAuth }, async (req, reply) => {
     const { password } = req.body || {};
-    if (!await argon2.verify(req.user.pass_hash, String(password || ''))) return reply.code(401).send({ error: 'credentials' });
+    if (!await verifyPass(req.user.pass_hash, String(password || ''))) return reply.code(401).send({ error: 'credentials' });
     q.deleteUser.run(req.user.id);
     reply.clearCookie('cm_sess', { path: '/' });
     await rm(join(BLOB_DIR, String(req.user.id)), { recursive: true, force: true });

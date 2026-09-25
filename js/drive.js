@@ -18,7 +18,7 @@ CM.Drive = (function(){
     'vault.status.plain':'Sejf otwarty (bez hasła)','vault.status.locked':'Sejf zablokowany 🔒','vault.status.unlocked':'Sejf odblokowany 🔓',
     'vault.setpass':'Ustaw hasło','vault.changepass':'Zmień hasło','vault.removepass':'Usuń hasło','vault.lock':'Zablokuj','vault.unlock':'Odblokuj',
     'vault.pass':'Hasło','vault.pass2':'Powtórz hasło','vault.passOld':'Obecne hasło','vault.passNew':'Nowe hasło',
-    'vault.passMismatch':'Hasła nie są identyczne.','vault.passEmpty':'Podaj hasło.','vault.passShort':'Hasło musi mieć co najmniej 4 znaki.',
+    'vault.passMismatch':'Hasła nie są identyczne.','vault.passEmpty':'Podaj hasło.','vault.passShort':'Hasło musi mieć co najmniej 8 znaków.',
     'vault.passWrong':'Nieprawidłowe hasło.','vault.encrypting':'Szyfruję sejf…','vault.decrypting':'Odszyfrowuję sejf…',
     'vault.passSet':'Hasło ustawione — sejf zaszyfrowany.','vault.passRemoved':'Hasło usunięte — sejf nie jest już szyfrowany.','vault.passChanged':'Hasło zmienione.',
     'vault.unlocked.msg':'Sejf odblokowany.','vault.locked.msg':'Sejf zablokowany.',
@@ -69,7 +69,7 @@ CM.Drive = (function(){
     'vault.status.plain':'Vault open (no password)','vault.status.locked':'Vault locked 🔒','vault.status.unlocked':'Vault unlocked 🔓',
     'vault.setpass':'Set password','vault.changepass':'Change password','vault.removepass':'Remove password','vault.lock':'Lock','vault.unlock':'Unlock',
     'vault.pass':'Password','vault.pass2':'Repeat password','vault.passOld':'Current password','vault.passNew':'New password',
-    'vault.passMismatch':'Passwords do not match.','vault.passEmpty':'Enter a password.','vault.passShort':'Password must be at least 4 characters.',
+    'vault.passMismatch':'Passwords do not match.','vault.passEmpty':'Enter a password.','vault.passShort':'The password must be at least 8 characters long.',
     'vault.passWrong':'Wrong password.','vault.encrypting':'Encrypting the vault…','vault.decrypting':'Decrypting the vault…',
     'vault.passSet':'Password set — vault encrypted.','vault.passRemoved':'Password removed — vault is no longer encrypted.','vault.passChanged':'Password changed.',
     'vault.unlocked.msg':'Vault unlocked.','vault.locked.msg':'Vault locked.',
@@ -133,9 +133,15 @@ CM.Drive = (function(){
   const VERIFY='CODEMAP_VAULT_OK_v1';
   function b64(buf){ const b=new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
   function unb64(str){ const s=atob(str); const b=new Uint8Array(s.length); for(let i=0;i<s.length;i++) b[i]=s.charCodeAt(i); return b; }
-  async function deriveKey(password, salt){
+  // Liczba iteracji PBKDF2 dla NOWYCH kluczy (OWASP 2023: ≥600k dla SHA-256). Album trzyma swoją
+  // wartość w meta.kdf — stare albumy (bez pola) odszyfrowują się z 210k, a przy zmianie hasła
+  // przechodzą na bieżącą. Ma to znaczenie, bo szyfrogram synchronizowanego albumu leży na serwerze.
+  const PBKDF2_ITER=600000;
+  const LEGACY_ITER=210000;
+  const kdfIter=(m)=>(m&&m.kdf&&Number.isFinite(+m.kdf.iter)&&+m.kdf.iter>0)?+m.kdf.iter:LEGACY_ITER;
+  async function deriveKey(password, salt, iterations=PBKDF2_ITER){
     const base=await crypto.subtle.importKey('raw', TE.encode(password), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations:210000, hash:'SHA-256'},
+    return crypto.subtle.deriveKey({name:'PBKDF2', salt, iterations, hash:'SHA-256'},
       base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
   }
   async function encBytes(key, bytes){
@@ -262,18 +268,18 @@ CM.Drive = (function(){
   async function albRekey(a, pw){
     const names=(await albList(a)).map(f=>f.name);
     const salt=crypto.getRandomValues(new Uint8Array(16));
-    const key=await deriveKey(pw, salt);
+    const key=await deriveKey(pw, salt, PBKDF2_ITER);
     const verifier=await encBytes(key, TE.encode(VERIFY));
     const files=[];
     for(const n of names){ files.push({name:n, data:await encBytes(key, await albRead(a, n))}); }
-    await albTransactState(a, {enc:true, salt:b64(salt), verifier:b64(verifier)}, files);
+    await albTransactState(a, {enc:true, salt:b64(salt), verifier:b64(verifier), kdf:{name:'pbkdf2', hash:'SHA-256', iter:PBKDF2_ITER}}, files);
     albKey[a]=key;
   }
   const albSetPassword=albRekey;
   const albChangePassword=albRekey;
   async function albUnlock(a, pw){
     const m=await albLoadMeta(a); if(!m.enc) return true;
-    const key=await deriveKey(pw, unb64(m.salt));
+    const key=await deriveKey(pw, unb64(m.salt), kdfIter(m));
     try{ const v=await decBytes(key, unb64(m.verifier)); if(TD.decode(v)!==VERIFY) throw 0; }
     catch(e){ throw new Error('wrong'); }
     albKey[a]=key; return true;
@@ -486,7 +492,7 @@ CM.Drive = (function(){
       const p2=el('input',{type:'password',class:'drv-input',placeholder:t('vault.pass2')});
       const go=el('button',{class:'drv-btn drv-btn-primary',html:ic.svg('lock',{size:14})+' '+t('vault.setpass')});
       go.onclick=async()=>{ const a=p1.value,b=p2.value; if(!a){U.toast(t('vault.passEmpty'),'error');return;}
-        if(a.length<4){U.toast(t('vault.passShort'),'error');return;} if(a!==b){U.toast(t('vault.passMismatch'),'error');return;}
+        if(a.length<8){U.toast(t('vault.passShort'),'error');return;} if(a!==b){U.toast(t('vault.passMismatch'),'error');return;}
         U.toast(t('vault.encrypting')); try{ await albSetPassword(album,a); U.toast(t('vault.passSet'),'success'); ref(); }catch(e){U.toast(String(e.message||e),'error');} };
       pwBox.appendChild(el('div',{class:'drv-row'},p1,p2,go));
     } else if(st==='locked'){
@@ -500,7 +506,7 @@ CM.Drive = (function(){
       const lockBtn=el('button',{class:'drv-btn',html:ic.svg('lock',{size:14})+' '+t('vault.lock'),onclick:()=>{ albLock(album); U.toast(t('vault.locked.msg')); ref(); }});
       const np=el('input',{type:'password',class:'drv-input',placeholder:t('vault.passNew')});
       const chg=el('button',{class:'drv-btn',html:ic.svg('refresh',{size:14})+' '+t('vault.changepass')});
-      chg.onclick=async()=>{ if(!np.value||np.value.length<4){U.toast(t('vault.passShort'),'error');return;} U.toast(t('vault.encrypting')); try{ await albChangePassword(album,np.value); U.toast(t('vault.passChanged'),'success'); ref(); }catch(e){U.toast(String(e.message||e),'error');} };
+      chg.onclick=async()=>{ if(!np.value||np.value.length<8){U.toast(t('vault.passShort'),'error');return;} U.toast(t('vault.encrypting')); try{ await albChangePassword(album,np.value); U.toast(t('vault.passChanged'),'success'); ref(); }catch(e){U.toast(String(e.message||e),'error');} };
       const rm=el('button',{class:'drv-btn drv-btn-danger',html:ic.svg('unlock',{size:14})+' '+t('vault.removepass')});
       rm.onclick=async()=>{ U.toast(t('vault.decrypting')); try{ await albRemovePassword(album); U.toast(t('vault.passRemoved'),'success'); ref(); }catch(e){U.toast(String(e.message||e),'error');} };
       pwBox.appendChild(el('div',{class:'drv-row'},lockBtn));

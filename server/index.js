@@ -6,7 +6,7 @@ import fastifyStatic from '@fastify/static';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CFG } from './config.js';
-import { registerAuth } from './auth.js';
+import { registerAuth, gcAuth } from './auth.js';
 import { registerSync } from './sync.js';
 import { registerVault } from './vault.js';
 
@@ -44,6 +44,8 @@ app.addHook('onRequest', (req, reply, done) => {
 app.get('/api/health', { config: { rateLimit: false } }, async () => ({ ok: true }));
 
 await registerAuth(app);
+gcAuth();
+setInterval(gcAuth, 3600 * 1000).unref();   // wygasłe sesje, tokeny, blokady logowania, dziennik maili
 await registerSync(app);
 await registerVault(app);
 

@@ -89,3 +89,21 @@ CREATE TABLE IF NOT EXISTS vault_files (
   blob_path  TEXT NOT NULL,
   PRIMARY KEY (user_id, album, name)
 );
+
+-- Nieudane logowania per adres (także dla nieistniejących kont — bez wyroczni istnienia).
+-- Po 5 porażkach blokada rośnie wykładniczo (30 s → 15 min); sukces kasuje wpis.
+CREATE TABLE IF NOT EXISTS login_attempts (
+  email        TEXT PRIMARY KEY COLLATE NOCASE,
+  fails        INTEGER NOT NULL DEFAULT 0,
+  locked_until INTEGER NOT NULL DEFAULT 0,
+  updated_at   INTEGER NOT NULL
+);
+
+-- Wysłane maile per adres (limit 3/h niezależnie od IP — koniec z mail-bombingiem przez
+-- rejestrację/resend/reset z wielu adresów IP).
+CREATE TABLE IF NOT EXISTS mail_log (
+  email   TEXT NOT NULL COLLATE NOCASE,
+  kind    TEXT NOT NULL,
+  sent_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mail_log ON mail_log(email, sent_at);
