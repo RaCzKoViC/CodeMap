@@ -3,6 +3,22 @@
 codemap.twojadomena.pl {
     encode zstd gzip
 
+    # Nagłówki bezpieczeństwa dla całej domeny (frontend + API).
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        # CSP w trybie REPORT-ONLY jako punkt startowy: nic nie blokuje, naruszenia widać w konsoli
+        # przeglądarki. Lista hostów = to, z czym aplikacja realnie rozmawia (API repozytoriów, Mistral,
+        # CDN WebLLM/php-wasm/rough.js, wagi modeli z Hugging Face, lokalna Ollama). Runner osadza kod
+        # w iframe srcdoc, który dziedziczy CSP — przed przełączeniem na tryb wymuszający potrzebuje
+        # nonce/hash albo blob: URL. Po tygodniu bez naruszeń zmień nazwę nagłówka na Content-Security-Policy.
+        Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://esm.run https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src blob:; img-src 'self' data: blob: https://avatars.githubusercontent.com https://github.com https://gitlab.com https://bitbucket.org; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://gitlab.com https://api.bitbucket.org https://api.mistral.ai https://esm.run https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co http://127.0.0.1:11434 http://localhost:11434; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
+        -Server
+    }
+
     handle /api/* {
         reverse_proxy 127.0.0.1:8787
     }

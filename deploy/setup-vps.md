@@ -92,6 +92,12 @@ EMAIL_FROM=CodeMap <no-reply@twojadomena.pl>
 NODE_ENV=production
 ```
 
+Plik `.env` zawiera klucz Resend — ma go czytać wyłącznie użytkownik usługi:
+
+```bash
+sudo chown codemap:codemap /opt/codemap/server/.env && sudo chmod 600 /opt/codemap/server/.env
+```
+
 ## 8. E-maile (WAŻNE: Hetzner blokuje porty SMTP 25/465)
 
 Wysyłka idzie przez HTTPS API — załóż darmowe konto **Resend** (resend.com, 3000 maili/mies.)

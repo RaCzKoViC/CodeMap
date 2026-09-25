@@ -14,6 +14,21 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/codemap/data
 NoNewPrivileges=true
+# Hardening: proces nie ma dostępu do /tmp innych usług, urządzeń, parametrów jądra ani surowych
+# gniazd; nowe pliki (bloby, SQLite) powstają z prawami 0600/0700.
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+SystemCallArchitectures=native
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
