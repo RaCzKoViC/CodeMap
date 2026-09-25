@@ -3,6 +3,26 @@
 Format: [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/), wersjonowanie [SemVer](https://semver.org/lang/pl/).
 Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji).
 
+## [Unreleased]
+
+Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
+
+### Dodane
+- Eksport widocznego grafu do **DOT** (Graphviz, klastry = foldery, kolory wg języka), **Mermaid**
+  (`flowchart LR`, subgraph per folder) i **GraphML** (yEd: atrybuty type/lang/size/lines, grupy) —
+  menu Projekt, paleta Ctrl+K, akcja ChatBota `exportGraph {format}` (`js/export.js`).
+- Metryki sprzężeń w panelu szczegółów: **Ca / Ce / I** (afferent, efferent, niestabilność Martina)
+  dla plików i folderów (agregacja po plikach potomnych, krawędzie wewnętrzne pomijane) (`js/metrics.js`).
+- Reguły architektury z pliku **`.codemap.rules.json`** w repozytorium (warstwy = globy `*`/`**`,
+  `forbid` między warstwami lub globami, `noCycles`) — reguła Inspect „naruszenia architektury"
+  (krytyczne); brak pliku = cisza, niepoprawny plik = informacja (`js/rules.js`). Przykład dla
+  samego CodeMap: rdzeń (analysis/graph/layouts) nie importuje UI (chrome/navigation/ui).
+- Inspect: reguła **zduplikowany kod** — winnowing (k=5 tokenów, okno 4, ≥ 8 wspólnych odcisków)
+  na treści plików ≥ 20 linii, próbka 1500 największych, liczone w chunkach; zastępuje dawną
+  regułę porównującą same nazwy plików.
+- Testy: `test/export.test.mjs`, `test/metrics.test.mjs`, `test/rules.test.mjs`; smoke sprawdza eksport
+  trzech formatów na grafie demo.
+
 ## [1.0.0] — 2026-09-25
 
 Pierwsze publiczne wydanie open source (MIT). Faza 0 planu rozwoju ([docs/ROADMAP.md](docs/ROADMAP.md)).

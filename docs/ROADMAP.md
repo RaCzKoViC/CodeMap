@@ -57,10 +57,11 @@ Publikacja:
 - Graf symboli i call graph przez `web-tree-sitter` (WASM ładowany na żądanie, jak WebLLM); symbole jako węzły drugiego poziomu, serializowane w mapie.
 - Analiza w Web Workerze i w chunkach (`graph.build` dziś blokuje UI); jeden przebieg `stripNonCode` zamiast dwóch.
 - Rozwiązywanie zależności: aliasy tsconfig per katalog + `extends`, `package.json#imports/exports`, workspaces monorepo (`@scope/pkg` → `packages/pkg`), dynamiczne importy z literałów, `new Worker()`/`new URL()`, SCSS `@use/@forward`, C# `using` i Rust `use crate::` łączone z plikami.
-- Plik reguł architektury (`.codemap.rules.json`: warstwy, zakazane importy) egzekwowany przez silnik Inspect.
-- Metryki sprzężeń (instability, abstractness), wykrywanie duplikatów kodu (winnowing na treści).
+- [x] Plik reguł architektury (`.codemap.rules.json`: warstwy, zakazane importy, `noCycles`) egzekwowany przez silnik Inspect (`js/rules.js`, reguła `archviolation`; przykład dla samego CodeMap w korzeniu repo).
+- [x] Metryki sprzężeń Ca / Ce / niestabilność per plik i folder (`js/metrics.js`, panel szczegółów); POZOSTAŁO: abstractness (wymaga symboli z tree-sittera).
+- [x] Wykrywanie duplikatów kodu — winnowing na treści (`CM.Metrics.findDuplicates`, reguła `dupcode` zamiast porównania nazw plików; ≥ 20 linii, próbka 1500 największych, chunkowane).
 - Wyszukiwanie w treści plików (grep/regex) z wynikami na mapie; parsery Kotlin/Swift/Dart/Scala/Elixir.
-- Eksport DOT / GraphML / Mermaid.
+- [x] Eksport DOT / GraphML / Mermaid (`js/export.js`, menu Projekt, paleta Ctrl+K, akcja ChatBota `exportGraph`).
 
 ## Faza 3 — inteligencja git
 

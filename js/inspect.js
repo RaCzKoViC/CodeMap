@@ -28,7 +28,8 @@ CM.Inspect = (function(){
     'r.todo':'Zagęszczenie TODO / FIXME','r.todo.d':'Duża liczba znaczników TODO/FIXME/HACK — dług techniczny zapisany wprost.',
     'r.deep':'Głębokie zagnieżdżenie folderów','r.deep.d':'Ścieżki o dużej głębokości utrudniają nawigację i świadczą o przerośniętej strukturze.',
     'r.crowded':'Przeładowane foldery','r.crowded.d':'Folder z bardzo dużą liczbą plików bezpośrednio w środku — brak pogrupowania.',
-    'r.dup':'Zduplikowane nazwy plików','r.dup.d':'Ta sama nazwa pliku w wielu miejscach utrudnia wyszukiwanie i importy.',
+    'r.dupcode':'Zduplikowany kod (wspólne fragmenty)','r.dupcode.d':'Pary plików dzielące wiele identycznych fragmentów tokenów (winnowing na treści, białe znaki nieistotne) — kandydaci do wyciągnięcia wspólnego modułu.',
+    'dupShare':'{a} i {b} dzielą {n} fragmentów',
     'r.emptycatch':'Puste bloki catch (połykanie wyjątków)','r.emptycatch.d':'`catch { }` bez obsługi ukrywa błędy. (Heurystyka na pierwszych 4000 znakach pliku.)',
     'r.risky':'Ryzykowne API (bezpieczeństwo)','r.risky.d':'Użycia eval / innerHTML= / document.write — potencjalne wektory XSS. (Heurystyka na pierwszych 4000 znakach.)',
     'r.debug':'Pozostałości debugowania','r.debug.d':'Liczne console.log / debugger w kodzie produkcyjnym. (Heurystyka na pierwszych 4000 znakach.)',
@@ -55,7 +56,8 @@ CM.Inspect = (function(){
     'r.todo':'TODO / FIXME density','r.todo.d':'Many TODO/FIXME/HACK markers — technical debt written down.',
     'r.deep':'Deep folder nesting','r.deep.d':'Very deep paths hamper navigation and hint at an overgrown structure.',
     'r.crowded':'Crowded folders','r.crowded.d':'A folder with very many files directly inside — no grouping.',
-    'r.dup':'Duplicated file names','r.dup.d':'The same file name in many places confuses search and imports.',
+    'r.dupcode':'Duplicated code (shared fragments)','r.dupcode.d':'Pairs of files sharing many identical token fragments (content winnowing, whitespace-insensitive) — candidates for extracting a common module.',
+    'dupShare':'{a} and {b} share {n} fragments',
     'r.emptycatch':'Empty catch blocks (exception swallowing)','r.emptycatch.d':'`catch { }` with no handling hides errors. (Heuristic over the first 4000 chars.)',
     'r.risky':'Risky APIs (security)','r.risky.d':'Uses of eval / innerHTML= / document.write — potential XSS vectors. (Heuristic over the first 4000 chars.)',
     'r.debug':'Debug leftovers','r.debug.d':'Multiple console.log / debugger in production code. (Heuristic over the first 4000 chars.)',
@@ -137,12 +139,19 @@ CM.Inspect = (function(){
       if(kids>=40) add(F,'crowded','low',fd, kids+' '+t('files'));
     }
 
-    // ---- duplicate file names ----
-    { const byName=new Map();
-      for(const f of files){ const nm=(f.name||'').toLowerCase(); if(/^(index\.|__init__|mod\.rs)/.test(nm)) continue;
-        (byName.get(nm)||byName.set(nm,[]).get(nm)).push(f); }
-      for(const [nm,list] of byName){ if(list.length>=5) add(F,'dup','low',list[0], nm+' × '+list.length); }
-    }
+    // ---- duplikaty kodu: winnowing na treści (CM.Metrics) — tylko pliki z preview ≥ 20 linii,
+    //      powyżej 1500 plików próbka największych; odciski liczone w chunkach (tick co 64 plików) ----
+    if(CM.Metrics && CM.Metrics.findDuplicates){ try{
+      const cand=CM.Metrics.duplicateCandidates(files);
+      const fps=new Array(cand.length);
+      for(let i=0;i<cand.length;i++){ fps[i]=CM.Metrics.fingerprints(cand[i]); if((i&63)===63) await tick(); }
+      const pairs=CM.Metrics.pairDuplicates(cand, fps);
+      for(const p of pairs.slice(0,LIMIT)){
+        const a=graph.nodes.get(p.a), b=graph.nodes.get(p.b); if(!a||!b) continue;
+        add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.shared}));
+      }
+      if(pairs.length>LIMIT){ const f=F.get('dupcode'); if(f) f.count=pairs.length; }
+    }catch(e){} }
 
     // ---- dependency cycles (reuse the graph's Tarjan) ----
     try{ const res=graph.importCycles();
@@ -176,7 +185,7 @@ CM.Inspect = (function(){
     // ---- health score: 100 minus severity-weighted density ----
     let penalty=0; for(const f of F.values()) penalty+=SEV_W[f.sev]*f.count;
     const score=Math.max(0, Math.round(100 - 100*penalty/(penalty + 3*N)));
-    const order=['archviolation','cycles','god','unstable','fanout','huge','complex','risky','orphan','emptycatch','debug','todo','deep','crowded','dup','minified','archrules'];
+    const order=['archviolation','cycles','god','unstable','fanout','huge','complex','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
     const findings=[...F.values()].sort((a,b)=>order.indexOf(a.rule)-order.indexOf(b.rule));
     return {findings, score, files:files.length, ms:Math.round(performance.now()-t0)};
   }
