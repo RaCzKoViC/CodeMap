@@ -118,3 +118,11 @@ Maile weryfikacyjne w trybie dev drukują się w konsoli serwera (`EMAIL_MODE=co
 
 **Produkcja (Hetzner VPS):** pełna instrukcja krok po kroku w [`deploy/setup-vps.md`](deploy/setup-vps.md);
 wgrywanie: `.\tools\deploy.ps1 -Server deploy@twoja-domena`.
+
+---
+
+## 📜 Licencja
+
+CodeMap jest **open source** na licencji [MIT](LICENSE) — możesz go używać, kopiować, modyfikować
+i rozpowszechniać (także komercyjnie), pod warunkiem zachowania informacji o prawach autorskich.
+Repozytorium: https://github.com/RaCzKoViC/CodeMap

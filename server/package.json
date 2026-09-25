@@ -2,8 +2,11 @@
   "name": "codemap-server",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
-  "engines": { "node": ">=20.6" },
+  "engines": {
+    "node": ">=20.6"
+  },
   "scripts": {
     "start": "node --env-file=.env index.js",
     "dev": "node --env-file=.env --watch index.js"
