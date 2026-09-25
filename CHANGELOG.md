@@ -20,6 +20,10 @@ Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
 - Inspect: reguła **zduplikowany kod** — winnowing (k=5 tokenów, okno 4, ≥ 8 wspólnych odcisków)
   na treści plików ≥ 20 linii, próbka 1500 największych, liczone w chunkach; zastępuje dawną
   regułę porównującą same nazwy plików.
+- Analiza plików w **Web Workerze** (`js/analysis-worker.js`): metryki, importy, symbole i hash liczone
+  poza głównym wątkiem, chunkami, z postępem „Analiza plików N / M" i anulowaniem; główny wątek składa
+  z wyników tylko strukturę i krawędzie (bez Workera: te same kroki z oddawaniem wątku). Jeden przebieg
+  `stripNonCode` dla importów i symboli (`analyzeFile`).
 - Rozwiązywanie zależności: aliasy `tsconfig`/`jsconfig` **per katalog** z `extends` (najbliższy config
   wygrywa, monorepo się nie miesza), **workspaces** (import po nazwie pakietu z `package.json` →
   `exports`/`module`/`main`/folder), dynamiczne odwołania JS (`new Worker`, `new URL(…, import.meta.url)`,
