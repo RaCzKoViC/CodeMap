@@ -1,6 +1,8 @@
 // Smoke test w prawdziwej przeglądarce (headless Chrome przez CDP, bez Playwrighta):
 // serwuje repo lokalnie, otwiera index.html#demo, czeka aż mapa się zbuduje i sprawdza:
-// liczbę węzłów, brak wyjątków JS, brak błędów konsoli (poza oczekiwanym 404 na /api/auth/me).
+// liczbę węzłów, brak wyjątków JS, brak błędów konsoli (poza oczekiwanym 404 na /api/auth/me),
+// a potem przechodzi przez ~50 akcji aplikacji (układy, filtry, motywy, panele, tryby) przez
+// CMApp.exec — siatka bezpieczeństwa dla refaktoryzacji okablowania UI.
 //   node tools/smoke.mjs            (CHROME=ścieżka/do/chrome, gdy autodetekcja zawiedzie)
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -63,12 +65,37 @@ const version = await evalJs('window.CM_VERSION');
 const sw = await evalJs("'serviceWorker' in navigator");
 const canvasOk = await evalJs("(function(){ const c=document.getElementById('map-canvas'); return !!c && c.width>0 && c.height>0; })()");
 
+// --- przejście przez akcje aplikacji (wszystko, co nie otwiera systemowych okien ani nie pobiera plików) ---
+const sweep = await evalJs(`(async()=>{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const A=[];
+  for(const layout of ['pack','structtree','structradial','treemap','icicle','sunburst','force','layered','modules','arcdiagram','galaxy','nebula','cosmicrings','pack']) A.push(['setLayout',{layout}]);
+  A.push(['search',{query:'app'}],['search',{query:''}],['focusNode',{query:'app.js'}],['fit',{}],['zoom',{dir:'in'}],['zoom',{dir:'out'}],
+    ['rotate',{dir:'left'}],['rotate',{dir:'right'}],['rotate',{dir:'reset'}],['toggle3D',{}],['toggle3D',{}],
+    ['collapseAll',{}],['collapseAll',{}],['toggleImpact',{}],['toggleImpact',{}],['toggleMinimap',{}],['toggleMinimap',{}],
+    ['setFilter',{externals:true}],['setFilter',{externals:false,references:true}],['setFilter',{references:false}],
+    ['setMetric',{metric:'complexity',min:1}],['setMetric',{metric:'lines',min:0}],['toggleLang',{lang:'js'}],['toggleLang',{lang:'js'}],
+    ['setTheme',{theme:'light'}],['setTheme',{theme:'dark'}],['setPreset',{name:'graphite'}],['setPreset',{name:'depth'}],
+    ['setAccent',{color:'#22d3ee'}],['setBackground',{color:'#070a10'}],['setGlass',{transparency:40,blur:12}],
+    ['setSpacing',{percent:120}],['setSpacing',{percent:100}],['setNodeScale',{percent:110}],['setNodeScale',{percent:100}],['setFontScale',{percent:100}],
+    ['renderOption',{grid:false,curved:false}],['renderOption',{grid:true,curved:true}],['togglePanel',{side:'left'}],['togglePanel',{side:'left'}],
+    ['togglePanel',{side:'right'}],['togglePanel',{side:'right'}],['detectCycles',{}],['hotspots',{}],['help',{}],
+    ['openSettings',{tab:'ai'}],['setMode',{mode:'mindmap'}],['setMode',{mode:'codemap'}],['resetAppearance',{}],['setLang',{lang:'en'}],['setLang',{lang:'pl'}]);
+  const fails=[]; let ran=0;
+  for(const [a,args] of A){ try{ CMApp.exec(a,args); ran++; }catch(e){ fails.push(a+' '+JSON.stringify(args)+': '+(e&&e.message||e)); } await sleep(40); }
+  try{ if(CM.Settings&&CM.Settings.close) CM.Settings.close(); }catch(e){}
+  await sleep(300);
+  return {ran, total:A.length, fails, nodesAfter:CMApp.graph.nodes.size, visible:CMApp.renderer()? (CMApp.renderer().nodes||[]).length : -1};
+})()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
 check(canvasOk, 'canvas mapy ma rozmiar');
 check(/^\d+\.\d+\.\d+$/.test(version || ''), `CM_VERSION = ${version}`);
 check(sw, 'API service workera dostępne');
+check(sweep && sweep.fails.length === 0 && sweep.ran === sweep.total, `akcje CMApp.exec: ${sweep?.ran}/${sweep?.total} OK${sweep?.fails?.length ? '\n   ' + sweep.fails.join('\n   ') : ''}`);
+check(sweep && sweep.nodesAfter === nodes, `graf nietknięty po przejściu (${sweep?.nodesAfter} węzłów)`);
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
