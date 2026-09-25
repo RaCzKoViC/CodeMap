@@ -106,7 +106,7 @@ Bez DKIM/SPF maile weryfikacyjne będą lądować w spamie.
 ## 9. Pierwszy deploy (z Windowsa)
 
 ```powershell
-cd D:\codemap
+cd D:\Projekty\CodeMap
 .\tools\deploy.ps1 -Server deploy@codemap.twojadomena.pl
 ```
 

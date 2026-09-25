@@ -7,7 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot   # katalog projektu (D:\codemap)
+$root = Split-Path -Parent $PSScriptRoot   # katalog projektu (D:\Projekty\CodeMap)
 
 Write-Host "== CodeMap deploy -> $Server ==" -ForegroundColor Cyan
 

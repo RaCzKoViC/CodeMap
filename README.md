@@ -15,7 +15,7 @@ i analizować zaawansowane parametry każdego elementu.
 uruchom mały serwer lokalny w katalogu projektu i wejdź na `http://localhost:8777`:
 
 ```powershell
-python -m http.server 8777 --directory D:\codemap
+python -m http.server 8777 --directory D:\Projekty\CodeMap
 ```
 
 > Chcesz od razu zobaczyć działanie? Otwórz `index.html#demo` lub kliknij **„✨ Zobacz demo"**.
