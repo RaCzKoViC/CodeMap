@@ -286,6 +286,7 @@ js/ui.js                   # details panels, filters, history, diff
 js/settings.js             # settings, tutorial, user manual
 js/inspect.js              # static analysis (16 rules + architecture rules, health score)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
+js/chatbot-strings.js  js/chatbot-core.js  js/chatbot-render.js   # ChatBot: PL/EN strings, pure logic (tools, prompts, action validation), rendering
 js/mindmap.js  js/mmdraw.js  # MindMap mode + drawing layer
 js/drive.js                # Drive (File System Access) and Vault (OPFS + AES-GCM)
 js/auth.js  js/sync.js     # account and sync (backend only)
