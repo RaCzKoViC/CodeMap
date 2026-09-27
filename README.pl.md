@@ -144,7 +144,8 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
 - **Pytania o kod (RAG, tryb 📚)** — przełącznik w nagłówku czatu: ChatBot odpowiada na podstawie
   fragmentów kodu wczytanego projektu i cytuje je jako `[1]`, `[2]` (klik = plik otwarty na tych liniach).
   Wyszukiwanie słów działa od razu (identyfikatory rozbijane, pytania po polsku rozszerzane o angielskie
-  pojęcia); model embeddingów w Ollamie (`bge-m3`, `nomic-embed-text`) dodaje wyszukiwanie semantyczne —
+  pojęcia); model embeddingów w Ollamie (`bge-m3`, `nomic-embed-text`) albo 🌐 **w przeglądarce** (WebLLM
+  `snowflake-arctic-embed`, WebGPU, bez Ollamy) dodaje wyszukiwanie semantyczne —
   indeks budowany w Ustawieniach → AI, wektory zapisane w przeglądarce i przeliczane tylko dla zmienionych
   fragmentów. Narzędzie `/codeSearch` pokazuje trafienia bez modelu.
 - **Agent z narzędziami (Ollama, tryb 📚)** — gdy fragmenty nie wystarczą, model sam sprawdza kod przed

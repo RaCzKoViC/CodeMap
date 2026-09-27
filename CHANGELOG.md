@@ -6,6 +6,12 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 ## [Unreleased]
 
 ### Dodane — Faza 7 (agent z narzędziami)
+- **Embeddingi w przeglądarce (WebLLM)** — semantyczny RAG bez Ollamy: `CM.LocalAI.embed()` na osobnym silniku
+  w workerze (niezależnym od modelu czatu), modele typu embedding z konfiguracji WebLLM (`snowflake-arctic-embed-s/-m`,
+  partie `-b4` / `-b32`, tekst ucięty do okna 512 tokenów). RAG: lista modeli z obu źródeł (🌐 = w przeglądarce, z VRAM),
+  jedno miejsce liczenia wektorów dla indeksu i zapytań; Ollama nadal domyślna (bge-m3 lepszy po polsku). Sekcja
+  „Indeks kodu (RAG)" w Ustawieniach → AI jest teraz też przy WebLLM (wspólna `ragSection`), z postępem ładowania
+  modelu. Sprawdzone na RTX 4060: indeks demo 18,8 s z pobraniem modelu, zapytanie hybrydowe ~28 ms.
 - **🧭 Trasy po kodzie** (`js/tour.js`, `js/tour-ui.js`; Projekt → „Trasa po kodzie…"): trasa automatyczna ze struktury
   (opis → punkty wejścia — importy przychodzące liczone tylko z kodu → rdzeń wg liczby zależnych → hotspot → testy
   rdzenia; bez importów po jednym pliku z największych folderów) albo ułożona przez model z samej struktury (ścieżki,

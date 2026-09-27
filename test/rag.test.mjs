@@ -86,3 +86,22 @@ describe('pliki wymienione w pytaniu', () => {
     assert.deepEqual(host(R.mentionedFiles('jak działa bus factor')), []);
   });
 });
+
+describe('modele embeddingów: Ollama + WebLLM w przeglądarce', () => {
+  test('lista łączy oba źródła; indeks i zapytanie z modelem webllm:… idą do CM.LocalAI.embed, inne do Ollamy', async () => {
+    const calls = [];
+    const C = loadCM([...CORE, 'rag']);
+    C.Ollama = { embeddingModels: async () => [{ name: 'bge-m3:latest' }], embed: async (t, o) => { calls.push('ollama:' + o.model); return t.map(() => [1, 0, 0]); } };
+    C.LocalAI = { embeddingModels: async () => [{ name: 'webllm:arctic-s-b4', vramMB: 239 }], embed: async (t, o) => { calls.push('web:' + o.model); return t.map((x) => [0, /reducer/.test(x) ? 1 : 0.1, 0.2]); } };
+    const g = new C.Graph.Graph().build([{ path: 'src/reducer.js', content: 'export function reducer(s, a){ return s; }', size: 40 }, { path: 'src/x.js', content: 'export const x = 1;', size: 19 }], { name: 't', source: 'rag-web' });
+    C.App = { graph: g };
+    const list = host((await C.RAG.embeddingModels()).map((m) => [m.name, !!m.web]));
+    assert.deepEqual(list, [['bge-m3:latest', false], ['webllm:arctic-s-b4', true]]);
+    assert.equal(await C.RAG.pickModel(), 'bge-m3:latest', 'Ollama ma pierwszeństwo');
+    const st = await C.RAG.buildVectors({ model: 'webllm:arctic-s-b4' });
+    assert.equal(st.model, 'webllm:arctic-s-b4'); assert.equal(st.dim, 3);
+    const r = await C.RAG.search('state update', { k: 2 });
+    assert.equal(r.mode, 'hybrid');
+    assert.ok(calls.every((c) => c.startsWith('web:')), JSON.stringify(calls));
+  });
+});

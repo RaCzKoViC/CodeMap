@@ -184,19 +184,29 @@ CM.RAG = (function(){
     S.model=model; S.dim=dim; S.vecs=out; S.partial=hit<S.chunks.length;
     return true;
   }
-  async function embeddingModels(){ try{ return CM.Ollama&&CM.Ollama.embeddingModels ? await CM.Ollama.embeddingModels() : []; }catch(e){ return []; } }
-  // domyślny model: zapamiętany → bge-m3 (wielojęzyczny) → nomic → pierwszy dostępny
+  // modele embeddingów: Ollama (bge-m3, nomic…) + WebLLM w przeglądarce ('webllm:…', gdy jest WebGPU)
+  async function embeddingModels(){
+    let out=[]; try{ if(CM.Ollama&&CM.Ollama.embeddingModels) out=await CM.Ollama.embeddingModels(); }catch(e){ out=[]; }
+    try{ if(CM.LocalAI&&CM.LocalAI.embeddingModels) out=out.concat((await CM.LocalAI.embeddingModels()).map(m=>({name:m.name, web:true, vramMB:m.vramMB}))); }catch(e){}
+    return out; }
+  const isWeb=(model)=>/^webllm:/.test(String(model||''));
+  async function embedTexts(model, texts, o){
+    o=o||{};
+    if(isWeb(model)) return CM.LocalAI.embed(texts, {model, signal:o.signal, onProgress:o.onLoad});
+    return CM.Ollama.embed(texts, {model, signal:o.signal});
+  }
+  // domyślny model: zapamiętany → bge-m3 (wielojęzyczny) → nomic → inny z Ollamy → najmniejszy WebLLM (w przeglądarce)
   async function pickModel(){
-    const list=(await embeddingModels()).map(m=>m.name); if(!list.length) return null;
+    const all=await embeddingModels(), list=all.map(m=>m.name); if(!list.length) return null;
     const pref=modelPref(); if(pref && list.includes(pref)) return pref;
-    return list.find(n=>/bge-m3/.test(n))||list.find(n=>/nomic/.test(n))||list[0];
+    return list.find(n=>/bge-m3/.test(n))||list.find(n=>/nomic/.test(n))||(all.find(m=>!m.web)||{}).name||list[0];
   }
   // liczenie brakujących wektorów w Ollamie (partiami), zapis do IndexedDB
   async function buildVectors(opts){
     opts=opts||{};
     const s=await ensure(); if(!s) throw new Error(T('rag.noProject','Najpierw wczytaj projekt.'));
     const model=opts.model||await pickModel();
-    if(!model) throw new Error(T('rag.noEmbed','Brak modelu embeddingów w Ollamie — pobierz np. bge-m3 lub nomic-embed-text (Ustawienia → AI).'));
+    if(!model) throw new Error(T('rag.noEmbed','Brak modelu embeddingów — pobierz w Ollamie bge-m3 albo nomic-embed-text, albo użyj modelu WebLLM w przeglądarce z WebGPU (Ustawienia → AI).'));
     if(building){ try{ building.ctrl.abort(); }catch(e){} }
     const ctrl=new AbortController(); building={ctrl, model};
     try{
@@ -204,11 +214,11 @@ CM.RAG = (function(){
       const pre=prefixes(model);
       const todo=s.chunks.map((c,i)=>i).filter(i=>!s.chunks[i]._v || s.model!==model);
       let vecs=s.vecs, dim=s.dim, done=s.chunks.length-todo.length;
-      const B=24;
+      const B=isWeb(model)?16:24;
       for(let p=0;p<todo.length;p+=B){
         if(ctrl.signal.aborted) throw Object.assign(new Error('cancelled'),{name:'AbortError'});
         const ids=todo.slice(p,p+B);
-        const res=await CM.Ollama.embed(ids.map(i=>docText(s.chunks[i], pre.d)), {model, signal:ctrl.signal});
+        const res=await embedTexts(model, ids.map(i=>docText(s.chunks[i], pre.d)), {signal:ctrl.signal, onLoad:opts.onLoad});
         if(!dim){ dim=res[0].length; vecs=new Float32Array(s.chunks.length*dim); }
         ids.forEach((i,j)=>{ vecs.set(normalize(res[j]), i*dim); s.chunks[i]._v=true; });
         done+=ids.length; if(opts.onProgress) opts.onProgress(done, s.chunks.length);
@@ -228,7 +238,7 @@ CM.RAG = (function(){
     const lex=bm25(s.lex, queryTokens(q));
     let cos=null, mode='lexical';
     if(s.vecs && !opts.lexicalOnly){ try{
-      const qv=normalize((await CM.Ollama.embed([prefixes(s.model).q+q], {model:s.model, signal:opts.signal}))[0]);
+      const qv=normalize((await embedTexts(s.model, [prefixes(s.model).q+q], {signal:opts.signal}))[0]);
       if(qv.length===s.dim){ cos=new Float32Array(s.chunks.length); for(let i=0;i<s.chunks.length;i++) cos[i]=s.chunks[i]._v?dot(s.vecs, i*s.dim, qv):-1; mode='hybrid'; }
     }catch(e){ if(e&&e.name==='AbortError') throw e; } }
     let hits=diversify(rank(lex, cos, 40), s.chunks, opts.k||6).filter(h=>h.score>0);

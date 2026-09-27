@@ -119,7 +119,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   albo JSON w treści; ponaglenie zamiast wymówki. Sprawdzone na llama3.2:3b, qwen3:8b, qwen2.5-coder:7b
   (qwen2.5:7b narzędzia ignoruje → zwykły tryb 📚). POZOSTAŁO: sterowanie
   aplikacją z pętli (akcje zmieniające widok), agent dla WebLLM.
-- Embeddingi w przeglądarce (WebLLM) — semantyczny RAG bez Ollamy.
+- [x] Embeddingi w przeglądarce (WebLLM `snowflake-arctic-embed`) — semantyczny RAG bez Ollamy; osobny silnik w workerze.
 - [x] „Doktor hotspotów" (`js/doctor.js`): plan refaktoryzacji pliku z czołówki hotspotów — kartoteka (metryki, git,
   testy, zależne) + fragmenty najdłuższych funkcji, cztery sekcje z cytatami; przycisk w panelu pliku i `hotspotDoctor`.
 - [x] Trasy po kodzie (`js/tour.js`): automatyczne albo z modelu (tylko struktura), odtwarzacz na mapie, zapis w mapie,

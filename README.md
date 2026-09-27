@@ -144,7 +144,8 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
 - **Code questions (RAG, 📚 mode)** — a toggle in the chat header: ChatBot answers from
   snippets of the loaded project's code and cites them as `[1]`, `[2]` (click = the file opens at those lines).
   Keyword search works out of the box (identifiers are split apart, Polish questions are expanded with English
-  terms); an embedding model in Ollama (`bge-m3`, `nomic-embed-text`) adds semantic search —
+  terms); an embedding model in Ollama (`bge-m3`, `nomic-embed-text`) or 🌐 **in the browser** (WebLLM
+  `snowflake-arctic-embed`, WebGPU, no Ollama needed) adds semantic search —
   the index is built in Settings → AI, and the vectors are stored in the browser and recomputed only for changed
   snippets. The `/codeSearch` tool shows matches without any model.
 - **Agent with tools (Ollama, 📚 mode)** — when the snippets are not enough, the model looks things up itself

@@ -343,7 +343,58 @@ CM.LocalAI = (function(){
     return out;
   }
 
+  // ---- embeddingi w przeglądarce (indeks semantyczny RAG bez Ollamy) ----
+  // Osobny silnik WebLLM w workerze, niezależny od modelu czatu (oba mogą być załadowane naraz). Modele typu
+  // embedding z prebuiltAppConfig (np. snowflake-arctic-embed-s/-m, sufiks -b4/-b32 = rozmiar partii).
+  let embEng=null, embId='', embLoad=null;
+  async function embeddingModels(){
+    if(!hasWebGPU()) return [];
+    try{ const cfg=await appCfg();
+      return cfg.model_list.filter(m=>m.model_type===1 || /embed/i.test(m.model_id))
+        .map(m=>({name:'webllm:'+m.model_id, id:m.model_id, vramMB:Math.round(m.vram_required_MB||0), batch:+((/-b(\d+)$/.exec(m.model_id)||[])[1]||4)}))
+        .sort((a,b)=>(a.vramMB-b.vramMB)||(b.batch-a.batch));
+    }catch(e){ return []; } }
+  async function embedEngine(id, onProg){
+    if(embEng && embId===id) return embEng;
+    if(embLoad && embLoad.id===id) return embLoad.p;
+    const p=(async()=>{
+      await ensureLib(); const cfg=await appCfg();
+      await embedUnload();
+      const prog=(r)=>{ if(onProg) try{ onProg({text:r.text||'', pct:Math.round((r.progress||0)*100)}); }catch(e){} };
+      let eng=null, w=null, wurl=null;
+      try{ const src='import {WebWorkerMLCEngineHandler} from "'+CDN+'";const h=new WebWorkerMLCEngineHandler();self.onmessage=(m)=>h.onmessage(m);';
+        wurl=URL.createObjectURL(new Blob([src],{type:'text/javascript'})); w=new Worker(wurl,{type:'module'});
+        eng=await lib.CreateWebWorkerMLCEngine(w, id, {initProgressCallback:prog, appConfig:cfg}); eng.__worker=w; eng.__wurl=wurl; }
+      catch(e){ try{ if(w) w.terminate(); if(wurl) URL.revokeObjectURL(wurl); }catch(x){}
+        eng=await lib.CreateMLCEngine(id, {initProgressCallback:prog, appConfig:cfg}); }
+      embEng=eng; embId=id; return eng;
+    })();
+    embLoad={id, p};
+    try{ return await p; } finally{ if(embLoad && embLoad.p===p) embLoad=null; }
+  }
+  async function embedUnload(){
+    const e=embEng; embEng=null; embId='';
+    if(e){ try{ await Promise.race([e.unload(), new Promise(r=>setTimeout(r,3000))]); }catch(x){} try{ if(e.__worker) e.__worker.terminate(); if(e.__wurl) URL.revokeObjectURL(e.__wurl); }catch(x){} }
+  }
+  // texts → wektory (tablice liczb); model: 'webllm:<id>' albo samo id; opts {signal, onProgress (ładowanie), batch}
+  async function embed(texts, opts){
+    opts=opts||{};
+    if(!hasWebGPU()) throw new Error(I.t('lai.noWebGPU','Ta przeglądarka nie obsługuje WebGPU — lokalne modele wymagają Chrome/Edge 113+ z włączonym GPU.'));
+    const id=await resolveId(String(opts.model||'').replace(/^webllm:/,''));
+    const eng=await embedEngine(id, opts.onProgress);
+    const B=Math.max(1, opts.batch || +((/-b(\d+)$/.exec(id)||[])[1]||4)), out=[];
+    // okno modeli arctic-embed = 512 tokenów; kod ma ~3 znaki/token → ucięcie z zapasem
+    const clip=(s)=>String(s||'').slice(0, 1400);
+    for(let i=0;i<texts.length;i+=B){
+      if(opts.signal && opts.signal.aborted) throw abortErr();
+      const r=await eng.embeddings.create({input:texts.slice(i, i+B).map(clip), model:id});
+      for(const d of (r&&r.data)||[]) out.push(d.embedding);
+    }
+    return out;
+  }
+
   return { MODELS, hasWebGPU, provider, setProvider, modelId, setModel, status, busy, loadedId, label, shortLabel, isThinking, listPrebuilt,
+           embeddingModels, embed, embedUnload, embedLoaded:()=>embId,
            isDownloaded, listDownloaded, deleteModel, interrupt,
            ensureEngine, chat, unload, deleteDownloads, downloadedInfo, onProgress,
            progress:()=>progress, _clampMsgs:clampMsgs };
