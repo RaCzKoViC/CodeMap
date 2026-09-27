@@ -1,33 +1,35 @@
-# CodeMap — Kartografia Kodu 🗺️
+# CodeMap — Code Cartography 🗺️
 
-[![Licencja MIT](https://img.shields.io/badge/licencja-MIT-22d3ee.svg)](LICENSE)
-[![Wydanie](https://img.shields.io/github/v/release/RaCzKoViC/CodeMap?label=wydanie&color=22d3ee)](https://github.com/RaCzKoViC/CodeMap/releases)
+**English** · [Polski](README.pl.md)
+
+[![MIT License](https://img.shields.io/badge/license-MIT-22d3ee.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/RaCzKoViC/CodeMap?label=release&color=22d3ee)](https://github.com/RaCzKoViC/CodeMap/releases)
 [![GitHub Pages](https://github.com/RaCzKoViC/CodeMap/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/RaCzKoViC/CodeMap/actions/workflows/deploy-pages.yml)
-[![Bez build-stepu](https://img.shields.io/badge/build--step-brak-8b5cf6.svg)](#-architektura)
+[![No build step](https://img.shields.io/badge/build--step-none-8b5cf6.svg)](#-architecture)
 
-> **English summary.** CodeMap is a local-first, Maltego-style code cartography tool: load a folder,
-> an archive or a GitHub/GitLab/Bitbucket repository and get an interactive map of files, dependencies
-> and metrics — with 13 layouts, static analysis (15 anti-pattern rules), snapshots and diffs, a MindMap
-> mode with a drawing layer, and optional AI assistants that can run **entirely in your browser**
-> (WebLLM) or on your machine (Ollama). Pure JavaScript, no build step, PWA, MIT. UI in Polish and English.
+CodeMap is a local-first, Maltego-style code cartography tool. Load a folder, an archive or a GitHub /
+GitLab / Bitbucket repository and get an interactive map of files, dependencies and metrics — together with
+git history, tests and coverage, static analysis, PR impact maps and optional AI assistants that can run
+**entirely in your browser** (WebLLM) or on your own machine (Ollama). Pure JavaScript, no build step,
+installable PWA, MIT-licensed. The UI is available in English and Polish.
 
-**Demo online:** https://raczkovic.github.io/CodeMap/#demo
+**Live demo:** https://raczkovic.github.io/CodeMap/#demo
 
-![CodeMap — mapa repozytorium CodeMap w układzie siłowym: pliki, foldery i importy](docs/screenshot-map.png)
+![CodeMap — the CodeMap repository mapped in the force layout: files, folders and imports](docs/screenshot-map.png)
 
-| Graf symboli i wywołań (tree-sitter) | ChatBot sterujący mapą, menu narzędzi `/` |
+| Symbol and call graph (tree-sitter) | ChatBot controlling the map, `/` tools menu |
 |:---:|:---:|
-| [![Graf symboli: funkcje pliku symbols-core.js i ich wywołania, panel szczegółów symbolu](docs/screenshot-symbols.png)](docs/screenshot-symbols.png) | [![ChatBot: wyniki /stats i /topFiles oraz lista narzędzi po wpisaniu /](docs/screenshot-chatbot.png)](docs/screenshot-chatbot.png) |
+| [![Symbol graph: the functions of symbols-core.js and their calls, with the symbol details panel](docs/screenshot-symbols.png)](docs/screenshot-symbols.png) | [![ChatBot: results of /stats and /topFiles and the tool list shown after typing /](docs/screenshot-chatbot.png)](docs/screenshot-chatbot.png) |
 
-| Historia git z lokalnego `.git`: częstość zmian, oś czasu, autorzy, testy ↔ kod |
+| Git history from the local `.git`: change frequency, timeline, authors, tests ↔ code |
 |:---:|
-| [![Oś czasu historii git: pliki zmienione w ostatnich commitach świecą, etykieta autora z promieniami do plików, kolorowanie wg częstości zmian, zielone krawędzie test → kod](docs/screenshot-git.png)](docs/screenshot-git.png) |
+| [![Git history timeline: files changed in recent commits glow, an author label with rays to their files, coloring by change frequency, green test → code edges](docs/screenshot-git.png)](docs/screenshot-git.png) |
 
-<sub>Zrzuty przedstawiają samo repozytorium CodeMap wczytane jako projekt; odtwarza je `node tools/screenshots.mjs`.</sub>
+<sub>The screenshots show the CodeMap repository itself loaded as a project; `node tools/screenshots.mjs` regenerates them.</sub>
 
 ---
 
-## 🚀 Start w 30 sekund
+## 🚀 Up and running in 30 seconds
 
 ```bash
 git clone https://github.com/RaCzKoViC/CodeMap.git
@@ -35,275 +37,276 @@ cd CodeMap
 python serve.py            # → http://localhost:8777
 ```
 
-Bez Pythona wystarczy dowolny serwer statyczny (`npx serve .`) albo dwuklik na `index.html`
-(tryb `file://` ma ograniczenia: brak service workera i migawek w IndexedDB).
-Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
+No Python? Any static server will do (`npx serve .`), or simply double-click `index.html`
+(`file://` mode has limitations: no service worker and no snapshots in IndexedDB).
+Click **“✨ See demo”** or open `index.html#demo`.
 
 ---
 
-## ✨ Co potrafi
+## ✨ Features
 
-### Wczytywanie (150+ formatów)
-- **Folder / pliki / przeciągnij-upuść / wklej** (`Ctrl+V`) — pełna struktura katalogów.
-- **Archiwa** ZIP, TAR, TGZ, GZ — rozpakowywane w przeglądarce (`DecompressionStream`).
-- **PDF** — mapa z zakładek i stron.
-- **Repozytoria** GitHub, GitLab, Bitbucket po adresie URL (publiczne lub z tokenem), wybór gałęzi/tagu,
-  podkatalogu, **porównanie dwóch gałęzi** po sygnaturze drzewa, eksport mapy do Gist.
-- **Linki**: `#repo=owner/nazwa[@gałąź[/podkatalog]]` (także pełny URL GitHub/GitLab/Bitbucket, `&layout=`),
-  `#gist=<id>` (mapa wyeksportowana do Gista), `#share=<id>` (publiczny link z backendu), `#v=` (bieżący widok).
-  Przykład: [`#repo=RaCzKoViC/CodeMap@main/server&layout=treemap`](https://raczkovic.github.io/CodeMap/#repo=RaCzKoViC/CodeMap@main/server&layout=treemap).
+### Loading (150+ formats)
+- **Folder / files / drag and drop / paste** (`Ctrl+V`) — the full directory structure.
+- **Archives** — ZIP, TAR, TGZ, GZ — unpacked right in the browser (`DecompressionStream`).
+- **PDF** — a map built from bookmarks and pages.
+- **Repositories** from GitHub, GitLab and Bitbucket by URL (public, or private with a token), with branch/tag
+  and subdirectory selection, **comparison of two branches** by tree signature, and map export to a Gist.
+- **Links**: `#repo=owner/name[@branch[/subdir]]` (a full GitHub/GitLab/Bitbucket URL works too, plus `&layout=`),
+  `#gist=<id>` (a map exported to a Gist), `#share=<id>` (a public link from the backend), `#v=` (the current view).
+  Example: [`#repo=RaCzKoViC/CodeMap@main/server&layout=treemap`](https://raczkovic.github.io/CodeMap/#repo=RaCzKoViC/CodeMap@main/server&layout=treemap).
 
-### Analiza
-- Metryki per plik: linie, kod, komentarze, złożoność, funkcje, TODO/FIXME, rozmiar, data.
-- Parsowanie importów dla 19 rodzin języków (JS/TS, Python, C/C++, Go, Java, C#, PHP, Ruby, Rust, Swift, Dart, Elixir, Lua, Zig, Haskell, Shell, CSS/SCSS,
-  HTML, Markdown), aliasy `tsconfig`/`jsconfig` per katalog z `extends`, workspaces monorepo, dynamiczne
-  odwołania (`new Worker`, `import.meta.glob`…), zależności zewnętrzne jako osobne węzły.
-- Symbole (funkcje, klasy, typy) z własną złożonością w panelu szczegółów.
-- **Graf symboli i wywołań (tree-sitter)** — opcjonalny: funkcje, metody, klasy, struktury, interfejsy,
-  enumy i traity jako węzły drugiego poziomu pod plikiem, a wywołania rozwiązane w pliku i przez importy
-  jako krawędzie. 12 gramatyk (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsowanie
-  w Web Workerze; dwuklik na pliku rozwija jego symbole, przy zwiniętych plikach wywołania łączą pliki.
-- Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
+### Analysis
+- Per-file metrics: lines, code, comments, complexity, functions, TODO/FIXME, size, date.
+- Import parsing for 19 language families (JS/TS, Python, C/C++, Go, Java, C#, PHP, Ruby, Rust, Swift, Dart, Elixir, Lua, Zig, Haskell, Shell, CSS/SCSS,
+  HTML, Markdown), per-directory `tsconfig`/`jsconfig` aliases with `extends`, monorepo workspaces, dynamic
+  references (`new Worker`, `import.meta.glob`…), and external dependencies as separate nodes.
+- Symbols (functions, classes, types) with their own complexity in the details panel.
+- **Symbol and call graph (tree-sitter)** — optional: functions, methods, classes, structs, interfaces,
+  enums and traits become second-level nodes under their file, and calls resolved within the file and through
+  imports become edges. 12 grammars (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsed
+  in a Web Worker; double-click a file to expand its symbols — while files are collapsed, calls connect the files.
+- Graph: neighbors, upstream and downstream **dependency impact**, **cycles** (Tarjan SCC), signatures for comparisons.
 
-### Mapa
-- **13 układów**: upakowane koła, drzewo strukturalne, radialny, treemap, icicle, sunburst, siła (force),
-  warstwowy, moduły, diagram łukowy, galaktyka, mgławica, pierścienie.
-- Fizyka układów siłowych w **Web Workerze** — UI nie zamiera na dużych repozytoriach (auto-LOD, budżet węzłów).
-- Pan, zoom do kursora, **obrót**, pseudo-3D, minimapa, radar okolicy, tryb lotu `WASD`, widok wpływu,
-  podgląd kodu po najechaniu, menu kontekstowe, paleta poleceń `Ctrl+K`, wyszukiwarka `/`.
-- Eksport **PNG** (2×/4×) i **SVG**, link do bieżącego widoku (`#v=`).
+### Map
+- **13 layouts**: packed circles, structure tree, radial tree, treemap, icicle, sunburst, force,
+  dependency layers, modules, arc diagram, galaxy, nebula, rings.
+- Force-directed physics runs in a **Web Worker**, so the UI doesn't freeze on large repositories (auto-LOD, node budget).
+- Pan, zoom to cursor, **rotation**, pseudo-3D, minimap, neighborhood radar, `WASD` fly mode, impact view,
+  code preview on hover, context menu, command palette (`Ctrl+K`), search (`/`).
+- **PNG** (2×/4×) and **SVG** export, link to the current view (`#v=`).
 
-### Śledzenie rozwoju
-- **Migawki** (IndexedDB) i **historia**: raport dodane / zmienione / usunięte, Δ linii i rozmiaru,
-  różnice naniesione na mapę (zielony / żółty / czerwony).
-- **Zapis / odczyt** całej mapy z pozycjami (`.codemap.json`), porównywanie kilku schematów obok siebie,
-  hotspoty (rozmiar × zależności × złożoność).
+### Tracking how the project evolves
+- **Snapshots** (IndexedDB) and **history**: an added / changed / removed report, Δ lines and size,
+  with the differences drawn on the map (green / yellow / red).
+- **Save / load** the whole map including positions (`.codemap.json`), compare several schemas side by side,
+  hotspots (size × dependencies × complexity).
 
-### Historia git
-- Folder wczytany **razem z katalogiem `.git`** jest analizowany od razu — w przeglądarce, w Web Workerze,
-  bez sieci (czytnik obiektów, paczek i delt gita napisany od zera). Repozytorium z GitHub / GitLab /
-  Bitbucket: Projekt → **Historia git** (API hostingu; bez tokenu pliki dla ~50 najnowszych commitów).
-- **Właściciel** każdego pliku i udziały autorów, **bus factor** projektu i każdego folderu, zmiany nazw
-  śledzone wstecz, boty pomijane przy własności; awatary właścicieli na węzłach.
-- **Hotspoty churn × złożoność** — pliki często zmieniane i jednocześnie złożone (jak w CodeScene).
-- **Kolorowanie** węzłów (lewy panel): właściciel, częstość zmian, hotspoty, ostatnia zmiana — obok
-  języka, złożoności i daty modyfikacji; legenda z licznikami, klik podświetla pliki.
-- **Oś czasu** — animowana ewolucja projektu (Gource-lite): pliki pojawiają się w kolejności powstania,
-  zmiany świecą kolorem autora; bez historii git — oś czasu z migawek.
-- Inspect: reguły **hotspoty zmian** i **wiedza w jednej głowie** (≥ 90 % zmian złożonego pliku od jednej osoby).
+### Git history
+- A folder loaded **together with its `.git` directory** is analyzed right away — in the browser, in a Web Worker,
+  with no network access (the git object, pack and delta reader is written from scratch). For a repository from
+  GitHub / GitLab / Bitbucket: Project → **Git history** (uses the host's API; without a token, changed files
+  are fetched for the ~50 newest commits).
+- The **owner** of every file and each author's share, the **bus factor** of the project and of every folder,
+  renames followed back through history, bots ignored when assigning ownership; owner avatars on the nodes.
+- **Churn × complexity hotspots** — files that change often and are complex at the same time (as in CodeScene).
+- **Coloring** of nodes (left panel): owner, change frequency, hotspots, last change — alongside
+  language, complexity and modification date; a legend with counts, and clicking an entry highlights its files.
+- **Timeline** — an animated evolution of the project (Gource-lite): files appear in the order they were
+  created and changes glow in the author's color; without git history, the timeline is built from snapshots.
+- Inspect: the **Change hotspots** and **Knowledge in one head** rules (≥ 90 % of a complex file's changes come from one person).
 
-### Testy i pokrycie
-- CodeMap sam wiąże **testy z testowanym kodem** — po nazwie (także ścieżki lustrzane `test/` ↔ `src/`,
-  `src/test/java` ↔ `src/main/java`) i po importach, dla kilkunastu języków; krawędzie „Testy (test → kod)".
-- **Pokrycie** z lcov, Istanbul (`coverage-final.json`, `coverage-summary.json`), Cobertura, JaCoCo i Clover —
-  wczytywane samo z `coverage/` wczytanego folderu, z menu Projekt → „Wczytaj pokrycie testów" albo przez
-  przeciągnięcie raportu na mapę. Kolorowanie „Pokrycie testami" i „Testy", sekcja „Testy i pokrycie"
-  w panelu, niepokryte linie w podglądzie pliku, reguły Inspect „złożone pliki bez testów" i „niskie pokrycie".
+### Tests and coverage
+- CodeMap links **tests to the code they test** on its own — by name (including mirrored paths `test/` ↔ `src/`,
+  `src/test/java` ↔ `src/main/java`) and by imports, for over a dozen languages; shown as “Tests (test → code)” edges.
+- **Coverage** from lcov, Istanbul (`coverage-final.json`, `coverage-summary.json`), Cobertura, JaCoCo and Clover —
+  picked up automatically from `coverage/` in the loaded folder, loaded from Project → “Load test coverage”, or
+  dropped onto the map. “Test coverage” and “Tests” colorings, a “Tests and coverage” section
+  in the details panel, uncovered lines in the file preview, and the Inspect rules “Complex files without tests” and “Low test coverage”.
 
-### Inspect — analiza statyczna
-16 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
-głębokie zagnieżdżenie, minifikaty, **zduplikowany kod** — winnowing na treści plików…) z progami
-statystycznymi, **health score** i raportem Markdown. Opcjonalny plik **`.codemap.rules.json`** w repozytorium
-(warstwy = globy ścieżek, `forbid` między warstwami, `noCycles`) jest egzekwowany jako reguła
-„naruszenia architektury". W panelu szczegółów każdy plik i folder ma **sprzężenia** Ca / Ce / I
-(afferent, efferent, niestabilność wg Martina). Widoczny graf da się **wyeksportować** do DOT (Graphviz),
-Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
+### Inspect — static analysis
+16 anti-pattern rules (cycles, god-files, hubs, orphans, complexity, risky APIs, empty `catch` blocks, debug leftovers,
+deep nesting, minified files, **duplicated code** — winnowing over file contents…) with statistical
+thresholds, a **health score** and a Markdown report. An optional **`.codemap.rules.json`** file in the repository
+(layers = path globs, `forbid` between layers, `noCycles`) is enforced as the
+“Architecture rule violations” rule. In the details panel every file and folder shows its **coupling** — Ca / Ce / I
+(afferent, efferent, Martin's instability). The visible graph can be **exported** to DOT (Graphviz),
+Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `exportGraph`.
 
-### AI — opcjonalnie, z zachowaniem prywatności
-- **WebLLM** — modele uruchamiane w przeglądarce (WebGPU), wagi w cache, bez wysyłania czegokolwiek.
-- **Ollama** — lokalny serwer modeli na Twoim komputerze.
-- **Klucze API (chmura)** — dowolna liczba kluczy: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
-  OpenRouter, DeepSeek, xAI, Together. Dostawca jest **wykrywany po formacie klucza** i potwierdzany
-  przyciskiem „Testuj" (lista modeli), model wybierany per klucz; działające klucze używane rotacyjnie.
-- **ChatBot** steruje aplikacją (ok. 50 akcji: układ, filtry, motyw, wyszukiwanie, migawki…). Akcje spoza
-  zbioru „tylko widok" wymagają kliknięcia — model nie może sam wczytać, skasować ani wyeksportować.
-- W polu czatu wpisz **`/`**, aby zobaczyć wszystkie narzędzia (statystyki, top plików, szukanie w treści,
-  zależności, eksport…); przeciągnij element z mapy do okna czatu, aby dołączyć go do pytania (do 30).
-  Okno czatu można przesuwać i rozciągać, a lista rozmów ma regulowaną szerokość.
-- Modele myślące (DeepSeek R1, Qwen 3) pokazują tok rozumowania w zwijanym panelu; przycisk ⚡ daje
-  szybką odpowiedź bez rozumowania.
-  Modele lokalne (WebLLM, Ollama) odpowiadają w **trybie strukturalnym**: JSON `{reply, actions}` wymuszony
-  schematem, więc nawet małe modele niezawodnie wykonują polecenia.
-- **Pytania o kod (RAG, tryb 📚)** — przełącznik w nagłówku czatu: ChatBot odpowiada na podstawie
-  fragmentów kodu wczytanego projektu i cytuje je jako `[1]`, `[2]` (klik = plik otwarty na tych liniach).
-  Wyszukiwanie słów działa od razu (identyfikatory rozbijane, pytania po polsku rozszerzane o angielskie
-  pojęcia); model embeddingów w Ollamie (`bge-m3`, `nomic-embed-text`) dodaje wyszukiwanie semantyczne —
-  indeks budowany w Ustawieniach → AI, wektory zapisane w przeglądarce i przeliczane tylko dla zmienionych
-  fragmentów. Narzędzie `/codeSearch` pokazuje trafienia bez modelu.
-- **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
-- Do modeli w chmurze trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików; fragmenty
-  kodu (tryb 📚, podgląd załączników) dostają tylko modele **lokalne** — WebLLM i Ollama.
+### AI — optional and privacy-preserving
+- **WebLLM** — models that run in the browser (WebGPU), with weights cached and nothing sent anywhere.
+- **Ollama** — a local model server on your own computer.
+- **API keys (cloud)** — as many keys as you like: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
+  OpenRouter, DeepSeek, xAI, Together. The provider is **detected from the key format** and confirmed with the
+  **Test** button (which fetches the model list); the model is chosen per key, and working keys are used in rotation.
+- **ChatBot** controls the app (about 50 actions: layout, filters, theme, search, snapshots…). Anything outside
+  the “view-only” set needs a click — the model can't load, delete or export anything on its own.
+- Type **`/`** in the chat box to see every tool (stats, top files, content search,
+  dependencies, export…); drag an element from the map into the chat window to attach it to your question (up to 30).
+  The chat window can be moved and resized, and the conversation list has an adjustable width.
+- Reasoning models (DeepSeek R1, Qwen 3) show their reasoning trace in a collapsible panel; the ⚡ button gives
+  a **Quick answer** without reasoning.
+  Local models (WebLLM, Ollama) answer in **structured mode**: JSON `{reply, actions}` enforced by a
+  schema, so even small models carry out commands reliably.
+- **Code questions (RAG, 📚 mode)** — a toggle in the chat header: ChatBot answers from
+  snippets of the loaded project's code and cites them as `[1]`, `[2]` (click = the file opens at those lines).
+  Keyword search works out of the box (identifiers are split apart, Polish questions are expanded with English
+  terms); an embedding model in Ollama (`bge-m3`, `nomic-embed-text`) adds semantic search —
+  the index is built in Settings → AI, and the vectors are stored in the browser and recomputed only for changed
+  snippets. The `/codeSearch` tool shows matches without any model.
+- **Runner** — a sandbox (`iframe` without `allow-same-origin`) for running generated HTML/SVG/CSS/JS/PHP.
+- Cloud models only ever receive the project's **structure** (names, numbers), never file contents; code
+  snippets (📚 mode, attachment previews) go to **local** models only — WebLLM and Ollama.
 
 ### MindMap
-Drugi tryb pracy: 16 szablonów kart, **34 typy diagramów**, warstwa rysowania z 9 narzędziami
-(styl odręczny), undo/redo, import/eksport Markdown, oś czasu migawek.
+A second working mode: 16 frame templates, **34 diagram types**, a drawing layer with 9 tools
+(hand-drawn style), undo/redo, Markdown import/export, and a snapshot timeline.
 
-### Dysk i Sejf
-- **Sejf** — magazyn w OPFS szyfrowany hasłem (AES-GCM-256, PBKDF2), galeria zdjęć, album „Ulubione".
-- **Dysk** — prawdziwy folder na komputerze przez File System Access API (uchwyt trwały).
+### Drive & Vault
+- **Vault** — password-encrypted storage in OPFS (AES-GCM-256, PBKDF2), a photo gallery and a “Favorites” album.
+- **Drive** — a real folder on your computer through the File System Access API (with a persistent handle).
 
-### Interfejs
-Polski i angielski, motyw ciemny/jasny, 8 presetów kolorystycznych, suwaki wyglądu „liquid glass",
-interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainstalowania.
+### Interface
+English and Polish, dark/light theme, 8 color presets, “liquid glass” appearance sliders,
+an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an installable PWA.
 
-### Przegląd PR — mapa wpływu
-- Projekt → **Przegląd PR** (numer albo adres PR / MR z GitHub, GitLab, Bitbucket) albo link
-  `#repo=owner/nazwa&pr=N`: zmienione pliki (znaczniki A/M/D/R na węzłach), pliki od nich zależne i **ryzyko
-  każdej zmiany** (0–100) z częstości zmian, złożoności, liczby zależnych, testów / pokrycia, rozmiaru zmiany
-  i tego, czy autor zna plik; sugerowani recenzenci z historii git; kolorowanie „Wpływ PR"; raport Markdown.
-- To samo w CI: CLI `--base` / `--baseline` / `--pr-md` i komentarz w PR z GitHub Action
-  (health score przed i po, nowe znaleziska, próg `max-score-drop`) — [docs/github-action.md](docs/github-action.md).
+### PR review — impact map
+- Project → **PR review — impact map…** (a PR / MR number or URL from GitHub, GitLab or Bitbucket) or the link
+  `#repo=owner/name&pr=N`: changed files (A/M/D/R markers on the nodes), the files that depend on them, and the
+  **risk of each change** (0–100) based on change frequency, complexity, number of dependents, tests / coverage,
+  change size and whether the author knows the file; suggested reviewers from git history; a “PR impact” coloring; a Markdown report.
+- The same in CI: the CLI's `--base` / `--baseline` / `--pr-md` options and a PR comment from the GitHub Action
+  (health score before and after, new findings, a `max-score-drop` threshold) — see [docs/github-action.md](docs/github-action.md) (in Polish).
 
-### CLI i CI
-- `node cli/codemap.mjs analyze [ścieżka]` (albo `npm link` → `codemap`) — ta sama analiza co panel „Analiza
-  statyczna", bez przeglądarki i bez zależności npm: historia git z `.git`, testy i pokrycie, reguły architektury.
-- Raporty: terminal, `--json`, `--md`, `--sarif` (GitHub code scanning), `--map` (mapa do otwarcia w aplikacji),
-  `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
-  `--max-findings` (kody wyjścia 0 / 1 / 2); przegląd zmian: `--base <ref>`, `--baseline`, `--pr-md`,
+### CLI and CI
+- `node cli/codemap.mjs analyze [path]` (or `npm link` → `codemap`) — the same analysis as the “Static
+  analysis” panel, with no browser and no npm dependencies: git history from `.git`, tests and coverage, architecture rules.
+- Reports: terminal, `--json`, `--md`, `--sarif` (GitHub code scanning), `--map` (a map to open in the app),
+  `--export dot|mermaid|graphml`. CI thresholds: `--min-score`, `--fail-on cycles,archviolation|high`,
+  `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
-- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
-  z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
+- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — a report in the step summary, SARIF, thresholds; an example
+  with code scanning is in [docs/github-action.md](docs/github-action.md) (in Polish). The same step runs in this repository's CI.
 
 ---
 
-## ⌨️ Skróty klawiszowe
+## ⌨️ Keyboard shortcuts
 
-| Klawisz | Działanie | | Klawisz | Działanie |
+| Key | Action | | Key | Action |
 |---|---|---|---|---|
-| `F` | dopasuj widok | | `Q` / `E` | obróć w lewo / prawo |
-| `+` / `-` | przybliż / oddal | | `R` | wyzeruj obrót |
-| `/` | wyszukiwanie | | `T` | perspektywa (pseudo-3D) |
-| `Ctrl+K` | paleta poleceń | | `Alt+S` | ściągawka skrótów |
-| `Esc` | odznacz / zamknij | | `WASD` + `Spacja` | tryb lotu |
+| `F` | fit view | | `Q` / `E` | rotate left / right |
+| `+` / `-` | zoom in / out | | `R` | reset rotation |
+| `/` | search | | `T` | perspective (pseudo-3D) |
+| `Ctrl+K` | command palette | | `Alt+S` | shortcuts cheatsheet |
+| `Esc` | deselect / close | | `WASD` + `Space` | fly mode |
 
-Mysz: przeciąganie tła = przesuwanie • kółko = zoom • `Shift`+przeciąganie lub PPM = obrót •
-dwuklik na folderze = zwiń/rozwiń • PPM = menu kontekstowe.
+Mouse: drag the background = pan • wheel = zoom • `Shift`+drag or right-drag = rotate •
+double-click a folder = collapse/expand • right-click = context menu.
 
 ---
 
-## 🔒 Prywatność — co opuszcza Twoje urządzenie
+## 🔒 Privacy — what leaves your device
 
-Domyślnie **nic**. Analiza, mapa, migawki, Sejf i historia żyją w przeglądarce. Sieć jest używana tylko
-na Twoje wyraźne żądanie:
+By default, **nothing**. Analysis, the map, snapshots, the Vault and history all live in your browser. The network is
+used only when you explicitly ask for it:
 
-| Kiedy | Dokąd | Co |
+| When | Where to | What |
 |---|---|---|
-| wczytanie repozytorium | api.github.com / gitlab.com / api.bitbucket.org | adres repo, opcjonalny token (tylko w pamięci karty) |
-| Historia git repozytorium z URL — na żądanie | te same API + avatars.githubusercontent.com | zapytania o listę commitów i zmienione pliki; awatary autorów. Lokalny `.git` jest czytany wyłącznie w przeglądarce |
-| klucz API (chmura) | API wybranego dostawcy (api.mistral.ai, api.openai.com, api.anthropic.com, …) | Twój klucz i struktura projektu (nazwy, liczby) |
-| WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
-| Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
-| Symbole (tree-sitter) — po włączeniu | cdn.jsdelivr.net | pobranie parsera web-tree-sitter i gramatyk WASM; parsowanie lokalnie w Web Workerze |
-| Ollama | 127.0.0.1:11434 | lokalnie — także fragmenty kodu w trybie 📚 i ich embeddingi (RAG) |
-| konto (opcjonalne) | Twój własny serwer | mapy, migawki, ustawienia; Sejf **tylko jako szyfrogram** |
-| otwarcie linku `#repo=` / `#gist=` | te same API co wczytanie repozytorium; api.github.com i gist.githubusercontent.com | adres repozytorium / id gista, **bez tokenu** |
-| publiczny link do mapy — po zalogowaniu, na żądanie | Twój serwer, potem **każdy, kto ma link** | kopia mapy: nazwy i ścieżki plików, metryki, zależności; podgląd treści i e-maile autorów tylko po odznaczeniu opcji; do wygaśnięcia lub unieważnienia |
+| loading a repository | api.github.com / gitlab.com / api.bitbucket.org | the repository address, an optional token (kept only in the tab's memory) |
+| Git history of a repository loaded from a URL — on request | the same APIs + avatars.githubusercontent.com | requests for the commit list and changed files; author avatars. A local `.git` is read only inside the browser |
+| API key (cloud) | the chosen provider's API (api.mistral.ai, api.openai.com, api.anthropic.com, …) | your key and the project structure (names, numbers) |
+| WebLLM | esm.run, huggingface.co | downloading the library and model weights; inference runs locally |
+| PHP Runner | cdn.jsdelivr.net | downloading the php-wasm interpreter |
+| Symbols (tree-sitter) — once enabled | cdn.jsdelivr.net | downloading the web-tree-sitter parser and WASM grammars; parsing runs locally in a Web Worker |
+| Ollama | 127.0.0.1:11434 | local — including code snippets in 📚 mode and their embeddings (RAG) |
+| account (optional) | your own server | maps, snapshots, settings; the Vault **only as ciphertext** |
+| opening a `#repo=` / `#gist=` link | the same APIs as loading a repository; api.github.com and gist.githubusercontent.com | the repository address / gist id, **without a token** |
+| public map link — when logged in, on request | your server, then **anyone who has the link** | a copy of the map: file names and paths, metrics, dependencies; file content previews and author e-mails only if you untick those options; until it expires or is revoked |
 
-Klucze API są przechowywane w `localStorage` przeglądarki i nigdy nie są synchronizowane z serwerem.
-Szczegóły i sposób zgłaszania podatności: [SECURITY.md](SECURITY.md).
+API keys are stored in the browser's `localStorage` and are never synced to the server.
+Details and how to report a vulnerability: [SECURITY.md](SECURITY.md) (in Polish).
 
 ---
 
-## 🧱 Architektura
+## 🧱 Architecture
 
-Czysty JavaScript, bez zależności i bez kroku budowania. Moduły to globalne obiekty `CM.*`
-ładowane w kolejności z `index.html`.
+Pure JavaScript, with no dependencies and no build step. The modules are global `CM.*` objects
+loaded in order from `index.html`.
 
 ```
-index.html                 # struktura UI
-css/styles.css             # motyw „cyber-cartography" (ciemny / jasny)
-js/util.js                 # kamera (pan/zoom/obrót/tilt), narzędzia, CM.VERSION
-js/icons.js  js/i18n.js    # ikony SVG, tłumaczenia PL/EN
-js/languages.js            # rejestr 150+ formatów
-js/analysis.js             # metryki, parsowanie importów, rozwiązywanie zależności
-js/analysis-worker.js      # analiza plików (metryki, importy, symbole) w Web Workerze
-js/symbols-core.js  js/symbols.js  js/symbols-worker.js   # graf symboli: tree-sitter w workerze
-js/graph.js                # model: hierarchia, agregaty, zwijanie, cykle, wpływ, (de)serializacja, diff
-js/layouts.js              # 13 układów (+ fizyka), js/sim-worker.js — Web Worker
-js/export.js               # eksport widocznego grafu: DOT (Graphviz), Mermaid, GraphML (yEd)
-js/metrics.js              # sprzężenia Ca/Ce/I per plik i folder, duplikaty kodu (winnowing)
-js/rules.js                # reguły architektury z .codemap.rules.json (warstwy, forbid, noCycles)
-js/git-core.js             # historia git bez DOM: autorzy, własność, bus factor, hotspoty, oś czasu
-js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, delty, packed-refs) w Web Workerze
-js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi Ollamy (IndexedDB), kontekst z cytatami
-js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
-js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
-js/overlays.js             # kolorowanie węzłów wg danych (język, złożoność, git, pokrycie) + legenda
-js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral; pliki boczne (.git, lcov)
-js/git-remote.js           # historia commitów z API GitHub / GitLab / Bitbucket
-js/storage.js              # migawki i sesja (IndexedDB)
-js/ui.js                   # panele szczegółów, filtry, historia, diff
-js/settings.js             # ustawienia, samouczek, instrukcja
-js/inspect.js              # analiza statyczna (16 reguł + reguły architektury, health score)
+index.html                 # UI structure
+css/styles.css             # "cyber-cartography" theme (dark / light)
+js/util.js                 # camera (pan/zoom/rotate/tilt), utilities, CM.VERSION
+js/icons.js  js/i18n.js    # SVG icons, PL/EN translations
+js/languages.js            # registry of 150+ formats
+js/analysis.js             # metrics, import parsing, dependency resolution
+js/analysis-worker.js      # file analysis (metrics, imports, symbols) in a Web Worker
+js/symbols-core.js  js/symbols.js  js/symbols-worker.js   # symbol graph: tree-sitter in a worker
+js/graph.js                # model: hierarchy, aggregates, collapsing, cycles, impact, (de)serialization, diff
+js/layouts.js              # 13 layouts (+ physics), js/sim-worker.js — Web Worker
+js/export.js               # export of the visible graph: DOT (Graphviz), Mermaid, GraphML (yEd)
+js/metrics.js              # Ca/Ce/I coupling per file and folder, duplicated code (winnowing)
+js/rules.js                # architecture rules from .codemap.rules.json (layers, forbid, noCycles)
+js/git-core.js             # DOM-free git history: authors, ownership, bus factor, hotspots, timeline
+js/git-local.js  js/git-worker.js   # local .git reader (objects, packs, deltas, packed-refs) in a Web Worker
+js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddings (IndexedDB), context with citations
+js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
+js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators
+js/overlays.js             # node coloring by data (language, complexity, git, coverage) + legend
+js/loaders.js              # folder / files / archives / PDF / GitHub / GitLab / Bitbucket / Mistral; side files (.git, lcov)
+js/git-remote.js           # commit history from the GitHub / GitLab / Bitbucket APIs
+js/storage.js              # snapshots and session (IndexedDB)
+js/ui.js                   # details panels, filters, history, diff
+js/settings.js             # settings, tutorial, user manual
+js/inspect.js              # static analysis (16 rules + architecture rules, health score)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
-js/mindmap.js  js/mmdraw.js  # tryb MindMap + warstwa rysowania
-js/drive.js                # Dysk (File System Access) i Sejf (OPFS + AES-GCM)
-js/auth.js  js/sync.js     # konto i synchronizacja (tylko z backendem)
-js/app-core.js             # CM.App — wspólny kontekst (graph, renderer, state, filters, handlers) + rdzeń:
-                           #   init/boot, apply, ingest, loadFromJSON, clearAll, zaznaczenie, sesja, tryby, worker
-js/chrome.js               # okablowanie DOM: toolbar, menu, panele, wygląd/ustawienia, filtry, szukaj, DnD, klawiatura, PWA
-js/repo-hosts.js           # GitHub/GitLab/Bitbucket: autorzy, deep-linki, gałęzie, gist, udostępnialny widok (#v=)
-js/compare.js              # porównywanie schematów, cykle, historia migawek i diff, hotspoty/Inspect
-js/navigation.js           # radar okolicy, minimapa, tarcza obrotu, nawigacja WASD, menu kontekstowe, eksport obrazu
-js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec, registerAction), paleta Ctrl+K, dane demo
-js/git.js                  # historia git na mapie: uruchamianie, nakładki, panel, awatary, oś czasu, akcje ChatBota
-js/pr-core.js  js/pr.js    # mapa wpływu PR: ryzyko zmian, zależne, recenzenci (bez DOM) + okno, nakładka, panel
-js/tests-ui.js             # testy i pokrycie w aplikacji: nakładki, panel, Inspect, ChatBot, wczytywanie raportów
-js/deeplink.js  js/links.js  # linki #repo= / #gist= / #share= (walidacja, wczytanie), okno publicznych linków
-js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)
-cli/                       # CLI headless (runtime vm z tymi samymi js/*.js, analiza, SARIF, raporty); action.yml — GitHub Action
-sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
+js/mindmap.js  js/mmdraw.js  # MindMap mode + drawing layer
+js/drive.js                # Drive (File System Access) and Vault (OPFS + AES-GCM)
+js/auth.js  js/sync.js     # account and sync (backend only)
+js/app-core.js             # CM.App — shared context (graph, renderer, state, filters, handlers) + core:
+                           #   init/boot, apply, ingest, loadFromJSON, clearAll, selection, session, modes, worker
+js/chrome.js               # DOM wiring: toolbar, menus, panels, appearance/settings, filters, search, DnD, keyboard, PWA
+js/repo-hosts.js           # GitHub/GitLab/Bitbucket: authors, deep links, branches, gist, shareable view (#v=)
+js/compare.js              # schema comparison, cycles, snapshot history and diff, hotspots/Inspect
+js/navigation.js           # neighborhood radar, minimap, rotation dial, WASD navigation, context menu, image export
+js/ai-bridge.js            # AI (Mistral/local), ChatBot bridge (appState/exec, registerAction), Ctrl+K palette, demo data
+js/git.js                  # git history on the map: running, overlays, panel, avatars, timeline, ChatBot actions
+js/pr-core.js  js/pr.js    # PR impact map: change risk, dependents, reviewers (DOM-free) + dialog, overlay, panel
+js/tests-ui.js             # tests and coverage in the app: overlays, panel, Inspect, ChatBot, report loading
+js/deeplink.js  js/links.js  # #repo= / #gist= / #share= links (validation, loading), public links dialog
+js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API for chatbot/drive/inspect/smoke)
+cli/                       # headless CLI (vm runtime with the same js/*.js, analysis, SARIF, reports); action.yml — GitHub Action
+sw.js  manifest.webmanifest  serve.py                       # PWA and local server
 ```
 
-Moduły `app-core` → `ai-bridge` dzielą jeden kontekst `CM.App` (`A`): każdy dopisuje swoje funkcje przez
-`Object.assign(A, …)` i woła pozostałe wyłącznie w czasie działania przez `A.nazwa(…)`, więc poza tym, że
-`app-core.js` ładuje się pierwszy (tworzy `CM.App`), a `app.js` ostatni, ich kolejność nie ma znaczenia.
-`A.graph` jest podmieniany przy każdym wczytaniu — moduły czytają go w momencie wywołania, nie kopiują.
+The modules from `app-core` to `ai-bridge` share a single `CM.App` context (`A`): each one adds its functions with
+`Object.assign(A, …)` and calls the others only at run time through `A.name(…)`, so apart from
+`app-core.js` loading first (it creates `CM.App`) and `app.js` last, their order doesn't matter.
+`A.graph` is replaced on every load — modules read it at call time instead of keeping a copy.
 
-Plan rozwoju i znane długi techniczne: [docs/ROADMAP.md](docs/ROADMAP.md).
+Roadmap and known technical debt: [docs/ROADMAP.md](docs/ROADMAP.md) (in Polish).
 
 ---
 
-## ☁️ Konto i synchronizacja (opcjonalny backend)
+## ☁️ Account and sync (optional backend)
 
-Katalog `server/` zawiera mały serwer (Node.js ≥ 20.6, Fastify, SQLite) dodający konta z weryfikacją
-e-mail i synchronizację map, migawek, ustawień oraz Sejfu — ten ostatni **wyłącznie jako szyfrogram**
-(AES-GCM po stronie klienta; serwer nigdy nie widzi haseł ani treści). Bez logowania aplikacja działa
-w 100 % lokalnie. Bez backendu przycisk „Konto" jest ukryty. Zalogowany użytkownik może utworzyć **publiczny
-link do mapy** (Projekt → „Udostępnij publiczny link…", `#share=<id>`) z czasem wygaśnięcia i unieważnianiem
-w Ustawienia → Konto; domyślnie bez podglądu treści plików. Testy backendu: `cd server; npm test`.
+The `server/` directory contains a small server (Node.js ≥ 20.6, Fastify, SQLite) that adds accounts with e-mail
+verification and syncing of maps, snapshots, settings and the Vault — the Vault **only as ciphertext**
+(client-side AES-GCM; the server never sees passwords or content). Without logging in, the app works
+100 % locally. Without a backend, the **Account** button is hidden. A logged-in user can create a **public
+map link** (Project → “Share a public link…”, `#share=<id>`) with an expiry time, and revoke it
+in Settings → Account; file content previews are left out by default. Backend tests: `cd server; npm test`.
 
 ```powershell
 cd server; copy .env.example .env; npm install; npm start   # → http://localhost:8787 (frontend + API)
 ```
 
-Maile w trybie dev drukują się w konsoli (`EMAIL_MODE=console`). Serwer dev nasłuchuje tylko na
-`127.0.0.1` i serwuje wyłącznie pliki frontendu. Produkcja (Caddy + systemd + backup):
-[`deploy/setup-vps.md`](deploy/setup-vps.md), wgrywanie `.\tools\deploy.ps1 -Server deploy@twoja-domena`.
+In development, e-mails are printed to the console (`EMAIL_MODE=console`). The dev server listens only on
+`127.0.0.1` and serves nothing but the frontend files. Production (Caddy + systemd + backups):
+[`deploy/setup-vps.md`](deploy/setup-vps.md) (in Polish); upload with `.\tools\deploy.ps1 -Server deploy@your-domain`.
 
 ---
 
-## 🤝 Współpraca
+## 🤝 Contributing
 
-Zgłoszenia błędów i pomysły: [Issues](https://github.com/RaCzKoViC/CodeMap/issues).
-Zasady, które utrzymują projekt prostym:
+Bug reports and ideas: [Issues](https://github.com/RaCzKoViC/CodeMap/issues).
+The rules that keep the project simple:
 
-- brak kroku budowania i zależności npm po stronie frontendu — nowe biblioteki tylko ładowane na żądanie;
-- każdy tekst w UI przez `CM.i18n.t()` z tłumaczeniem PL **i** EN;
-- zmiana plików `js/` lub `css/` = bump `?v=` w `index.html` i `CACHE` w `sw.js`;
-- `index.html` edytuj narzędziem zachowującym UTF-8;
-- przed commitem `npm run verify` (testy, lint, sonda gramatyk, sonda `.git` zgodna z `git log`) i `node tools/smoke.mjs` (headless Chrome);
-  po zmianach w wyglądzie `node tools/screenshots.mjs` odświeża zrzuty w `docs/`.
+- no build step and no npm dependencies on the frontend — new libraries are only loaded on demand;
+- every UI string goes through `CM.i18n.t()` with both a PL **and** an EN translation;
+- a change to files in `js/` or `css/` = bump `?v=` in `index.html` and `CACHE` in `sw.js`;
+- edit `index.html` with a tool that preserves UTF-8;
+- before committing, run `npm run verify` (tests, lint, grammar probe, a `.git` probe checked against `git log`) and `node tools/smoke.mjs` (headless Chrome);
+  after visual changes, `node tools/screenshots.mjs` refreshes the screenshots in `docs/`.
 
-Historia zmian: [CHANGELOG.md](CHANGELOG.md).
+Changelog: [CHANGELOG.md](CHANGELOG.md) (in Polish).
 
 ---
 
-## 📜 Licencja
+## 📜 License
 
-CodeMap jest **open source** na licencji [MIT](LICENSE) — możesz go używać, kopiować, modyfikować
-i rozpowszechniać (także komercyjnie), pod warunkiem zachowania informacji o prawach autorskich.
+CodeMap is **open source** under the [MIT](LICENSE) license — you may use, copy, modify
+and distribute it (commercially too), as long as the copyright notice is kept.
 
-Biblioteki ładowane na żądanie: [WebLLM](https://github.com/mlc-ai/web-llm) (Apache-2.0),
+Libraries loaded on demand: [WebLLM](https://github.com/mlc-ai/web-llm) (Apache-2.0),
 [rough.js](https://github.com/rough-stuff/rough) (MIT), [php-wasm](https://github.com/seanmorris/php-wasm) (Apache-2.0).
 Backend: Fastify, better-sqlite3, argon2 (MIT).

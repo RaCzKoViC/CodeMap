@@ -19,6 +19,12 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **GitHub Action — komentarz w PR**: w `pull_request` baza PR automatycznie, jeden komentarz aktualizowany
   przy kolejnych pushach (`pr-comment`), `max-score-drop`, link do mapy wpływu, wyjścia `risk` i `score-delta`.
 
+### Zmienione
+- **README po angielsku** jako główne (`README.md`), polskie w `README.pl.md` (przełącznik języka na górze obu).
+- Wspólny kod zamiast kopii (Inspect „zduplikowany kod” na samym CodeMap): fizyka układu siłowego w `js/physics.js`
+  (okno i `sim-worker.js`), obsługa Chrome przez CDP w `tools/cdp.mjs` (smoke i zrzuty), pigułka postępu / okno
+  dialogowe / token / indeks plików w `js/ui-kit.js` (git, PR, linki).
+
 ### Bezpieczeństwo
 - Treść plików z sekretami (`.env*` poza przykładami, `.npmrc`, `.netrc`, klucze prywatne, `*.pem/.key/.p12/.pfx/.jks`)
   nie jest czytana — plik jest na mapie, ale jego treść nie trafia do podglądu, zapisanej mapy, publicznego

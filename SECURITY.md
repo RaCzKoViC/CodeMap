@@ -11,7 +11,7 @@ Wspierana jest najnowsza wersja z gałęzi `main` / ostatniego wydania.
 ## Model zagrożeń w skrócie
 
 **Frontend (aplikacja w przeglądarce)** działa w całości lokalnie. Sieć jest używana tylko na żądanie
-użytkownika (tabela w [README → Prywatność](README.md#-prywatność--co-opuszcza-twoje-urządzenie)).
+użytkownika (tabela w [README → Prywatność](README.pl.md#-prywatność--co-opuszcza-twoje-urządzenie)).
 
 - Tokeny GitHub/GitLab/Bitbucket żyją wyłącznie w pamięci karty; adresy API są zaszyte na stałe,
   więc obcy URL repozytorium nie może przekierować tokenu.
