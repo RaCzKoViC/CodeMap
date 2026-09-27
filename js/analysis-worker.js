@@ -5,7 +5,9 @@
    dostaje wyniki i buduje z nich graf (foldery, krawędzie) bez parsowania. Samowystarczalny: importuje
    te same moduły co strona (util → languages → analysis), więc regexy parserów mają jedno źródło. */
 self.window = self;                                   // util.js: window.CM = window.CM || {}
-importScripts('util.js', 'languages.js', 'analysis.js');
+// wersja z URL-a workera (?v=…): bez niej importScripts dostałby nieaktualną kopię z cache service workera
+const V = (self.location && self.location.search.match(/[?&]v=([\w.-]+)/) || [])[1] || '';
+importScripts(...['util.js', 'languages.js', 'analysis.js'].map((f) => f + (V ? '?v=' + V : '')));
 const A = self.CM.Analysis, L = self.CM.languages, U = self.CM.util;
 const CHUNK = 24;                                     // plików na jeden krok (między krokami: postęp + kolejka zadań)
 let curGen = 0;

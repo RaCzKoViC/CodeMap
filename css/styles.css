@@ -2082,3 +2082,7 @@ body.light .set-ai-prov{background:rgba(20,30,45,.08)}
 .set-localai-sugbtn{border:1px solid var(--glass-border);background:rgba(255,255,255,.05);color:var(--text);font-size:11px;padding:3px 8px;border-radius:999px;cursor:pointer}
 .set-localai-sugbtn:hover{border-color:var(--accent);color:var(--accent)}
 .set-localai-pull{margin-top:4px}
+
+/* ---- graf symboli: pigułka postępu analizy tree-sittera, przycisk „Pokaż plik” ---- */
+.toast.sym-pill{border-left:3px solid var(--accent)}
+.det-showfile{margin-top:8px}

@@ -111,6 +111,28 @@ const inspectOk = await evalJs(`(async()=>{ try{
   return okA && okD ? 'ok' : 'rules-demo: '+JSON.stringify(rules2)+' '+JSON.stringify((av||dc||{}).items);
 }catch(e){ return String(e&&e.stack||e); } })()`);
 
+// graf symboli (tree-sitter z CDN jsdelivr): włącz na demo, czekaj ≤ 60 s, rozwiń plik, sprawdź widoczność
+// i eksport. Brak sieci / CDN → „pominięto", nie błąd (analiza jest opcjonalna i opt-in).
+const symbolsRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  CMApp.loadDemo();
+  for(let i=0;i<60;i++){ if(CMApp.graph && CMApp.graph.meta && /demo/i.test(CMApp.graph.meta.name||'') && CMApp.graph.nodes.size>20) break; await sleep(100); }
+  CMApp.exec('symbols',{on:true});
+  for(let i=0;i<120;i++){ const st=CM.Symbols.state(); if(CMApp.graph.symbolsInfo || st.status==='error') break; await sleep(500); }
+  const st=CM.Symbols.state(), info=CMApp.graph.symbolsInfo;
+  if(!info) return {skip:true, why:st.error||st.status};
+  const f=[...CMApp.graph.nodes.values()].find(n=>n.symbolCount);
+  CM.App.toggleCollapse(f);
+  const vis=CMApp.graph.getVisible(CM.App.filters);
+  const shown=vis.nodes.filter(n=>n.type==='symbol').length;
+  const sym=vis.nodes.find(n=>n.type==='symbol'); if(sym) CM.App.select(sym);
+  const details=(document.querySelector('#details-body')||{}).textContent||'';
+  const dot=CM.Export.build(CMApp.graph, CM.App.filters, 'dot');
+  CMApp.exec('symbols',{on:false});
+  const hidden=!CMApp.graph.getVisible(CM.App.filters).nodes.some(n=>n.type==='symbol');
+  return {count:info.count, calls:info.calls, files:info.files, shown, details:details.length>0, exportOk:dot.nodes>0 && /digraph/.test(dot.text), hidden};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -121,6 +143,9 @@ check(exportOk === 'ok', `eksport grafu DOT / Mermaid / GraphML na demo${exportO
 check(sweep && sweep.fails.length === 0 && sweep.ran === sweep.total, `akcje CMApp.exec: ${sweep?.ran}/${sweep?.total} OK${sweep?.fails?.length ? '\n   ' + sweep.fails.join('\n   ') : ''}`);
 check(sweep && sweep.nodesAfter === nodes, `graf nietknięty po przejściu (${sweep?.nodesAfter} węzłów)`);
 check(inspectOk === 'ok', `Inspect: reguły architektury (.codemap.rules.json) i duplikaty kodu${inspectOk === 'ok' ? '' : ': ' + inspectOk}`);
+if (symbolsRes && symbolsRes.skip) console.log(`– graf symboli (tree-sitter): pominięto — ${symbolsRes.why}`);
+else check(symbolsRes && !symbolsRes.error && symbolsRes.count > 0 && symbolsRes.shown > 0 && symbolsRes.details && symbolsRes.exportOk && symbolsRes.hidden,
+  `graf symboli (tree-sitter): ${symbolsRes && symbolsRes.error ? symbolsRes.error : JSON.stringify(symbolsRes)}`);
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

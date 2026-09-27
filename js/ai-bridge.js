@@ -346,6 +346,9 @@
         A.aiAskNode(node, I.t('cb.explainQ','Wyjaśnij rolę tego elementu w projekcie i co warto o nim wiedzieć.')).then(txt=>{ if(CM.UI&&CM.UI.renderDetails) U.toast(String(txt||'').slice(0,400), 'info', 12000); }).catch(e=>U.toast((e&&e.message)||String(e),'error'));
         return I.t('cb.explainRun','Pytam AI o: ')+node.name; }
       case 'clearChat': { if(CM.ChatBot&&CM.ChatBot._newChat) CM.ChatBot._newChat(); return I.t('cb.execClearChat','Nowa rozmowa.'); }
+      case 'symbols': { _needProject(); const on=!(args.on===false||args.on==='false'||args.on===0); const cb=$('#show-symbols');
+        if(cb){ cb.checked=on; cb.dispatchEvent(new Event('change',{bubbles:true})); }
+        return on?I.t('cb.execSymOn','Włączono symbole (tree-sitter) — analiza w tle.'):I.t('cb.execSymOff','Ukryto symbole.'); }
       case 'help': case 'listActions': return I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', ');
       default: throw new Error(I.t('cb.unknownAction','Nieznana akcja: ')+action+'. '+I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', '));
     }
@@ -356,7 +359,7 @@
     'openSettings','openDrive','openHistory','openCompare','saveMap','snapshot','exportImage','exportGraph','copyLink','detectCycles',
     'hotspots','inspect','aiAnalyze','setTheme','setPreset','setAccent','setBackground','setGlass','setSpacing','setNodeScale','setFontScale',
     'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help',
-    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat'];
+    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat','symbols'];
 
   Object.assign(A, {
     paletteCommands, buildPalette, aiStructureSummary, aiKeyList, aiModel, aiConfigured, aiGuard, aiChat,

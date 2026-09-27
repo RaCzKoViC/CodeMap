@@ -174,6 +174,7 @@ CM.Graph = (function(){
       for(const n of this.nodes.values()){
         if(n.type==='folder') n.r = U.clamp(9 + Math.log2((n.descFiles||1)+1)*3.4, 11, 42);
         else if(n.type==='external') n.r = U.clamp(5 + Math.log2((n.count||1)+1)*1.5, 5, 13);
+        else if(n.type==='symbol') n.r = U.clamp(3.5 + Math.log2((n.callsOut||0)+(n.callsIn||0)+1)*0.8, 3.5, 6);
         // file radius reflects its weight (lines if known, else √bytes) on a wider scale so big files stand out
         else { const m = (n.metrics && n.metrics.lines) ? n.metrics.lines : Math.sqrt(n.size||1); n.r = U.clamp(3.5 + Math.log2(m+1)*1.8, 4, 24); }
       }
@@ -204,6 +205,7 @@ CM.Graph = (function(){
         if(n.type==='file' && !F.files) continue;
         if((n.type==='external' || n.id==='__ext__') && !F.externals) continue;
         if(n.type==='file' && F.langsOff && F.langsOff.has(n.lang)) continue;
+        if(n.type==='symbol' && (!F.symbols || (F.langsOff && F.langsOff.has(n.lang)))) continue;   // graf symboli (tree-sitter): tylko gdy włączony
         if(n.type==='file' && F.minMetric>0){
           const m=F.metric||'lines';
           const v = m==='size' ? (n.size||0) : (n.metrics ? (n.metrics[m]||0) : 0);
@@ -218,6 +220,7 @@ CM.Graph = (function(){
         if(e.type==='contains' && !F.contains) continue;
         if(e.type==='import' && !F.import) continue;
         if(e.type==='reference' && !F.reference) continue;
+        if(e.type==='call' && (!F.symbols || F.call===false)) continue;   // wywołania symbol → symbol; przy zwiniętym pliku agregują się do plik → plik
         const sN = this.nodes.get(e.source), tN = this.nodes.get(e.target);
         if(!sN || !tN) continue;
         const s = this._rep(sN, vis), t = this._rep(tN, vis);
@@ -351,6 +354,7 @@ CM.Graph = (function(){
           metrics:n.metrics, count:n.count, importers:n.importers,
           collapsed:!!n.collapsed, x:Math.round(n.x*100)/100, y:Math.round(n.y*100)/100,
           preview: n.preview ? n.preview.slice(0,1500) : null,
+          kind:n.kind, line:n.line, endLine:n.endLine, symbolCount:n.symbolCount,   // graf symboli (węzły 'symbol' i pliki z symbolami)
         });
       }
       return {
@@ -390,8 +394,89 @@ CM.Graph = (function(){
         }
       }
       g._computeImportDegrees();
+      g._restoreSymbols();
       g.computeAggregates();
       return g;
+    }
+
+    // ---- graf symboli (tree-sitter): funkcje/klasy/metody jako węzły drugiego poziomu pod plikiem ----
+    // results = [{path, symbols:[{name,kind,line,endLine,calls:[nazwy]}]}] z CM.Symbols (worker).
+    // Symbole są dziećmi pliku (krawędź contains), plik zostaje ZWINIĘTY (dwuklik rozwija), a wywołania
+    // rozwiązane przez CM.SymbolsCore.resolveCalls (ten sam plik → pliki importowane) to krawędzie 'call'.
+    addSymbols(results){
+      const Core = (typeof CM !== 'undefined') && CM.SymbolsCore;
+      if(!Core) throw new Error('CM.SymbolsCore');
+      this.removeSymbols();
+      const perFile = []; let count = 0;
+      for(const r of (results||[])){
+        const f = this.nodes.get(r.path);
+        if(!f || f.type !== 'file' || !r.symbols || !r.symbols.length) continue;
+        const syms = []; const n0 = r.symbols.length;
+        r.symbols.forEach((s, i)=>{
+          const id = Core.symbolId(f.id, s); if(this.nodes.has(id)) return;
+          const ang = (i / n0) * Math.PI * 2, rad = (f.r || 8) + 10 + (i % 3) * 5;
+          const n = { id, type:'symbol', name:s.name, path:f.path + '#' + s.name, parent:f.id, depth:f.depth + 1,
+            kind:s.kind, line:s.line, endLine:s.endLine, lang:f.lang, langInfo:f.langInfo, children:[], collapsed:false,
+            importsIn:[], importsOut:[], callsOut:0, callsIn:0,
+            x:(f.x||0) + Math.cos(ang) * rad, y:(f.y||0) + Math.sin(ang) * rad, vx:0, vy:0, r:4, _placed:true };
+          this.nodes.set(id, n);
+          if(!f.children) f.children = [];
+          f.children.push(id);
+          this.edges.push({id:'sc' + this.edges.length, source:f.id, target:id, type:'contains'});
+          syms.push({id, name:s.name, calls:s.calls || []});
+        });
+        if(syms.length){ f.symbolCount = syms.length; f.collapsed = true; perFile.push({path:f.id, symbols:syms}); count += syms.length; }
+      }
+      // pliki importowane przez plik (+ pliki w importowanym folderze — pakiety Go)
+      const importsOf = (path)=>{
+        const n = this.nodes.get(path); const out = [];
+        for(const id of ((n && n.importsOut) || [])){
+          const t = this.nodes.get(id); if(!t) continue;
+          if(t.type === 'file') out.push(id);
+          else if(t.type === 'folder') for(const c of (t.children || [])){ const cn = this.nodes.get(c); if(cn && cn.type === 'file') out.push(c); }
+        }
+        return out;
+      };
+      const calls = Core.resolveCalls(perFile, importsOf);
+      for(const e of calls) this.edges.push({id:'call' + this.edges.length, source:e.source, target:e.target, type:'call'});
+      this._countCalls();
+      for(const n of this.nodes.values()) if(n.type === 'symbol') n.r = U.clamp(3.5 + Math.log2(n.callsOut + n.callsIn + 1) * 0.8, 3.5, 6);
+      this.symbolsInfo = {count, calls:calls.length, files:perFile.length, at:Date.now()};
+      return this.symbolsInfo;
+    }
+    removeSymbols(){
+      let any = false;
+      for(const [id, n] of this.nodes){ if(n.type === 'symbol'){ this.nodes.delete(id); any = true; } }
+      if(!any && !this.symbolsInfo) return;
+      this.edges = this.edges.filter(e=>e.type !== 'call' && this.nodes.has(e.target) && this.nodes.has(e.source));
+      for(const n of this.nodes.values()){
+        if(n.symbolCount){ n.children = (n.children || []).filter(c=>this.nodes.has(c)); delete n.symbolCount; if(n.type === 'file') n.collapsed = false; }
+      }
+      this.symbolsInfo = null;
+    }
+    _countCalls(){
+      for(const n of this.nodes.values()) if(n.type === 'symbol'){ n.callsOut = 0; n.callsIn = 0; }
+      for(const e of this.edges){
+        if(e.type !== 'call') continue;
+        const s = this.nodes.get(e.source), t = this.nodes.get(e.target);
+        if(s) s.callsOut = (s.callsOut || 0) + 1;
+        if(t) t.callsIn = (t.callsIn || 0) + 1;
+      }
+    }
+    // po wczytaniu mapy z pliku: symbole dziedziczą język (kolor) po pliku, liczniki wywołań od nowa
+    _restoreSymbols(){
+      let count = 0, files = 0;
+      for(const n of this.nodes.values()){
+        if(n.type !== 'symbol') continue;
+        count++;
+        const f = this.nodes.get(n.parent);
+        if(f){ n.langInfo = f.langInfo || L.lookup(f.name); n.lang = n.lang || f.lang; }
+        n.callsOut = 0; n.callsIn = 0; n.importsIn = n.importsIn || []; n.importsOut = n.importsOut || [];
+      }
+      if(!count) return;
+      for(const n of this.nodes.values()) if(n.symbolCount) files++;
+      this._countCalls();
+      this.symbolsInfo = {count, calls:this.edges.filter(e=>e.type === 'call').length, files, at:0, restored:true};
     }
 
     // ---- snapshot signature (for diffing development over time) ----

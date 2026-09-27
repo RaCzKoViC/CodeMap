@@ -39,6 +39,20 @@ CM.UI = (function(){
     return el('div',{class:'det-icon',style:`background:${U.rgba(c,0.18)};color:${c}`}, L.glyph(node.langInfo||{name:'?'}));
   }
   function metric(val,lbl){ return el('div',{class:'metric'}, el('div',{class:'m-val',text:val}), el('div',{class:'m-lbl',text:lbl})); }
+  const SYM_KIND_PL={function:'funkcja', method:'metoda', constructor:'konstruktor', class:'klasa', interface:'interfejs', struct:'struktura',
+    enum:'enum', trait:'trait', impl:'impl', type:'typ', module:'moduł'};
+  const symKind=(k)=>I.t('cu.symbolKind.'+k, SYM_KIND_PL[k]||k||'symbol');
+  // lista symboli połączonych wywołaniami (klik = skok do symbolu na mapie)
+  function symList(title, ids, graph){
+    const sec=el('div',{class:'det-section'}); sec.appendChild(el('h5',{}, title, el('span',{class:'muted',text:ids.length})));
+    if(!ids.length){ sec.appendChild(el('div',{class:'muted small',text:I.t('sym.none2','—')})); return sec; }
+    const list=el('div',{class:'dep-list'});
+    for(const id of ids.slice(0,60)){ const n=graph.nodes.get(id); if(!n) continue;
+      const f=graph.nodes.get(n.parent);
+      list.appendChild(el('div',{class:'dep-item',style:'cursor:pointer',title:(n.path||n.name),onclick:()=>{ if(window.CMApp&&CMApp.focusNode) CMApp.focusNode(n.id); }},
+        el('span',{class:'tag',text:symKind(n.kind)}), ' '+n.name, el('span',{class:'muted',text:f?('  '+f.name+':'+n.line):''}))); }
+    sec.appendChild(list); return sec;
+  }
 
   // repository card (shown in the empty details panel when a GitHub/GitLab/Bitbucket repo is loaded)
   function repoCard(graph, H){
@@ -75,11 +89,11 @@ CM.UI = (function(){
     }
 
     const dicon=nodeIcon(node);
-    if(node.type!=='external' && H.openFile){ dicon.classList.add('det-icon-open'); dicon.title=I.t('cu.openFullPreview','Otwórz pełny podgląd'); dicon.onclick=()=>H.openFile(node); }
+    if(node.type!=='external' && node.type!=='symbol' && H.openFile){ dicon.classList.add('det-icon-open'); dicon.title=I.t('cu.openFullPreview','Otwórz pełny podgląd'); dicon.onclick=()=>H.openFile(node); }
     body.appendChild(el('div',{class:'det-header'}, dicon,
       el('div',{class:'det-title'},
         el('div',{class:'det-name',text:node.name}),
-        el('div',{class:'det-kind',text: node.type==='folder'?(node.external?I.t('cu.externalDir','katalog zewnętrzny'):I.t('cu.folder','folder')):node.type==='external'?I.t('cu.externalDep','zależność zewnętrzna'):(node.langInfo?node.langInfo.name:I.t('cu.file','plik'))}))));
+        el('div',{class:'det-kind',text: node.type==='symbol'?(symKind(node.kind)+(node.langInfo?(' · '+node.langInfo.name):'')):node.type==='folder'?(node.external?I.t('cu.externalDir','katalog zewnętrzny'):I.t('cu.folder','folder')):node.type==='external'?I.t('cu.externalDep','zależność zewnętrzna'):(node.langInfo?node.langInfo.name:I.t('cu.file','plik'))}))));
 
     if(node.path && node.type!=='external') body.appendChild(el('div',{class:'det-path',text:node.path}));
 
@@ -98,12 +112,28 @@ CM.UI = (function(){
       grid.appendChild(metric(U.fmtBytes(node.totalSize),I.t('cu.size','Rozmiar')));
       grid.appendChild(metric(U.fmtNum(node.totalLines||0),I.t('cu.lines','Linie')));
       grid.appendChild(metric(U.fmtNum(node.childCount||0),I.t('cu.elements','Elementy')));
+    } else if(node.type==='symbol'){
+      grid.appendChild(metric(symKind(node.kind),I.t('sym.kind','Rodzaj')));
+      grid.appendChild(metric(node.line+(node.endLine&&node.endLine!==node.line?('–'+node.endLine):''),I.t('sym.lines','Linie')));
+      grid.appendChild(metric(U.fmtNum(node.callsOut||0),I.t('sym.callsOut','Wywołuje')));
+      grid.appendChild(metric(U.fmtNum(node.callsIn||0),I.t('sym.callsIn','Wywoływany przez')));
     } else {
       grid.appendChild(metric(U.fmtNum(node.count||0),I.t('cu.imports','Importów')));
       grid.appendChild(metric(U.fmtNum((node.importers||[]).length),I.t('cu.filesCount','Plików')));
       grid.appendChild(metric(node.version?('v'+node.version.replace(/^v/,'')):'—',I.t('cu.version','Wersja')));
     }
     body.appendChild(grid);
+    // graf symboli (tree-sitter): wywołania symbolu, a dla pliku — liczba symboli i podpowiedź
+    if(node.type==='symbol' && graph && graph.edges){
+      const out=[], inn=[]; for(const e of graph.edges){ if(e.type!=='call') continue; if(e.source===node.id) out.push(e.target); else if(e.target===node.id) inn.push(e.source); }
+      body.appendChild(symList(I.t('sym.callsOut','Wywołuje'), out, graph));
+      body.appendChild(symList(I.t('sym.callsIn','Wywoływany przez'), inn, graph));
+      const f=graph.nodes.get(node.parent);
+      if(f) body.appendChild(el('button',{class:'tb-btn det-showfile',text:'↗ '+I.t('sym.showFile','Pokaż plik')+' '+f.name,onclick:()=>{ if(window.CMApp&&CMApp.focusNode) CMApp.focusNode(f.id); }}));
+    } else if(node.type==='file' && node.symbolCount){
+      body.appendChild(el('div',{class:'det-section'}, el('h5',{}, I.t('sym.inFile','Symbole (tree-sitter)'), el('span',{class:'muted',text:node.symbolCount})),
+        el('div',{class:'muted small',text:I.t('sym.expandHint','Dwuklik na pliku na mapie rozwija jego symbole.')})));
+    }
     // sprzężenia (Ca / Ce / I) — CM.Metrics, dla plików i folderów projektu (nie dla pakietów zewnętrznych)
     if((node.type==='file' || (node.type==='folder' && !node.external)) && CM.Metrics && graph && graph.nodes){
       const cp=CM.Metrics.couplingFor(graph).get(node.id);

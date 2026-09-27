@@ -46,6 +46,10 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   HTML, Markdown), aliasy `tsconfig`/`jsconfig` per katalog z `extends`, workspaces monorepo, dynamiczne
   odwołania (`new Worker`, `import.meta.glob`…), zależności zewnętrzne jako osobne węzły.
 - Symbole (funkcje, klasy, typy) z własną złożonością w panelu szczegółów.
+- **Graf symboli i wywołań (tree-sitter)** — opcjonalny: funkcje, metody, klasy, struktury, interfejsy,
+  enumy i traity jako węzły drugiego poziomu pod plikiem, a wywołania rozwiązane w pliku i przez importy
+  jako krawędzie. 12 gramatyk (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsowanie
+  w Web Workerze; dwuklik na pliku rozwija jego symbole, przy zwiniętych plikach wywołania łączą pliki.
 - Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
 
 ### Mapa
@@ -129,6 +133,7 @@ na Twoje wyraźne żądanie:
 | klucz API (chmura) | API wybranego dostawcy (api.mistral.ai, api.openai.com, api.anthropic.com, …) | Twój klucz i struktura projektu (nazwy, liczby) |
 | WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
 | Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
+| Symbole (tree-sitter) — po włączeniu | cdn.jsdelivr.net | pobranie parsera web-tree-sitter i gramatyk WASM; parsowanie lokalnie w Web Workerze |
 | Ollama | 127.0.0.1:11434 | lokalnie |
 | konto (opcjonalne) | Twój własny serwer | mapy, migawki, ustawienia; Sejf **tylko jako szyfrogram** |
 
@@ -149,6 +154,8 @@ js/util.js                 # kamera (pan/zoom/obrót/tilt), narzędzia, CM.VERSI
 js/icons.js  js/i18n.js    # ikony SVG, tłumaczenia PL/EN
 js/languages.js            # rejestr 150+ formatów
 js/analysis.js             # metryki, parsowanie importów, rozwiązywanie zależności
+js/analysis-worker.js      # analiza plików (metryki, importy, symbole) w Web Workerze
+js/symbols-core.js  js/symbols.js  js/symbols-worker.js   # graf symboli: tree-sitter w workerze
 js/graph.js                # model: hierarchia, agregaty, zwijanie, cykle, wpływ, (de)serializacja, diff
 js/layouts.js              # 13 układów (+ fizyka), js/sim-worker.js — Web Worker
 js/export.js               # eksport widocznego grafu: DOT (Graphviz), Mermaid, GraphML (yEd)

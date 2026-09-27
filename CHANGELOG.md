@@ -20,6 +20,13 @@ Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
 - Inspect: reguła **zduplikowany kod** — winnowing (k=5 tokenów, okno 4, ≥ 8 wspólnych odcisków)
   na treści plików ≥ 20 linii, próbka 1500 największych, liczone w chunkach; zastępuje dawną
   regułę porównującą same nazwy plików.
+- **Graf symboli i wywołań (tree-sitter)** — przełącznik „Symbole (tree-sitter)" w lewym panelu (opt-in,
+  pierwsze włączenie pobiera `web-tree-sitter` 0.22.6 i gramatyki z `tree-sitter-wasms` 0.1.12 z jsdelivr):
+  funkcje, metody, klasy, struktury, interfejsy, enumy, traity/impl z 12 języków jako węzły-romby pod plikiem,
+  wywołania rozwiązane w tym samym pliku i w plikach importowanych jako przerywane krawędzie `call`
+  (przełącznik „Wywołania"). Parsowanie w Web Workerze z postępem; pliki zwinięte (dwuklik rozwija), przy
+  zwiniętych wywołania łączą pliki; panel szczegółów: rodzaj, linie, „wywołuje" / „wywoływany przez";
+  symbole zapisują się w mapie; akcja ChatBota `symbols {on}`; `tools/symbols-probe.mjs` w `npm run verify`.
 - Analiza plików w **Web Workerze** (`js/analysis-worker.js`): metryki, importy, symbole i hash liczone
   poza głównym wątkiem, chunkami, z postępem „Analiza plików N / M" i anulowaniem; główny wątek składa
   z wyników tylko strukturę i krawędzie (bez Workera: te same kroki z oddawaniem wątku). Jeden przebieg
@@ -40,6 +47,8 @@ Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
   do Ollamy z Ustawień (postęp, propozycje); strumień rozumowania Ollamy pokazywany na żywo.
 
 ### Naprawione
+- Workery (`analysis-worker.js`, `symbols-worker.js`) importują moduły z tym samym stemplem `?v=` co strona —
+  bez niego `importScripts` dostawał nieaktualną kopię z cache service workera.
 - ChatBot wykonywał auto-akcje z pustymi argumentami (`setLayout` → „Nieznany układ", `setTheme` zawsze
   ciemny) — główna przyczyna, dla której modele lokalne „nie sterowały aplikacją".
 - Gramatyka JSON Ollamy tylko dla małych modeli i nigdy z rozumowaniem (z nią ~1 tok/s; duże modele

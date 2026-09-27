@@ -23,7 +23,7 @@
     gidSeq:0,
     cyclesOn:false,
   };
-  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, langsOff:new Set(), metric:'lines', minMetric:0};
+  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, symbols:false, call:true, langsOff:new Set(), metric:'lines', minMetric:0};
 
   // ---------------- init ----------------
   function init(){
@@ -33,7 +33,8 @@
     A.renderer.onSelect = (n)=>select(n);
     A.renderer.onHover  = (n,e)=>{ onHover(n,e); };
     A.renderer.onToggleCollapse = (n)=>toggleCollapse(n);
-    A.renderer.onDblFile = (n)=>{ select(n); A.renderer.centerOn(n); };
+    // plik z symbolami tree-sittera (i włączonym filtrem symboli): dwuklik rozwija/zwija je jak folder
+    A.renderer.onDblFile = (n)=>{ if(n && n.type==='file' && n.symbolCount && filters.symbols){ toggleCollapse(n); return; } select(n); A.renderer.centerOn(n); };
     A.renderer.onContext = (n,x,y)=>A.contextMenu(n,x,y);
     A.renderer.onEdgeSelect = (edge)=>selectEdge(edge);
     A.renderer.onNodeDrop=(n,x,y)=>!!(CM.ChatBot&&CM.ChatBot.acceptDrop&&CM.ChatBot.acceptDrop(n,x,y));   // przeciągnij element mapy do ChatBota
@@ -272,7 +273,9 @@
       let px=0, py=0;
       let p=n.parent!=null?A.graph.nodes.get(n.parent):null;
       while(p){ if(byId.has(p.id)&&p._placed){ px=p.x; py=p.y; break; } p=p.parent!=null?A.graph.nodes.get(p.parent):null; }
-      const ang=(n.id.length*0.7)% (Math.PI*2), rad=46+(n.r||8);
+      let ang=(n.id.length*0.7)% (Math.PI*2), rad=46+(n.r||8);
+      if(n.type==='symbol'){ const par=A.graph.nodes.get(n.parent); const sib=(par&&par.children)||[]; const i=Math.max(0,sib.indexOf(n.id));
+        ang=(i/Math.max(1,sib.length))*Math.PI*2; rad=((par&&par.r)||8)+10+(i%3)*5; }
       n.x=px+Math.cos(ang)*rad; n.y=py+Math.sin(ang)*rad; n.vx=0; n.vy=0; n._placed=true;
     }
   }
@@ -336,6 +339,7 @@
   // Every project-scoped bit of state that must NOT leak from one loaded project into the next.
   // Shared by ingest / loadFromJSON / clearAll.
   function resetProjectState(){
+    if(CM.Symbols) CM.Symbols.cancel();   // analiza symboli poprzedniego projektu — porzuć
     if(state.sim){ if(state.sim._worker) state.sim.stop(); else state.sim.running=false; }
     state.sim=null;
     state.groups=[]; state.gidSeq=0; A.renderer.setGroups([]);
@@ -413,6 +417,7 @@
       if(meta.html && /^(github|gitlab|bitbucket)$/.test(meta.kind||'')) A.pushRecentRepo(meta);
       U.toast(I.t('ca.loadedPre','Wczytano <b>')+U.fmtNum(files.length)+I.t('ca.loadedMid','</b> plików — „')+meta.name+I.t('ca.loadedPost','".'),'success');
       // (AI no longer runs automatically on load — view tuning is purely the local heuristic autoTuneView())
+      if(filters.symbols) ensureSymbols();   // graf symboli był włączony → policz dla nowego projektu (w tle)
       if(meta.warnings && meta.warnings.length) U.toast(I.t('ca.skippedArchivesPre','Pominięto nieobsługiwane archiwa (RAR/7z itp.): ')+meta.warnings.join(', ')+I.t('ca.skippedArchivesPost','. Rozpakuj je lub użyj ZIP / TAR.'),'',6500);
     }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
     if(gen===A._ingestGen) hideLoading();
@@ -495,6 +500,7 @@
     updateStatus(); A.renderer.drawMinimap($('#minimap'));
     requestAnimationFrame(()=>A.renderer.fit());
     U.toast(I.t('ca.mapLoaded','📂 Mapa wczytana z pliku.'),'success');
+    if(filters.symbols && !A.graph.symbolsInfo) ensureSymbols();
   }
 
   // ---------------- go ----------------
@@ -520,7 +526,30 @@
     if(go) setTimeout(()=>{ try{ if(CM.Settings&&CM.Settings.startTutorial) CM.Settings.startTutorial('codemap'); }catch(e){} }, 1100);
   }
 
-  Object.assign(A, { analyzeFiles, analyzeInline,
+  // ---------------- graf symboli (tree-sitter, opt-in) ----------------
+  // Włączenie filtra „Symbole" po raz pierwszy dla danego grafu uruchamia analizę w workerze
+  // (CM.Symbols); kolejne przełączenia tylko pokazują/ukrywają. Zmiana projektu anuluje analizę.
+  let _symGen=0;
+  async function ensureSymbols(){
+    if(!filters.symbols || !A.graph || !state.counts.nodes || !CM.Symbols) return null;
+    if(A.graph.symbolsInfo){ apply({relayout:false}); return A.graph.symbolsInfo; }
+    const g=A.graph, my=++_symGen;
+    if(!CM.Symbols.supportedCount(g)){ U.toast(I.t('sym.none','Symbole: brak plików z treścią w obsługiwanych językach (JS/TS, Python, Go, Java, Rust, C/C++, C#, PHP, Ruby).'),'',6000); return null; }
+    try{
+      const res=await CM.Symbols.run(g);
+      if(!res || my!==_symGen || g!==A.graph) return null;   // anulowane / zmieniony projekt
+      const info=g.addSymbols(res.results);
+      apply({relayout:false, persist:true});
+      if(A.renderer.selected) UI.renderDetails(A.renderer.selected, A.graph, handlers);
+      U.toast(I.t('sym.done','Symbole: ')+U.fmtNum(info.count)+I.t('sym.doneMid',' definicji, ')+U.fmtNum(info.calls)+I.t('sym.doneCalls',' wywołań — dwuklik na pliku rozwija jego symbole.'),'success',6000);
+      return info;
+    }catch(e){
+      if(my===_symGen) U.toast(I.t('sym.fail','Symbole: nie udało się uruchomić tree-sittera — ')+((e&&e.message)||e),'error',7000);
+      return null;
+    }
+  }
+
+  Object.assign(A, { analyzeFiles, analyzeInline, ensureSymbols,
     state, filters, init, onHover, THEME_PRESETS, saveSessionDebounced, restoreSessionPrompt, setMode,
     wireModes, selectEdge, handlers, useWorker, startWorkerSim, apply, seedUnplaced, select,
     applyImpact, toggleImpact, toggleCollapse, toggleLang, revealNode, focusNode, biggestInFolder, tick,

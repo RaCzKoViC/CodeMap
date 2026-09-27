@@ -36,7 +36,7 @@
 
   const SETTINGS_INPUTS=['rng-trans','rng-menu','rng-blur','rng-tint','col-accent','col-bg',
     'rng-nscale','rng-spacing','rng-fscale','sel-layout','sel-metric',
-    'show-folders','show-files','show-externals','edge-contains','edge-import','edge-reference',
+    'show-folders','show-files','show-externals','show-symbols','edge-contains','edge-import','edge-reference','edge-call',
     'opt-grid','opt-curved','opt-lockall','opt-hover-preview'];
   function collectSettings(){
     const s={};
@@ -434,7 +434,9 @@
     // toggling a filter keeps existing node positions (relayout:false) so the map never re-scrambles
     const bind=(id,key)=>{ $('#'+id).onchange=(e)=>{ filters[key]=e.target.checked; A.apply({relayout:false}); }; };
     bind('show-folders','folders'); bind('show-files','files'); bind('show-externals','externals');
-    bind('edge-contains','contains'); bind('edge-import','import'); bind('edge-reference','reference');
+    bind('edge-contains','contains'); bind('edge-import','import'); bind('edge-reference','reference'); bind('edge-call','call');
+    // symbole: pierwsze włączenie dla danego grafu uruchamia analizę tree-sittera (w tle, w workerze)
+    { const sc=$('#show-symbols'); if(sc) sc.onchange=(e)=>{ filters.symbols=e.target.checked; A.apply({relayout:false}); if(filters.symbols) A.ensureSymbols(); }; }
     $('#lang-toggle-all').onclick=()=>{
       const stats=Array.from(A.graph.langStats.keys());
       if(filters.langsOff.size){ filters.langsOff.clear(); } else { stats.forEach(k=>filters.langsOff.add(k)); }

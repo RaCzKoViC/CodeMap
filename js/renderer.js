@@ -301,13 +301,13 @@ CM.Renderer = (function(){
       const edgeLOD = this.edges.length>lodBudget || z<0.18;
       const skipRef = edgeLOD && (z<0.5 || this.edges.length>lodBudget*1.5);
       const lodCap = edgeLOD ? Math.max(2000, lodBudget) : Infinity;   // max strands actually batched
-      const imp=new Map(), ref=new Map(); let lodCount=0;
+      const imp=new Map(), ref=new Map(), callM=new Map(); let lodCount=0;
       for(const e of this.edges){ if(e.type==='contains') continue;
         if(skipRef && e.type==='reference') continue;
         if(lodCount>=lodCap) break;
         const s=byId.get(e.source), t=byId.get(e.target); if(!s||!t||cull(s,t)||!vis(e)) continue;
         const col=cosmic ? this.cosmicColor(s._cosmic) : (e._ec || (e._ec=badgeColor(s)));
-        const m=(e.type==='reference')?ref:imp; let a=m.get(col); if(!a){ a=[]; m.set(col,a); } a.push(s,t);
+        const m=(e.type==='reference')?ref:(e.type==='call'?callM:imp); let a=m.get(col); if(!a){ a=[]; m.set(col,a); } a.push(s,t);
         lodCount++;
       }
       const batch=(map, alpha, w, dash)=>{ if(dash) ctx.setLineDash(dash); else ctx.setLineDash([]); ctx.lineWidth=w/z;
@@ -316,6 +316,7 @@ CM.Renderer = (function(){
       if(cosmic) ctx.globalCompositeOperation='lighter';   // glowing strands
       batch(imp, cosmic?0.5:(dimMode?0.62:0.48), cosmic?1.05:0.85);
       batch(ref, cosmic?0.42:(dimMode?0.5:0.4), cosmic?0.9:0.8, [3.4/z, 3.4/z]);
+      if(callM.size) batch(callM, cosmic?0.45:(dimMode?0.6:0.5), 0.6, [1.4/z, 2.6/z]);   // wywołania symbol → symbol (tree-sitter)
       if(cosmic) ctx.globalCompositeOperation='source-over';
       ctx.setLineDash([]);
 
@@ -376,7 +377,7 @@ CM.Renderer = (function(){
       const minRPx=(huge||z<0.12)?1.1:0.5;
       const specialCap=this.opts.lodSpecialCap||600;
       // bucket visible nodes by colour; collect the few that need per-node decoration
-      const full=new Map(), dim=new Map(), special=[];
+      const full=new Map(), dim=new Map(), fullD=new Map(), dimD=new Map(), special=[];   // *D = romby (symbole)
       for(const n of this.nodes){
         const sp=this.cam.toScreen(n.x,n.y,W,H);
         const rPx=n.r*scale*z;
@@ -390,10 +391,11 @@ CM.Renderer = (function(){
           else if(imp.down.has(n.id)) col=downCol;
           else if(imp.up.has(n.id)) col=upCol;
         } else bright=!this.highlight||this.highlight.has(n.id);
-        const m=bright?full:dim; let arr=m.get(col); if(!arr){ arr=[]; m.set(col,arr); } arr.push(sp.x,sp.y,rPx);
+        const isSym=n.type==='symbol';
+        const m=bright?(isSym?fullD:full):(isSym?dimD:dim); let arr=m.get(col); if(!arr){ arr=[]; m.set(col,arr); } arr.push(sp.x,sp.y,rPx);
         const isSel=this.selected&&this.selected.id===n.id, isHov=this.hovered&&this.hovered.id===n.id;
         const isFocus=imp&&n.id===imp.focus;
-        if((isSel||isHov||isFocus||n.locked||(n.type==='folder'&&n.collapsed)||(this.diffMode&&n.diff))
+        if((isSel||isHov||isFocus||n.locked||((n.type==='folder'||n.symbolCount)&&n.collapsed)||(this.diffMode&&n.diff))
            && special.length<specialCap)
           special.push({n,x:sp.x,y:sp.y,rPx,isSel,isHov,isFocus});
       }
@@ -415,6 +417,12 @@ CM.Renderer = (function(){
       }
       if(dim.size) fillBatch(dim, this.opts.dim, !cosmic);
       if(full.size) fillBatch(full, 1, !cosmic);
+      const fillDiamonds=(map, alpha)=>{ ctx.globalAlpha=alpha;
+        for(const [col,arr] of map){ ctx.fillStyle=col; ctx.beginPath();
+          for(let i=0;i<arr.length;i+=3){ const x=arr[i],y=arr[i+1],r=arr[i+2]*1.15; ctx.moveTo(x,y-r); ctx.lineTo(x+r,y); ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath(); }
+          ctx.fill(); ctx.strokeStyle=U.rgba('#08121e',0.45); ctx.lineWidth=1; ctx.stroke(); } };
+      if(dimD.size) fillDiamonds(dimD, this.opts.dim);
+      if(fullD.size) fillDiamonds(fullD, 1);
       ctx.globalAlpha=1;
       // per-node decorations — only the handful of special nodes
       for(const sp of special){
@@ -422,7 +430,7 @@ CM.Renderer = (function(){
         if(isFocus){ ctx.strokeStyle=focusCol||'#ffffff'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,rPx+4,0,7); ctx.stroke(); }
         if(this.diffMode && n.diff){ const dc=n.diff==='added'?'#34d399':n.diff==='removed'?'#f87171':'#fbbf24';
           ctx.strokeStyle=U.rgba(dc,0.95); ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(x,y,rPx+5,0,7); ctx.stroke(); }
-        if(n.type==='folder'&&n.collapsed){ ctx.strokeStyle=U.rgba('#ffffff',0.9); ctx.lineWidth=1.6;
+        if((n.type==='folder'||n.symbolCount)&&n.collapsed){ ctx.strokeStyle=U.rgba('#ffffff',0.9); ctx.lineWidth=1.6;
           const s=rPx*0.4; ctx.beginPath(); ctx.moveTo(x-s,y); ctx.lineTo(x+s,y); ctx.moveTo(x,y-s); ctx.lineTo(x,y+s); ctx.stroke(); }
         if(isHov&&!isSel){ ctx.strokeStyle=U.rgba('#ffffff',0.8); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rPx+2,0,7); ctx.stroke(); }
         if(isSel){ ctx.strokeStyle=getCss('--accent')||'#22d3ee'; ctx.lineWidth=2.6; ctx.beginPath(); ctx.arc(x,y,rPx+2,0,7); ctx.stroke(); }
@@ -805,17 +813,23 @@ CM.Renderer = (function(){
   // 0..1 weight of a module from its connectivity / size
   // shapes are SYSTEM-IMPOSED by node type/kind (no user picker) so categories stay distinguishable
   // short format/extension code shown on top of a node
+  const SYM_CODE={function:'FN', method:'MTH', constructor:'NEW', class:'CLS', interface:'IF', struct:'ST', enum:'EN', trait:'TR', impl:'IMP', type:'TY', module:'MOD'};
   function formatCode(n){
     if(n.type==='folder') return n.collapsed?'DIR+':'DIR';
+    if(n.type==='symbol') return SYM_CODE[n.kind]||'SYM';
     if(n.type==='external') return 'PKG';
     let c = n.ext || (n.lang && n.lang!=='__file__' ? n.lang : '') || '';
     if(!c && n.name && n.name.indexOf('.')>=0) c=n.name.split('.').pop();
     return (c||'?').toUpperCase().slice(0,4);
   }
   // per-node animation signature (stable phase + speed) so every figure's outgoing paths flow distinctly
+  // symbol: kolor języka pliku-rodzica, rozjaśniony w stronę szarości (odróżnia się od pliku)
+  function mixHex(a,b,t){ const A=U.hexToRgb(a), B=U.hexToRgb(b); const h=(v)=>Math.round(v).toString(16).padStart(2,'0');
+    return '#'+h(A[0]+(B[0]-A[0])*t)+h(A[1]+(B[1]-A[1])*t)+h(A[2]+(B[2]-A[2])*t); }
   function badgeColor(n){
     if(n.type==='folder') return '#22d3ee';
     if(n.type==='external') return '#a78bfa';
+    if(n.type==='symbol'){ if(!n._sc){ const c=(n.langInfo&&n.langInfo.color)||'#7d8aa0'; n._sc=/^#[0-9a-f]{3,6}$/i.test(c)?mixHex(c.length===4?'#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3]:c,'#c8d2e0',0.35):c; } return n._sc; }
     return (n.langInfo&&n.langInfo.color)||'#7d8aa0';
   }
   function roundRectScreen(ctx,x,y,w,h,r){ r=Math.min(r,w/2,h/2); ctx.beginPath();

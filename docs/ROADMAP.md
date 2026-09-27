@@ -52,9 +52,9 @@ Publikacja:
 - [x] Backend (blokada per konto 30 s → 15 min, 3 maile/h na adres, wysyłka poza ścieżką odpowiedzi, limit współbieżności argon2, GC co godzinę, PBKDF2 600k z polem `kdf`, min. 8 znaków hasła albumu). Pierwotny opis: rate limit per konto (backoff po nieudanych logowaniach), limit maili per adres, sprzątanie wygasłych sesji i tokenów, PBKDF2 ≥ 600k iteracji z polem `kdf` w meta Sejfu, minimum 12 znaków hasła albumu synchronizowanego.
 - [x] Autozapis: nie serializować całego grafu po każdym `apply()`; zapis tylko po zmianie struktury lub pozycji.
 
-## Faza 2 — wyróżnik: głębsza analiza — W TOKU (stan 2026-09-26)
+## Faza 2 — wyróżnik: głębsza analiza — WYKONANA 2026-09-27 (zostały drobne: abstractness, pole szukania w treści w UI, `package.json#imports`)
 
-- [ ] Graf symboli i call graph przez `web-tree-sitter` (WASM ładowany na żądanie, jak WebLLM); symbole jako węzły drugiego poziomu, serializowane w mapie.
+- [x] Graf symboli i call graph przez `web-tree-sitter` (`js/symbols-core.js` + `js/symbols-worker.js` + `js/symbols.js`; web-tree-sitter 0.22.6 + tree-sitter-wasms 0.1.12 z jsdelivr, opt-in przełącznik „Symbole (tree-sitter)", 12 gramatyk, symbole jako węzły pod plikiem, krawędzie `call` rozwiązane w pliku i przez importy, serializowane w mapie).
 - [x] Analiza w Web Workerze i w chunkach (`js/analysis-worker.js`: metryki/importy/symbole/hash poza głównym wątkiem, postęp, anulowanie; `graph.build(files, meta, pre)`); jeden przebieg `stripNonCode` (`analyzeFile`).
 - [x] Rozwiązywanie zależności (bez `package.json#imports` i `extends` na pakiet npm): aliasy tsconfig per katalog + `extends`, `package.json#imports/exports`, workspaces monorepo (`@scope/pkg` → `packages/pkg`), dynamiczne importy z literałów, `new Worker()`/`new URL()`, SCSS `@use/@forward`, C# `using` i Rust `use crate::` łączone z plikami.
 - [x] Plik reguł architektury (`.codemap.rules.json`: warstwy, zakazane importy, `noCycles`) egzekwowany przez silnik Inspect (`js/rules.js`, reguła `archviolation`; przykład dla samego CodeMap w korzeniu repo).

@@ -19,10 +19,13 @@
     "smoke": "node tools/smoke.mjs",
     "bump": "node tools/bump.mjs",
     "serve": "python serve.py",
-    "verify": "npm run check && npm test && npm run lint"
+    "verify": "npm run check && npm test && npm run lint && npm run symbols-probe",
+    "symbols-probe": "node tools/symbols-probe.mjs"
   },
   "devDependencies": {
     "eslint": "^9.39.0",
-    "globals": "^16.4.0"
+    "globals": "^16.4.0",
+    "tree-sitter-wasms": "^0.1.12",
+    "web-tree-sitter": "^0.22.6"
   }
 }

@@ -181,6 +181,7 @@ CM.ChatBot = (function(){
     'startTutorial {mode:"codemap"|"mindmap"} — start the interactive tutorial',
     'mindmap {action:"arrange"|"layout"|"fit"|"save"|"markdown"|"undo"} — MindMap-mode operations',
     'installPWA — trigger the install-app prompt',
+    'symbols {on:boolean} — show/hide the tree-sitter symbol graph (functions, classes, methods, calls); first use downloads the parser',
     'help — list all available actions',
     'stats — project statistics: files, folders, languages, biggest files, cycles',
     'topFiles {metric:"lines"|"complexity"|"size"|"deps", n?} — list the top files by a metric and highlight them',
