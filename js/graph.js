@@ -168,7 +168,7 @@ CM.Graph = (function(){
         } else if(n==='go.sum'){
           for(const line of content.split(/\r?\n/)){ const m=/^(\S+)\s+(v[^\s/]+?)(?:\/go\.mod)?\s+h1:/.exec(line); if(m) lock(m[1], m[2], 'go'); }
         }
-      }catch(e){}
+      }catch(e){ /* uszkodzony manifest / plik blokady — bez wersji z niego, reszta analizy bez zmian */ }
     }
 
     _computeImportDegrees(){

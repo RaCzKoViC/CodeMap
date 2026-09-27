@@ -71,6 +71,17 @@ describe('Inspect: ryzyko, pliki generowane, cykle', () => {
   });
 });
 
+describe('Inspect: puste catch tylko w kodzie', () => {
+  test('catch {} w napisie, szablonie i komentarzu się nie liczy; w kodzie — tak', async () => {
+    const res = await run([
+      F('src/str.js', "const a = 'try { x() } catch (e) {}';\nconst b = `catch {}`;\n// catch (e) {}\n/* catch {} */\nexport default a + b;\n"),
+      F('src/real.js', 'try { go(); } catch (e) {}\ntry { go(); } catch {}\nexport const r = 1;\n'),
+    ]);
+    const r = rule(res, 'emptycatch');
+    assert.deepEqual(r.items.map((i) => [i.path, i.detail]), [['src/real.js', 'w ok. 2 miejscach']]);
+  });
+});
+
 describe('Inspect: ukryte sprzężenie zmian', () => {
   test('para kodu zmieniana razem bez importu → zgłoszona; z importem, z testem albo rzadka → nie', async () => {
     const files = [

@@ -99,6 +99,20 @@ CM.Inspect = (function(){
 
   /* ---------------- rules engine ---------------- */
   const SEV_W={high:6, med:3, low:1, info:0};                    // weights for the health score
+  // błąd w jednej regule nie przerywa raportu, ale nie znika po cichu (konsola; w CLI — stderr)
+  // JS bez treści napisów i komentarzy (cudzysłowy zostają) — `catch {}` w napisie (fixture, opis reguły) to nie kod
+  function codeOnly(src){
+    let out='', i=0; const n=src.length;
+    while(i<n){
+      const c=src[i], d=src[i+1];
+      if(c==='/'&&d==='/'){ while(i<n&&src[i]!=='\n') i++; continue; }
+      if(c==='/'&&d==='*'){ const e=src.indexOf('*/',i+2); i=e<0?n:e+2; out+=' '; continue; }
+      if(c==='"'||c==="'"||c==='`'){ out+=c; i++; while(i<n&&src[i]!==c&&!(c!=='`'&&src[i]==='\n')){ if(src[i]==='\\') i++; i++; } out+=c; i++; continue; }
+      out+=c; i++;
+    }
+    return out;
+  }
+  const ruleFail=(rule,e)=>{ if(typeof console!=='undefined') console.warn('[CodeMap] reguła '+rule+':', e&&e.message||e); };
   const LIMIT=60;                                                 // max stored items per rule (UI shows fewer)
   // MessageChannel yield: gives the event loop room WITHOUT the background-tab setTimeout
   // throttling (~1s/tick hidden) — chunked analysis stays fast even in a non-focused tab
@@ -171,7 +185,7 @@ CM.Inspect = (function(){
         }
         const pv=f.preview;
         if(pv && !minified && CODE_JS.test(f.lang||'')){
-          const ec=(pv.match(/catch\s*(\([^)]*\))?\s*\{\s*\}/g)||[]).length;
+          const ec=(codeOnly(pv).match(/catch\s*(\([^)]*\))?\s*\{\s*\}/g)||[]).length;   // bez napisów i komentarzy
           if(ec) add(F,'emptycatch','low',f, t('ln',{n:ec}));
           // innerHTML = '' (czyszczenie elementu) nie wstawia treści — nie liczy się jako ryzyko
           const risky=(pv.match(/\beval\s*\(|\.innerHTML\s*=(?!=|\s*(''|""|``)\s*[;,)}\n])|document\.write\s*\(|dangerouslySetInnerHTML/g)||[]).length;
@@ -203,7 +217,7 @@ CM.Inspect = (function(){
         if(g.own==null || g.share<0.9 || g.c<5 || (cx<20 && (f.metrics.lines||0)<300)) continue;
         const who=(gi.authors[g.own]||{}).name||'?';
         add(F,'silo','low',f, t('silo',{who, s:Math.round(g.share*100), c:g.c})); }
-    }catch(e){} }
+    }catch(e){ ruleFail('silo', e); } }
 
     // ---- ukryte sprzężenie zmian: pary kodu zmieniane razem (CM.GitCore.coupling, jak code-maat), bez importu ----
     if(graph.gitInfo && CM.GitCore && CM.GitCore.coupling){ try{
@@ -264,7 +278,7 @@ CM.Inspect = (function(){
         add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.tokens!=null?p.tokens:p.shared,k:p.blocks||1}), [b.id]);
       }
       if(pairs.length>LIMIT){ const f=F.get('dupcode'); if(f) f.count=pairs.length; }
-    }catch(e){} }
+    }catch(e){ ruleFail('dupcode', e); } }
 
     // ---- cykle między pakietami monorepo (CM.DSM: składowe grafu pakietów) ----
     if(CM.DSM && CM.DSM.packageCycles){ try{
@@ -283,7 +297,7 @@ CM.Inspect = (function(){
         add(F,'cycles', comp.length>=4?'high':'med', first, names+(comp.length>4?' → …':'')+'  ('+comp.length+')', comp.slice(1,101));
       }
       if(res.components&&res.components.length>LIMIT){ const f=F.get('cycles'); if(f) f.count=res.components.length; }
-    }catch(e){}
+    }catch(e){ ruleFail('cycles', e); }
 
     // ---- reguły architektury: .codemap.rules.json w projekcie (CM.Rules); brak pliku = reguła milczy ----
     if(CM.Rules){ try{
@@ -302,7 +316,7 @@ CM.Inspect = (function(){
           if(v.length>LIMIT){ const f=F.get('archviolation'); if(f) f.count=v.length; }
         }
       }
-    }catch(e){} }
+    }catch(e){ ruleFail('archviolation', e); } }
 
     // ---- health score: 100 minus severity-weighted density ----
     let penalty=0; for(const f of F.values()) penalty+=SEV_W[f.sev]*f.count;

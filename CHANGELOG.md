@@ -70,6 +70,20 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Cykle bez dokumentacji**: linki README.md ↔ README.pl.md to nawigacja, nie cykl zależności (także `noCycles`).
 - Wynik zdrowia CodeMap: 45 → 53 bez zmian w kodzie aplikacji (same poprawki reguł; `test/inspect.test.mjs`).
 
+### Zmienione — dług z własnej analizy (faza 9)
+- **Puste `catch`: 229 miejsc → 0** — ok. 40 dostało prawdziwą obsługę (`console.warn('[CodeMap] …')` albo istniejący
+  komunikat: odzyskiwanie transakcji i usuwanie plików w Sejfie, synchronizacja, czyszczenie danych, autozapis sesji,
+  samouczek, menu VS Code, utrata kontekstu WebGL, błąd pojedynczej reguły Inspect), ok. 60 — wspólne pomocniki
+  (`CM.util.lsSet` / `lsDel` / `lsJSON` zamiast ~35 kopii try/catch wokół localStorage, `quiet()`, `soft()`, `errBody()`…),
+  reszta — krótkie uzasadnienie, dlaczego zignorowanie jest poprawne. Reguła „puste catch" liczy już tylko kod (bez
+  treści napisów i komentarzy — `catch {}` w fixture czy opisie reguły to nie kod).
+- **Zduplikowane bloki → wspólne funkcje**: geometria łączników mapy myśli (`CM.MindMapLayout.anchorDirs/anchorPoint/
+  eachConnector/connectorSvg/cardBounds` — eksport SVG bajt w bajt taki sam na 8976 przypadkach), szkielet paneli
+  Ustawień i Sejfu (`CM.Settings.kit`), kolory i widoczność krawędzi renderera (canvas i WebGL), `CM.Renderer.fitPoints`,
+  `CM.util.matchPath` / `matchNode` (agent, doktor, git, testy, ai-bridge), `CM.UIKit.barRow`, pomocniki wczytywania
+  (`A.isMapFile`, `A.loadError`, `A.needProject`), `sendRowBlob` / `deleteRowBlob` na serwerze; smoke webview VS Code
+  używa `tools/cdp.mjs` zamiast własnej kopii klienta CDP (`serveDir` rozpoznaje teraz checkout w `.claude/worktrees`).
+
 ### Poprawione — rozbieżności znalezione korpusem
 - **TypeScript ESM (NodeNext)**: `import './x.js'` w źródle .ts wskazuje `x.ts` / `x.tsx` (`.mjs` → `.mts`,
   `.cjs` → `.cts`) — w ky CodeMap nie widział żadnej z 50 krawędzi.

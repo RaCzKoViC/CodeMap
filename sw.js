@@ -1,5 +1,5 @@
 /* ===================== sw.js — CodeMap service worker (offline app shell) ===================== */
-const CACHE = 'codemap-shell-v173';
+const CACHE = 'codemap-shell-v175';
 const CORE = ['./', 'index.html', 'runner.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
@@ -22,7 +22,7 @@ self.addEventListener('install', (e)=>{
       assets = [...html.matchAll(/(?:src|href)="((?:js|css)\/[^"]+\?v=[^"]+)"/g)].map(m=>m[1]);
       const appV = (html.match(/js\/app\.js\?v=([\w.-]+)/)||[])[1];
       if(appV){ for(const w of ['sim-worker','analysis-worker','symbols-worker','git-worker']) assets.push('js/'+w+'.js?v='+appV); }   // workers are loaded (app-core.js, symbols.js, git-local.js) at the shared ?v= stamp (read off js/app.js in the HTML)
-    }catch(_){ }
+    }catch(_){ /* index.html niedostępny (offline) — lista zasobów z ASSET_FALLBACK niżej */ }
     if(!assets.length) assets = ASSET_FALLBACK;
     await c.addAll(assets).catch(()=>{});
   })().then(()=>self.skipWaiting()));

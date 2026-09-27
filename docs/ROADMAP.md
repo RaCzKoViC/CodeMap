@@ -151,6 +151,10 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   (500 ms wczytania, 10 ms klatki); w CI odniesieniem jest artefakt ostatniego zielonego przebiegu main.
 - Dług wskazany przez własną analizę: 57 złożonych plików bez testów (najpierw app-core, loaders, drive, sync),
   47 pustych `catch`, 76 zduplikowanych fragmentów; cel: zdrowie 45 → 60+.
+  ✅ puste `catch`: 229 miejsc → 0 (obsługa, wspólne pomocniki `CM.util.lsSet/lsDel/lsJSON` albo uzasadnienie; reguła
+  liczy już tylko kod, bez napisów i komentarzy); ✅ duplikaty: prawdziwe bloki wyciągnięte do wspólnych funkcji
+  (mindmap, ustawienia/Sejf, renderer, git/testy/PR, app-core/compare, serwer, smoke VS Code ↔ cdp), reguła liczy
+  ciągłe bloki ≥ 50 tokenów (78 → 24 par); zdrowie 45 → 56. W toku: testy nieprzetestowanych modułów (agent).
 
 ## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27 (poza wykresem trendu w aplikacji)
 
