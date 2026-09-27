@@ -49,6 +49,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 - **PDF** — mapa z zakładek i stron.
 - **Repozytoria** GitHub, GitLab, Bitbucket po adresie URL (publiczne lub z tokenem), wybór gałęzi/tagu,
   podkatalogu, **porównanie dwóch gałęzi** po sygnaturze drzewa, eksport mapy do Gist.
+- **Linki**: `#repo=owner/nazwa[@gałąź[/podkatalog]]` (także pełny URL GitHub/GitLab/Bitbucket, `&layout=`),
+  `#gist=<id>` (mapa wyeksportowana do Gista), `#share=<id>` (publiczny link z backendu), `#v=` (bieżący widok).
+  Przykład: [`#repo=RaCzKoViC/CodeMap@main/server&layout=treemap`](https://raczkovic.github.io/CodeMap/#repo=RaCzKoViC/CodeMap@main/server&layout=treemap).
 
 ### Analiza
 - Metryki per plik: linie, kod, komentarze, złożoność, funkcje, TODO/FIXME, rozmiar, data.
@@ -143,6 +146,15 @@ Drugi tryb pracy: 16 szablonów kart, **34 typy diagramów**, warstwa rysowania 
 Polski i angielski, motyw ciemny/jasny, 8 presetów kolorystycznych, suwaki wyglądu „liquid glass",
 interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainstalowania.
 
+### CLI i CI
+- `node cli/codemap.mjs analyze [ścieżka]` (albo `npm link` → `codemap`) — ta sama analiza co panel „Analiza
+  statyczna", bez przeglądarki i bez zależności npm: historia git z `.git`, testy i pokrycie, reguły architektury.
+- Raporty: terminal, `--json`, `--md`, `--sarif` (GitHub code scanning), `--map` (mapa do otwarcia w aplikacji),
+  `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
+  `--max-findings` (kody wyjścia 0 / 1 / 2).
+- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
+  z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
+
 ---
 
 ## ⌨️ Skróty klawiszowe
@@ -175,6 +187,8 @@ na Twoje wyraźne żądanie:
 | Symbole (tree-sitter) — po włączeniu | cdn.jsdelivr.net | pobranie parsera web-tree-sitter i gramatyk WASM; parsowanie lokalnie w Web Workerze |
 | Ollama | 127.0.0.1:11434 | lokalnie — także fragmenty kodu w trybie 📚 i ich embeddingi (RAG) |
 | konto (opcjonalne) | Twój własny serwer | mapy, migawki, ustawienia; Sejf **tylko jako szyfrogram** |
+| otwarcie linku `#repo=` / `#gist=` | te same API co wczytanie repozytorium; api.github.com i gist.githubusercontent.com | adres repozytorium / id gista, **bez tokenu** |
+| publiczny link do mapy — po zalogowaniu, na żądanie | Twój serwer, potem **każdy, kto ma link** | kopia mapy: nazwy i ścieżki plików, metryki, zależności; podgląd treści i e-maile autorów tylko po odznaczeniu opcji; do wygaśnięcia lub unieważnienia |
 
 Klucze API są przechowywane w `localStorage` przeglądarki i nigdy nie są synchronizowane z serwerem.
 Szczegóły i sposób zgłaszania podatności: [SECURITY.md](SECURITY.md).
@@ -225,7 +239,9 @@ js/navigation.js           # radar okolicy, minimapa, tarcza obrotu, nawigacja W
 js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec, registerAction), paleta Ctrl+K, dane demo
 js/git.js                  # historia git na mapie: uruchamianie, nakładki, panel, awatary, oś czasu, akcje ChatBota
 js/tests-ui.js             # testy i pokrycie w aplikacji: nakładki, panel, Inspect, ChatBot, wczytywanie raportów
+js/deeplink.js  js/links.js  # linki #repo= / #gist= / #share= (walidacja, wczytanie), okno publicznych linków
 js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)
+cli/                       # CLI headless (runtime vm z tymi samymi js/*.js, analiza, SARIF, raporty); action.yml — GitHub Action
 sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
 ```
 
@@ -243,7 +259,9 @@ Plan rozwoju i znane długi techniczne: [docs/ROADMAP.md](docs/ROADMAP.md).
 Katalog `server/` zawiera mały serwer (Node.js ≥ 20.6, Fastify, SQLite) dodający konta z weryfikacją
 e-mail i synchronizację map, migawek, ustawień oraz Sejfu — ten ostatni **wyłącznie jako szyfrogram**
 (AES-GCM po stronie klienta; serwer nigdy nie widzi haseł ani treści). Bez logowania aplikacja działa
-w 100 % lokalnie. Bez backendu przycisk „Konto" jest ukryty.
+w 100 % lokalnie. Bez backendu przycisk „Konto" jest ukryty. Zalogowany użytkownik może utworzyć **publiczny
+link do mapy** (Projekt → „Udostępnij publiczny link…", `#share=<id>`) z czasem wygaśnięcia i unieważnianiem
+w Ustawienia → Konto; domyślnie bez podglądu treści plików. Testy backendu: `cd server; npm test`.
 
 ```powershell
 cd server; copy .env.example .env; npm install; npm start   # → http://localhost:8787 (frontend + API)

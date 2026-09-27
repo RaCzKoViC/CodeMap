@@ -78,11 +78,12 @@ Publikacja:
 
 ## Faza 4 — ekosystem — W TOKU 2026-09-27
 
-- Tryb headless/CLI + GitHub Action (fail na cyklach lub progu health score, raport SARIF).
+- [x] Tryb headless/CLI + GitHub Action (`cli/`, `action.yml`): raporty JSON / Markdown / SARIF 2.1.0 / mapa,
+  progi `--min-score` / `--fail-on` / `--max-findings`, job `codemap` w naszym CI.
 - [x] RAG dla lokalnych modeli (`js/rag.js`): fragmenty wg symboli, BM25 + embeddingi Ollamy (`/api/embed`),
   indeks w IndexedDB z przeliczaniem zmienionych fragmentów, tryb 📚 w ChatBocie z cytatami i źródłami,
   tylko dostawcy lokalni; `/codeSearch`.
-- Deep-linki `#repo=owner/name`, `#gist=id`; publiczne linki do map przez backend.
+- [x] Deep-linki `#repo=`, `#gist=`, `#share=`; publiczne linki do map przez backend (`/api/shares`, testy backendu).
 - Rozszerzenie VS Code / integracja z LSP jako opcja.
 - Wydanie v1.1.0 (Release, notatki z CHANGELOG, nowe zrzuty).
 

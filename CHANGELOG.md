@@ -5,9 +5,25 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-09-27
+
 Fazy 2–4 planu rozwoju — głębsza analiza, inteligencja git, ekosystem ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
 ### Dodane — Faza 4 (ekosystem)
+- **Tryb headless — CLI** `codemap analyze` (`cli/`, bez zależności, te same `js/*.js` w kontekście `vm`): raporty
+  w terminalu, JSON, Markdown, **SARIF 2.1.0** (reguły Inspect, `relatedLocations` dla cykli i duplikatów, stabilne
+  odciski, URI względne od korzenia repo), mapa `.codemap.json`, DOT / Mermaid / GraphML; historia git z `.git`
+  (także z katalogu nadrzędnego i worktree), testy i pokrycie; progi `--min-score` / `--fail-on` / `--max-findings`
+  (kody 0/1/2); API `analyzeProject()`. CodeMap: ~1 s, Odysseus-Lab (1649 plików, 464 tys. linii): ~6 s.
+- **GitHub Action** (`action.yml`, kompozytowa): raport w podsumowaniu kroku, SARIF, progi, wyjścia `score` /
+  `findings` / `sarif-file`; job `codemap` w CI tego repozytorium; przykład z code scanning w `docs/github-action.md`.
+- **Deep-linki**: `#repo=owner/nazwa[@gałąź[/podkatalog]]` (także pełne URL GitHub/GitLab/Bitbucket, `&layout=`),
+  `#gist=<id>`, `#share=<id>`; link wklejony do otwartej aplikacji wczytuje mapę (z potwierdzeniem).
+- **Publiczne linki do map** (backend): „Udostępnij publiczny link…" z wygasaniem i opcjami prywatności
+  (domyślnie bez podglądu treści), lista z unieważnianiem w Ustawienia → Konto; `POST/GET/DELETE /api/shares`,
+  publiczny `GET /api/share/:id` (no-store, bez CORS i ciasteczek, ta sama 404 dla nieistniejących/wygasłych);
+  treść w magazynie blobów wliczana do quoty; testy backendu (`server/test`, `app.inject`) w CI.
+- Eksport do Gista kopiuje link `…/#gist=<id>` otwierający mapę w CodeMap.
 - **Pytania o kod — RAG dla modeli lokalnych** (`js/rag.js`, tryb 📚 w ChatBocie): pliki dzielone na fragmenty
   wg granic symboli (scalanie krótkich, okno 60 linii dla długich), wyszukiwanie BM25 zawsze (rozbijanie
   identyfikatorów camelCase/snake_case, polskie pojęcia rozszerzane o angielskie odpowiedniki) + semantyczne
@@ -93,6 +109,13 @@ Fazy 2–4 planu rozwoju — głębsza analiza, inteligencja git, ekosystem ([do
 - Modele lokalne: 18 wyselekcjonowanych modeli WebLLM + pełna lista silnika (135), pobieranie modeli
   do Ollamy z Ustawień (postęp, propozycje); strumień rozumowania Ollamy pokazywany na żywo.
 
+### Zmienione
+- `#v=` niesie podkatalog repozytorium oraz źródło gist / publiczny link; podkatalog działa też dla GitLab i Bitbucket.
+- Inspect: pozycje znalezisk z własną ważnością i powiązanymi plikami, raport Markdown bez DOM (`toMarkdown`).
+- Inspect: reguła duplikatów bez fałszywych alarmów — `k=15`, okno 10, min. 12 wspólnych odcisków, odciski
+  obecne w > 8 plikach pomijane (boilerplate), pliki blokad (`package-lock.json`, `yarn.lock`…) wykluczone.
+  Na samym CodeMap 2034 → 44 par, health score 6 → 42.
+
 ### Naprawione
 - Workery (`analysis-worker.js`, `symbols-worker.js`) importują moduły z tym samym stemplem `?v=` co strona —
   bez niego `importScripts` dostawał nieaktualną kopię z cache service workera.
@@ -115,6 +138,10 @@ Fazy 2–4 planu rozwoju — głębsza analiza, inteligencja git, ekosystem ([do
   rozszerzenie.
 - Testy: `test/export.test.mjs`, `test/metrics.test.mjs`, `test/rules.test.mjs`; smoke sprawdza eksport
   trzech formatów na grafie demo oraz ChatBota bez modelu (pomoc, walidacja akcji, 0 chipów błędu).
+
+### Bezpieczeństwo
+- Walidacja źródeł z linków (także ze starego `#v=`, które trafiało do loadera bez kontroli); czyszczenie adresów
+  repozytorium i awatarów w mapach wczytywanych z pliku lub linku (`javascript:`, obrazki śledzące).
 
 ### Dokumentacja
 - Nowe zrzuty w README (mapa repozytorium CodeMap, graf symboli, ChatBot z menu `/`) zamiast
