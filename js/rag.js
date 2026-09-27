@@ -234,8 +234,19 @@ CM.RAG = (function(){
     let hits=diversify(rank(lex, cos, 40), s.chunks, opts.k||6).filter(h=>h.score>0);
     // słabe dopasowania tylko rozpraszają mały model i wydłużają prefill — zostają fragmenty ≥ 60 % najlepszego (min. 2)
     if(!opts.all && hits.length>2){ const top=hits[0].score; hits=hits.filter((h,i)=>i<2||h.score>=top*(opts.cut||0.6)); }
+    // plik wymieniony w pytaniu z nazwy („co robi agent.js…"), którego wyszukiwanie nie zwróciło → jego 2 najlepsze fragmenty
+    for(const base of mentionedFiles(q).slice(0,2)){
+      if(hits.some(h=>s.chunks[h.i].path.split('/').pop().toLowerCase()===base)) continue;
+      const own=[]; s.chunks.forEach((c,i)=>{ if(c.path.split('/').pop().toLowerCase()===base) own.push(i); });
+      own.sort((a,b)=>(lex[b]-lex[a])||(a-b));
+      hits.unshift(...own.slice(0,2).map(i=>({i, score:hits.length?hits[0].score:1, mentioned:true})));   // na początek — budżet kontekstu ich nie odetnie
+    }
     return {hits, mode, s};
   }
+  // nazwy plików wymienione w pytaniu (bez ścieżki, małe litery)
+  const FILE_RE=/\b[\w.-]+\.(m?[jt]sx?|cjs|py|go|java|kt|rs|rb|php|cs|c|cc|cpp|h|hpp|swift|dart|css|scss|html|vue|svelte|md|json|ya?ml|sql|sh)\b/gi;
+  function mentionedFiles(q){ return [...new Set((String(q||'').match(FILE_RE)||[]).map(x=>x.toLowerCase()))]; }
+
   // kontekst dla ChatBota: {text, sources, mode}
   async function context(q, opts){
     opts=opts||{};
@@ -244,7 +255,7 @@ CM.RAG = (function(){
     return {text:cb.text, sources:cb.sources, mode:r.mode};
   }
 
-  return {tokenize, queryTokens, chunkFile, buildLexical, bm25, rank, diversify, contextBlock, prefixes, normalize,
+  return {mentionedFiles, tokenize, queryTokens, chunkFile, buildLexical, bm25, rank, diversify, contextBlock, prefixes, normalize,
     ensure, reset, stats, search, context, buildVectors, clearVectors, embeddingModels, pickModel, modelPref, setModelPref,
     isBuilding:()=>!!building, cancelBuild:()=>{ if(building){ try{ building.ctrl.abort(); }catch(e){} } }};
 })();

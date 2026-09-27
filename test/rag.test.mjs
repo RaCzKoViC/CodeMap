@@ -79,3 +79,10 @@ describe('wyszukiwanie', () => {
     assert.ok(Math.abs(v[0] - 0.6) < 1e-6 && Math.abs(v[1] - 0.8) < 1e-6);
   });
 });
+
+describe('pliki wymienione w pytaniu', () => {
+  test('mentionedFiles: nazwy z rozszerzeniem, bez duplikatów, małe litery', () => {
+    assert.deepEqual(host(R.mentionedFiles('Co robi Agent.js i agent.js? A plik src/rag.js oraz README.md?')), ['agent.js', 'src/rag.js'.split('/').pop(), 'readme.md']);
+    assert.deepEqual(host(R.mentionedFiles('jak działa bus factor')), []);
+  });
+});

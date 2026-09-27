@@ -39,7 +39,7 @@ CM.ChatBot = (function(){
     'ragLocalOnly':'Tryb **📚 kod** wysyła do modelu fragmenty Twoich plików, dlatego działa tylko z modelami **lokalnymi** (przeglądarkowy WebLLM albo Ollama). Przełącz model w Ustawieniach → AI albo wyłącz 📚 w nagłówku czatu.',
     'ragSearching':'Szukam w kodzie…','ragFoundHybrid':'znaleziono fragmenty (semantycznie + słowa)','ragFoundLex':'znaleziono fragmenty (wyszukiwanie słów)',
     'ragNothing':'Nie znalazłem w kodzie projektu fragmentów pasujących do pytania. Upewnij się, że projekt został wczytany z treścią plików (folder albo repozytorium), i spróbuj użyć nazw plików, funkcji lub pojęć z kodu.',
-    'ragSources':'Źródła','ragGone':'Tego pliku nie ma już na mapie.',
+    'ragSources':'Źródła','ragGone':'Tego pliku nie ma już na mapie.','agentSteps':'Kroki agenta',
     'quick':'Szybka odpowiedź (bez rozumowania)','quickOn':'Szybka odpowiedź: WŁ — model odpowiada od razu, bez rozumowania','quickOff':'Szybka odpowiedź: WYŁ — model pokazuje tok rozumowania',
     'resize':'Rozciągnij okno','sbResize':'Przeciągnij, aby zmienić szerokość listy rozmów (do 0 = zwiń)',
     'toolArgHint':'Dopisz argument i wciśnij Enter, np. /setLayout treemap',
@@ -78,7 +78,7 @@ CM.ChatBot = (function(){
     'ragLocalOnly':'**📚 code** mode sends snippets of your files to the model, so it only works with **local** models (in-browser WebLLM or Ollama). Switch the model in Settings → AI or turn 📚 off in the chat header.',
     'ragSearching':'Searching the code…','ragFoundHybrid':'snippets found (semantic + keywords)','ragFoundLex':'snippets found (keyword search)',
     'ragNothing':'I found no code snippets in the project matching the question. Make sure the project was loaded with file contents (a folder or a repository) and try names of files, functions or terms from the code.',
-    'ragSources':'Sources','ragGone':'This file is no longer on the map.',
+    'ragSources':'Sources','ragGone':'This file is no longer on the map.','agentSteps':'Agent steps',
     'quick':'Quick answer (no reasoning)','quickOn':'Quick answer: ON — the model answers right away, without reasoning','quickOff':'Quick answer: OFF — the model shows its reasoning',
     'resize':'Resize the window','sbResize':'Drag to resize the conversation list (0 = collapse)',
     'toolArgHint':'Add an argument and press Enter, e.g. /setLayout treemap',
@@ -854,9 +854,14 @@ CM.ChatBot = (function(){
       const txt=s<10?(s.toFixed(1).replace('.',I.getLang()==='en'?'.':',')+' s'):(s<90?Math.round(s)+' s':(Math.floor(s/60)+' min '+Math.round(s%60)+' s'));
       wrap.appendChild(el('span',{class:'cb-time',title:t('genTime'),text:'⏱ '+txt}));
     }
+    if(m.steps&&m.steps.length){   // agent: jakie narzędzia wywołał model, zanim odpowiedział
+      const d=el('details',{class:'cb-steps'}); d.appendChild(el('summary',{text:'🔧 '+t('agentSteps')+' ('+m.steps.length+')'}));
+      for(const s of m.steps) d.appendChild(el('div',{class:'cb-step'+(s.ok?'':' err'),text:s.name+' '+argText(s.args)+' → '+(s.summary||'')}));
+      wrap.appendChild(d);
+    }
     if(m.sources&&m.sources.length){   // tryb „📚 kod": fragmenty, na których oparto odpowiedź
       const box=el('div',{class:'cb-sources'});
-      box.appendChild(el('span',{class:'cb-src-h',text:(m.ragMode==='hybrid'?'📚 ':'🔎 ')+t('ragSources')}));
+      box.appendChild(el('span',{class:'cb-src-h',text:(m.ragMode==='agent'?'🧭 ':m.ragMode==='hybrid'?'📚 ':'🔎 ')+t('ragSources')}));
       for(const s of m.sources){ box.appendChild(el('button',{class:'cb-src',type:'button',title:s.path+':'+s.start+'–'+s.end+(s.sym?' · '+s.sym:''),
         text:'['+s.n+'] '+String(s.path).split('/').pop()+':'+s.start+'–'+s.end,onclick:()=>openSource(s)})); }
       wrap.appendChild(box);
@@ -1227,6 +1232,21 @@ CM.ChatBot = (function(){
         if(CM.LocalAI.status()!=='ready') setStage(t('stLoading'));
         try{ acc=await CM.LocalAI.chat(messages, opts); } finally{ off(); updateSub(); }
       } else {
+        // Ollama: agent z narzędziami (agent.js) — model sam dopytuje kod (tylko odczyt), start z tymi samymi fragmentami;
+        // model bez obsługi narzędzi (code 'notools') → zwykły strumień RAG poniżej
+        if(agentOn() && CM.Agent && CM.Ollama.chatTools){
+          try{
+            const sysA=sys.replace('using ONLY the numbered code snippets in the user message.',
+              'using the numbered code snippets in the user message and, when they are not enough, the read-only tools (codeSearch, readFile, findFiles, dependencies, dependents, fileInfo, hotspots, owners, tests). If any part of the question is not covered by the snippets, call codeSearch or readFile for it BEFORE answering — never answer that something "would need to be inspected". Tool results are numbered [n] too.');
+            const res=await CM.Agent.run({messages:[{role:'system',content:sysA}].concat(messages.slice(1)), sources:ctx.sources.slice(), maxSteps:5, signal:abortCtl.signal,
+              ctx:{graph:CM.App.graph, rag:CM.RAG, gitCore:CM.GitCore, testMap:CM.TestMap, signal:abortCtl.signal},
+              chat:(msgs, tools)=>CM.Ollama.chatTools(msgs, tools, {signal:abortCtl.signal, think:false, maxTokens:900, temperature:0.2}),
+              onStep:(s)=>setStage('🔧 '+s.name+' '+argText(s.args))});
+            done=true; if(paintT){ clearTimeout(paintT); paintT=null; }
+            finish(stripThink(res.answer)||t('ragNothing'), {sources:res.sources, ragMode:'agent', steps:res.steps.map(s=>({name:s.name, args:s.args, ok:s.ok, summary:s.summary}))});
+            return;
+          }catch(e){ if(!(e&&e.code==='notools')) throw e; }
+        }
         if(quick) opts.think=false;
         acc=await CM.Ollama.chat(messages, opts);
       }
@@ -1241,6 +1261,8 @@ CM.ChatBot = (function(){
       done=true; streaming=false; setSending(false); abortCtl=null; if(inputEl) inputEl.focus();
     }
   }
+  function agentOn(){ try{ return localStorage.getItem('codemap_chatbot_agent')!=='0'; }catch(e){ return true; } }
+  function argText(a){ const v=a&&(a.query||a.path||(a.n!=null?String(a.n):'')); return v?'„'+String(v).slice(0,48)+'”':''; }
   // [n] w tekście odpowiedzi → link do źródła (poza blokami kodu)
   function linkCites(root, sources){
     const byN=new Map(sources.map(s=>[String(s.n),s]));

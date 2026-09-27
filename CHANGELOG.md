@@ -5,6 +5,24 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 7 (agent z narzędziami)
+- **Agent kodu w trybie 📚 z Ollamą** (`js/agent.js`): gdy fragmenty z RAG nie wystarczą, model sam woła narzędzia
+  tylko do odczytu — `codeSearch`, `readFile` (do 150 linii), `findFiles`, `dependencies`, `dependents`,
+  `fileInfo`, `hotspots`, `owners` (autorzy i bus factor z git), `tests` (testy pliku, folderu, najbardziej złożone
+  pliki bez testów) — na grafie i kodzie wczytanego projektu, najwyżej 5 kroków, potem odpowiedź bez narzędzi.
+  Natywne `tool_calls` (Llama 3.x, Qwen 3) albo JSON wywołania w treści (Qwen 2.5 Coder, także z opisem narzędzia
+  zamiast nazwy); wymyślone narzędzie → model dostaje listę prawdziwych, powtórzone wywołanie nie jest wykonywane
+  drugi raz, błąd narzędzia wraca do modelu jako `error: …`; odpowiedź-wymówka („trzeba by zajrzeć do pliku…")
+  → jedno ponaglenie do użycia narzędzia. Wyniki `codeSearch` / `readFile` numerowane `[n]` wspólnie
+  z fragmentami, więc cytaty i klik w źródło działają jak w RAG; kroki w zwijanej liście „🔧 Kroki agenta".
+  Model bez obsługi narzędzi → zwykły tryb 📚. Przełącznik w Ustawieniach → AI → Ollama.
+- `CM.Ollama.chatTools()` (wywołanie `/api/chat` z `tools`, bez strumienia, `think:false`), 12 testów pętli i narzędzi
+  ze skryptowanym modelem, krok smoke w przeglądarce.
+
+### Zmienione
+- RAG: plik wymieniony w pytaniu z nazwy (`co robi agent.js…`), którego wyszukiwanie nie zwróciło, dostaje dwa
+  najlepsze fragmenty na początku kontekstu (`CM.RAG.mentionedFiles`).
+
 ## [1.2.0] — 2026-09-27
 
 Rozszerzenie VS Code (domknięcie fazy 4), przegląd zmian w PR (faza 5), folder na żywo (faza 6), README po angielsku

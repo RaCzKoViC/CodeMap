@@ -136,6 +136,13 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
   terms); an embedding model in Ollama (`bge-m3`, `nomic-embed-text`) adds semantic search —
   the index is built in Settings → AI, and the vectors are stored in the browser and recomputed only for changed
   snippets. The `/codeSearch` tool shows matches without any model.
+- **Agent with tools (Ollama, 📚 mode)** — when the snippets are not enough, the model looks things up itself
+  before answering: `codeSearch`, `readFile`, `findFiles`, `dependencies`, `dependents`, `fileInfo`,
+  `hotspots`, `owners` (git), `tests` — all read-only, running in the browser on the loaded project. Works with native tool calls
+  (Llama 3.x, Qwen 3) and with models that write the call as JSON in the text (Qwen 2.5 Coder); tool results are
+  cited as `[n]` like the snippets, and the steps are shown in a collapsible "Agent steps" list. Up to 5 steps,
+  then the model has to answer. A file named in the question (`agent.js`) is always included in the context.
+  Can be switched off in Settings → AI → Ollama.
 - **Runner** — a sandbox (`iframe` without `allow-same-origin`) for running generated HTML/SVG/CSS/JS/PHP.
 - Cloud models only ever receive the project's **structure** (names, numbers), never file contents; code
   snippets (📚 mode, attachment previews) go to **local** models only — WebLLM and Ollama.
@@ -239,6 +246,7 @@ js/rules.js                # architecture rules from .codemap.rules.json (layers
 js/git-core.js             # DOM-free git history: authors, ownership, bus factor, hotspots, timeline
 js/git-local.js  js/git-worker.js   # local .git reader (objects, packs, deltas, packed-refs) in a Web Worker
 js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddings (IndexedDB), context with citations
+js/agent.js                # agent loop: read-only tools (codeSearch, readFile, dependents…), native tool_calls or JSON in text
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators
 js/overlays.js             # node coloring by data (language, complexity, git, coverage) + legend

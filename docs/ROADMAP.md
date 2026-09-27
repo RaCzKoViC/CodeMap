@@ -107,10 +107,13 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Cache analizy w OPFS (szybkie ponowne wczytanie tego samego projektu).
 - Benchmarki w CI (czasy wczytania / analizy / układu na stałych repozytoriach).
 
-## Faza 7 — agent kodu (lokalne AI)
+## Faza 7 — agent kodu (lokalne AI) — W TOKU 2026-09-27
 
-- ChatBot z narzędziami w pętli: model sam woła `codeSearch`, `dependsOn`, `owners`, `tests` przed
-  odpowiedzią (wywołania narzędzi Ollamy); łączy tryb 📚 ze sterowaniem aplikacją.
+- [x] ChatBot z narzędziami w pętli (`js/agent.js`): model sam woła `codeSearch`, `readFile`, `findFiles`,
+  `dependencies`, `dependents`, `fileInfo`, `hotspots`, `owners`, `tests` przed odpowiedzią — natywne wywołania narzędzi Ollamy
+  albo JSON w treści; ponaglenie zamiast wymówki. Sprawdzone na llama3.2:3b, qwen3:8b, qwen2.5-coder:7b
+  (qwen2.5:7b narzędzia ignoruje → zwykły tryb 📚). POZOSTAŁO: sterowanie
+  aplikacją z pętli (akcje zmieniające widok), agent dla WebLLM.
 - Embeddingi w przeglądarce (WebLLM) — semantyczny RAG bez Ollamy.
 - „Doktor hotspotów": plan refaktoryzacji pliku z czołówki hotspotów na podstawie kodu i testów, z cytatami.
 - Trasy po kodzie (onboarding): uporządkowana ścieżka po plikach z notatkami, generowana przez model

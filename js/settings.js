@@ -44,6 +44,7 @@ CM.Settings = (function(){
     'ai.localAll':'Wszystkie modele silnika WebLLM','ai.localAllHint':'Pełna lista modeli czatu wbudowana w używaną wersję WebLLM (VRAM w MB). Wybór dopisuje model do listy powyżej.','ai.localAllShow':'Pokaż wszystkie modele','ai.localAllPick':'— wybierz model —',
     'ai.rag':'Indeks kodu (RAG) — tryb „📚 kod" w ChatBocie','ai.ragDesc':'ChatBot w trybie 📚 odpowiada na podstawie fragmentów kodu wczytanego projektu. Wyszukiwanie słów działa zawsze; model embeddingów w Ollamie (np. bge-m3 — dobry po polsku, albo nomic-embed-text) dodaje wyszukiwanie semantyczne. Wektory liczy Ollama na Twoim komputerze i zapisują się w przeglądarce — przy kolejnym wczytaniu liczone są tylko zmienione fragmenty.',
     'ai.ragModel':'Model embeddingów','ai.ragNoModel':'Brak modelu embeddingów w Ollamie — pobierz bge-m3 albo nomic-embed-text (propozycje wyżej).','ai.ragBuild':'Zbuduj / odśwież indeks semantyczny','ai.ragCancel':'Anuluj','ai.ragClear':'Usuń wektory',
+    'ai.ragAgent':'Agent z narzędziami: w trybie 📚 model w Ollamie sam przeszukuje kod, czyta pliki i sprawdza zależności przed odpowiedzią (tylko odczyt; modele bez narzędzi odpowiadają jak zwykle)',
     'ai.ragStat':'Fragmenty: {c} z {f} plików · indeks semantyczny: {v}','ai.ragNoProject':'Wczytaj projekt z treścią plików, aby zbudować indeks.','ai.ragYes':'gotowy ({m}, {d} wym.)','ai.ragNo':'brak (tylko wyszukiwanie słów)','ai.ragDone':'Indeks semantyczny gotowy: ',
     'ai.ollamaPull':'Pobierz model do Ollamy','ai.ollamaPullHint':'Nazwa jak w bibliotece ollama.com (np. qwen2.5:3b). Pobieranie odbywa się w Ollamie, postęp poniżej.','ai.ollamaPullBtn':'Pobierz','ai.ollamaPullDone':'Pobrano: ','ai.ollamaPullCancel':'Anuluj','ai.ollamaSuggest':'Propozycje: ',
     'ai.localList':'Pobrane modele (zarządzanie)','ai.localNone':'Nie pobrano jeszcze żadnego modelu.','ai.localRun':'Uruchom (pobrany — bez ponownego pobierania)',
@@ -154,6 +155,7 @@ CM.Settings = (function(){
     'ai.localAll':'All WebLLM engine models','ai.localAllHint':'The full chat-model list built into the WebLLM version in use (VRAM in MB). Picking one adds it to the list above.','ai.localAllShow':'Show all models','ai.localAllPick':'— pick a model —',
     'ai.rag':'Code index (RAG) — "📚 code" mode in ChatBot','ai.ragDesc':'In 📚 mode ChatBot answers from code snippets of the loaded project. Keyword search always works; an embedding model in Ollama (e.g. bge-m3 — multilingual, or nomic-embed-text) adds semantic search. Vectors are computed by Ollama on your machine and stored in the browser — on the next load only changed snippets are recomputed.',
     'ai.ragModel':'Embedding model','ai.ragNoModel':'No embedding model in Ollama — pull bge-m3 or nomic-embed-text (suggestions above).','ai.ragBuild':'Build / refresh the semantic index','ai.ragCancel':'Cancel','ai.ragClear':'Delete vectors',
+    'ai.ragAgent':'Agent with tools: in 📚 mode the Ollama model searches the code, reads files and checks dependencies before answering (read-only; models without tools answer as usual)',
     'ai.ragStat':'Snippets: {c} from {f} files · semantic index: {v}','ai.ragNoProject':'Load a project with file contents to build the index.','ai.ragYes':'ready ({m}, {d} dims)','ai.ragNo':'none (keyword search only)','ai.ragDone':'Semantic index ready: ',
     'ai.ollamaPull':'Pull a model into Ollama','ai.ollamaPullHint':'Name as in the ollama.com library (e.g. qwen2.5:3b). The download runs inside Ollama; progress below.','ai.ollamaPullBtn':'Pull','ai.ollamaPullDone':'Pulled: ','ai.ollamaPullCancel':'Cancel','ai.ollamaSuggest':'Suggestions: ',
     'ai.localList':'Downloaded models (manage)','ai.localNone':'No models downloaded yet.','ai.localRun':'Start (downloaded — no re-download)',
@@ -557,6 +559,9 @@ CM.Settings = (function(){
           const bClear=el('button',{class:'tb-btn',text:t('ai.ragClear')});
           brow.appendChild(bBuild); brow.appendChild(bClear);
           ragBox.appendChild(el('div',{class:'set-desc',text:t('ai.ragModel')})); ragBox.appendChild(eSel); ragBox.appendChild(brow); ragBox.appendChild(rbar); ragBox.appendChild(rstat);
+          const agentCb=el('input',{type:'checkbox'}); try{ agentCb.checked=localStorage.getItem('codemap_chatbot_agent')!=='0'; }catch(e){ agentCb.checked=true; }
+          agentCb.onchange=()=>{ try{ localStorage.setItem('codemap_chatbot_agent', agentCb.checked?'1':'0'); }catch(e){} };
+          ragBox.appendChild(el('label',{class:'chk set-mt'}, agentCb, el('span',{text:t('ai.ragAgent')})));
           const showStat=async()=>{
             const g=window.CMApp&&CMApp.graph; if(!g||!g.nodes||g.nodes.size<2){ rstat.textContent=t('ai.ragNoProject'); return; }
             await CM.RAG.ensure(g); const s=CM.RAG.stats();

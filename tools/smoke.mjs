@@ -197,6 +197,20 @@ const ragRes = await evalJs(`(async()=>{ try{
   return {chunks:st.chunks, files:st.files, cs:String(cs).slice(0,120), csOk:String(cs).includes('\u0060'), lexHits, had, localOnly};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// agent z narzędziami (faza 7) bez modelu: skryptowany „model" na demo — natywne tool_calls (dependents,
+// codeSearch), potem JSON w treści (readFile), odpowiedź; kroki, wspólna numeracja źródeł, graf nietknięty
+const agentRes = await evalJs(`(async()=>{ try{
+  const g=CMApp.graph, n0=g.nodes.size; let i=0; const seen=[];
+  const replies=[
+    {content:'', tool_calls:[{function:{name:'dependents', arguments:{path:'src/utils/format.js'}}}, {function:{name:'codeSearch', arguments:{query:'reducer state', k:2}}}]},
+    {content:'{"name":"readFile","arguments":{"path":"src/store/reducer.js","start":1,"end":5}}'},
+    {content:'Reducer jest w src/store/reducer.js [1].'}];
+  const r=await CM.Agent.run({messages:[{role:'user', content:'kto używa format.js i gdzie jest reducer?'}], sources:[],
+    ctx:{graph:g, rag:CM.RAG, gitCore:CM.GitCore}, chat:async(msgs, tools)=>{ seen.push(msgs[msgs.length-1].role); return replies[Math.min(i++, replies.length-1)]; }});
+  return {answer:r.answer, steps:r.steps.map(s=>s.name+':'+s.ok).join(','), sources:r.sources.length, nums:r.sources.every((s,k)=>s.n===k+1),
+    roles:seen.join(','), tools:CM.Agent.ollamaTools().length, same:CMApp.graph===g && g.nodes.size===n0};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 // deep-linki i publiczne linki (faza 4) BEZ sieci: fetch podstawiony w stronie. #gist= → mapa (adresy z mapy
 // oczyszczone), #v= niesie gist; #share= bez backendu → czytelny błąd, mapa bez zmian; #repo= z podkatalogiem
 // i układem przez podstawione API GitHub; obcy host odrzucony bez żadnego zapytania; „Udostępnij publiczny
@@ -297,6 +311,9 @@ check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitR
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexHits > 0 && ragRes.had && ragRes.localOnly,
   `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
+check(agentRes && !agentRes.error && agentRes.steps === 'dependents:true,codeSearch:true,readFile:true' && agentRes.sources >= 2 && agentRes.nums
+  && agentRes.roles === 'user,tool,user' && agentRes.tools === 9 && agentRes.same && /reducer/.test(agentRes.answer),
+  `agent z narzędziami: tool_calls + JSON w treści, źródła [n], graf nietknięty: ${JSON.stringify(agentRes)}`);
 check(prRes && !prRes.error && prRes.changed === 2 && prRes.outside === 1 && prRes.impacted > 0 && prRes.cur === "pr" && prRes.card && prRes.md && prRes.link && prRes.chat && prRes.persisted && prRes.cleared,
   `mapa wpływu PR: ryzyko, zależne, nakładka, panel, raport, link, ChatBot: ${JSON.stringify(prRes)}`);
 check(liveRes && !liveRes.error && liveRes.ok && liveRes.skipped && String(liveRes.added)==="src/c.js" && String(liveRes.changed)==="src/b.js" && liveRes.kept && liveRes.edge && liveRes.badge && liveRes.off,

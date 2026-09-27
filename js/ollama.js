@@ -40,6 +40,25 @@ CM.Ollama = (function(){
   }
   async function online(){ try{ await models(true); return true; }catch(e){ return false; } }
 
+  // ---- agent (agent.js): /api/chat z narzędziami, bez strumienia → {content, tool_calls, thinking} ----
+  // model bez wsparcia narzędzi → błąd z code 'notools' (ChatBot wraca wtedy do zwykłego trybu RAG)
+  async function chatTools(messages, tools, opts){
+    opts=opts||{};
+    const m=opts.model||model();
+    if(!m) throw new Error(I.t('ol.noModel','Nie wybrano modelu Ollamy — otwórz Ustawienia → AI i odśwież listę modeli.'));
+    const body={ model:m, stream:false,
+      messages:messages.map(x=>{ const o={role:x.role, content:String(x.content||'')}; if(x.tool_calls) o.tool_calls=x.tool_calls; if(x.tool_name) o.tool_name=x.tool_name; return o; }),
+      options:Object.assign({temperature:opts.temperature==null?0.2:opts.temperature}, opts.maxTokens?{num_predict:opts.maxTokens}:{}) };
+    if(tools && tools.length) body.tools=tools;
+    if(opts.think===false) body.think=false;
+    let r;
+    try{ r=await fetch(base()+'/api/chat',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:opts.signal}); }
+    catch(e){ if(e&&e.name==='AbortError') throw e; throw offlineErr(); }
+    if(!r.ok){ const t=(await r.text().catch(()=>'')).slice(0,200); const e=new Error('Ollama: HTTP '+r.status+(t?' — '+t:'')); if(/does not support tools|tools? (are|is) not supported/i.test(t)) e.code='notools'; throw e; }
+    const j=await r.json(); const msg=j.message||{};
+    return {content:msg.content||'', tool_calls:msg.tool_calls||null, thinking:msg.thinking||''};
+  }
+
   // ---- embeddingi (RAG w rag.js): modele embedujące z tej samej listy /api/tags ----
   const isEmbedModel=(m)=>{ const fam=((m.details&&m.details.family)||'').toLowerCase(), n=String(m.name||'').toLowerCase();
     return /bert|nomic/.test(fam) || /embed|bge-|minilm|e5-|gte-|arctic/.test(n); };
@@ -163,5 +182,5 @@ CM.Ollama = (function(){
     {name:'gemma3:4b', size:'3.3 GB', note:'Google, wielojęzyczny'},
     {name:'gpt-oss:20b', size:'13 GB', note:'OpenAI open-weight (myślący; 16 GB+ RAM)'},
   ];
-  return { base, setBase, model, setModel, models, online, chat, pull, modelSizeGB, embeddingModels, embed, SUGGESTED, DEF_BASE };
+  return { base, setBase, model, setModel, models, online, chat, chatTools, pull, modelSizeGB, embeddingModels, embed, SUGGESTED, DEF_BASE };
 })();

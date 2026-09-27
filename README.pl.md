@@ -135,6 +135,13 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   pojęcia); model embeddingów w Ollamie (`bge-m3`, `nomic-embed-text`) dodaje wyszukiwanie semantyczne —
   indeks budowany w Ustawieniach → AI, wektory zapisane w przeglądarce i przeliczane tylko dla zmienionych
   fragmentów. Narzędzie `/codeSearch` pokazuje trafienia bez modelu.
+- **Agent z narzędziami (Ollama, tryb 📚)** — gdy fragmenty nie wystarczą, model sam sprawdza kod przed
+  odpowiedzią: `codeSearch`, `readFile`, `findFiles`, `dependencies`, `dependents`, `fileInfo`, `hotspots`, `owners` (git), `tests` —
+  wyłącznie odczyt, w przeglądarce, na wczytanym projekcie. Działa z natywnymi wywołaniami narzędzi
+  (Llama 3.x, Qwen 3) i z modelami, które zapisują wywołanie jako JSON w treści (Qwen 2.5 Coder); wyniki
+  narzędzi są cytowane jako `[n]` jak fragmenty, a kroki widać w zwijanej liście „Kroki agenta". Najwyżej
+  5 kroków, potem model musi odpowiedzieć. Plik wymieniony w pytaniu (`agent.js`) zawsze trafia do kontekstu.
+  Wyłączany w Ustawieniach → AI → Ollama.
 - **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
 - Do modeli w chmurze trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików; fragmenty
   kodu (tryb 📚, podgląd załączników) dostają tylko modele **lokalne** — WebLLM i Ollama.
@@ -237,6 +244,7 @@ js/rules.js                # reguły architektury z .codemap.rules.json (warstwy
 js/git-core.js             # historia git bez DOM: autorzy, własność, bus factor, hotspoty, oś czasu
 js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, delty, packed-refs) w Web Workerze
 js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi Ollamy (IndexedDB), kontekst z cytatami
+js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSearch, readFile, dependents…), tool_calls albo JSON w treści
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
 js/overlays.js             # kolorowanie węzłów wg danych (język, złożoność, git, pokrycie) + legenda
