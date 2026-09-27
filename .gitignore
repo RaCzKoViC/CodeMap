@@ -18,5 +18,11 @@ Desktop.ini
 node_modules/
 _site/
 
+# rozszerzenie VS Code: kopie z integrations/vscode/scripts/bundle.mjs i paczki .vsix
+integrations/vscode/app/
+integrations/vscode/cli/
+integrations/vscode/LICENSE
+integrations/vscode/*.vsix
+
 # worktree agentow (subagent isolation)
 .claude/worktrees/

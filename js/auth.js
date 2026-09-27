@@ -280,6 +280,7 @@ CM.Auth = (function(){
   // sesji; 404 / błąd sieci = nie ma API, więc formularz logowania zawsze by zawiódł.
   function setBackend(on){ const b=$('#btn-account'); if(b) b.classList.toggle('hidden', !on); document.body.classList.toggle('no-backend', !on); }
   async function refresh(){
+    if(window.acquireVsCodeApi){ setBackend(false); return; }   // webview VS Code (integrations/vscode): bez konta i /api
     if(!navigator.onLine) return;
     try{ setUser(await api('/api/auth/me')); setBackend(true); }
     catch(e){ setBackend(!!(e&&e.status===401)); }

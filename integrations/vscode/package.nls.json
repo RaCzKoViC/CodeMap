@@ -1,0 +1,21 @@
+{
+  "ext.description": "Code cartography in the editor: dependency map, static analysis (cycles, god files, duplicates, architecture rules), git hotspots and bus factor — findings in Problems, the interactive CodeMap map in a panel.",
+  "ext.virtual": "CodeMap reads files and the .git directory from disk.",
+  "command.analyze": "Analyze workspace",
+  "command.openMap": "Open map",
+  "command.revealInMap": "Show file on map",
+  "command.clear": "Clear findings",
+  "config.analyzeOnSave": "Re-run the analysis after saving a file (debounced by 1.5 s; a newer run cancels the previous one).",
+  "config.minSeverity": "Lowest severity of CodeMap findings shown in **Problems**.",
+  "config.minSeverity.info": "All findings, including informational ones (Hint).",
+  "config.minSeverity.low": "Low and above (Information, Warning, Error).",
+  "config.minSeverity.med": "Medium and above (Warning, Error).",
+  "config.minSeverity.high": "High only (Error).",
+  "config.git": "Read the local `.git` history: change hotspots, file owners, bus factor, the *change hotspots* and *knowledge in one head* rules.",
+  "config.exclude": "Glob patterns (relative to the workspace folder) skipped during analysis, e.g. `generated/**`. `node_modules`, `dist`, `build`, `coverage` and similar are always skipped.",
+  "config.lang": "Language of findings, the status bar and the map.",
+  "config.lang.auto": "The VS Code display language (Polish for `pl`, English otherwise).",
+  "config.lang.pl": "Polish.",
+  "config.lang.en": "English.",
+  "config.codeLens": "Show a CodeLens above hotspot files (changes × complexity, owner) when git history is available."
+}

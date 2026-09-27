@@ -1,0 +1,6 @@
+test/**
+scripts/**
+.vscode/**
+**/*.vsix
+**/.DS_Store
+**/Thumbs.db

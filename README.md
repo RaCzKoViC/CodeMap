@@ -170,6 +170,13 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
 - **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — a report in the step summary, SARIF, thresholds; an example
   with code scanning is in [docs/github-action.md](docs/github-action.md) (in Polish). The same step runs in this repository's CI.
 
+### VS Code extension
+`integrations/vscode/` — the same analysis inside the editor: Inspect findings in **Problems** (line, rule,
+related files), the health score in the status bar, CodeLens above git hotspots, the CodeMap map in a panel
+with navigation both ways (file ↔ node), analysis on save. Runs locally in a worker thread, no network.
+Install: `cd integrations/vscode && npm run package` → `code --install-extension codemap-0.1.0.vsix`
+(requires VS Code ≥ 1.90).
+
 ---
 
 ## ⌨️ Keyboard shortcuts
@@ -257,6 +264,8 @@ js/pr-core.js  js/pr.js    # PR impact map: change risk, dependents, reviewers (
 js/tests-ui.js             # tests and coverage in the app: overlays, panel, Inspect, ChatBot, report loading
 js/deeplink.js  js/links.js  # #repo= / #gist= / #share= links (validation, loading), public links dialog
 js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API for chatbot/drive/inspect/smoke)
+js/vscode-bridge.js        # bridge to the VS Code extension (does nothing outside its webview)
+integrations/vscode/       # VS Code extension: diagnostics, status bar, CodeLens, map panel
 cli/                       # headless CLI (vm runtime with the same js/*.js, analysis, SARIF, reports); action.yml — GitHub Action
 sw.js  manifest.webmanifest  serve.py                       # PWA and local server
 ```

@@ -76,7 +76,7 @@ Publikacja:
 - [x] Dodatkowo: czytnik lokalnego `.git` w przeglądarce (`js/git-local.js`, sonda zgodności z `git log`),
   kolorowanie węzłów wg danych (`js/overlays.js`), reguły Inspect „hotspoty zmian" i „wiedza w jednej głowie".
 
-## Faza 4 — ekosystem — W TOKU 2026-09-27
+## Faza 4 — ekosystem — WYKONANA 2026-09-27
 
 - [x] Tryb headless/CLI + GitHub Action (`cli/`, `action.yml`): raporty JSON / Markdown / SARIF 2.1.0 / mapa,
   progi `--min-score` / `--fail-on` / `--max-findings`, job `codemap` w naszym CI.
@@ -84,8 +84,9 @@ Publikacja:
   indeks w IndexedDB z przeliczaniem zmienionych fragmentów, tryb 📚 w ChatBocie z cytatami i źródłami,
   tylko dostawcy lokalni; `/codeSearch`.
 - [x] Deep-linki `#repo=`, `#gist=`, `#share=`; publiczne linki do map przez backend (`/api/shares`, testy backendu).
-- Rozszerzenie VS Code / integracja z LSP jako opcja.
-- Wydanie v1.1.0 (Release, notatki z CHANGELOG, nowe zrzuty).
+- [x] Rozszerzenie VS Code (`integrations/vscode/`): Problems, pasek stanu, CodeLens, panel z mapą, nawigacja
+  w obie strony, analiza przy zapisie. Integracja LSP — nie (niepotrzebna przy diagnostykach z rozszerzenia).
+- [x] Wydanie v1.1.0 (2026-09-27); v1.2.0 z rozszerzeniem VS Code, fazą 5 i trybem na żywo.
 
 ## Faza 5 — przegląd zmian (PR) — W TOKU 2026-09-27
 

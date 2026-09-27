@@ -6,11 +6,14 @@ import { join, extname } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const SKIP = new Set(['node_modules', '.git', 'Sejf', 'data', '_site']);
+// kopie js/ i cli/ w paczce rozszerzenia VS Code (integrations/vscode/scripts/bundle.mjs) — sprawdzane w źródle
+const SKIP_PATHS = new Set(['app', 'cli'].map((d) => join(ROOT, 'integrations', 'vscode', d)));
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
     if (SKIP.has(name)) continue;
     const p = join(dir, name);
+    if (SKIP_PATHS.has(p)) continue;
     if (statSync(p).isDirectory()) yield* walk(p);
     else if (['.js', '.mjs'].includes(extname(name))) yield p;
   }

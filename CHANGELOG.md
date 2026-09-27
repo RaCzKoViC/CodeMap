@@ -5,6 +5,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 4 (rozszerzenie VS Code)
+- **Rozszerzenie VS Code** (`integrations/vscode/`, v0.1.0, VS Code ≥ 1.90): analiza workspace (kopia CLI w wątku
+  roboczym, anulowanie) → diagnostyki w Problems z progiem ważności, kodem reguły i powiązanymi plikami; health
+  score w pasku stanu; CodeLens nad hotspotami git; mapa w panelu webview (CSP z nonce, ścieżki zapasowe bez
+  Workerów) z nawigacją edytor ↔ mapa; analiza przy zapisie (debounce 1,5 s); 37 testów z atrapą `vscode`
+  i smoke webview w headless Chrome. W aplikacji: `js/vscode-bridge.js`, hak `A.ctxExtra` w menu kontekstowym,
+  w webview bez service workera i bez `/api`.
+
 ### Dodane — Faza 6 (tryb na żywo)
 - **Folder na żywo** (`js/live.js`, Wczytaj → „Folder na żywo"): uchwyt katalogu z File System Access, obserwacja
   przez `FileSystemObserver` (wyzwalacz) + skan dat modyfikacji co 2,5–15 s (siatka bezpieczeństwa, tylko przy

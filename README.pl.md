@@ -169,6 +169,12 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
 - **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
   z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
 
+### Rozszerzenie VS Code
+`integrations/vscode/` — ta sama analiza w edytorze: znaleziska Inspect w **Problems** (linia, reguła, powiązane
+pliki), health score w pasku stanu, CodeLens nad hotspotami git, mapa CodeMap w panelu i nawigacja w obie strony
+(plik ↔ węzeł), analiza przy zapisie. Lokalnie, w wątku roboczym, bez sieci. Instalacja:
+`cd integrations/vscode && npm run package` → `code --install-extension codemap-0.1.0.vsix` (VS Code ≥ 1.90).
+
 ---
 
 ## ⌨️ Skróty klawiszowe
@@ -256,6 +262,8 @@ js/pr-core.js  js/pr.js    # mapa wpływu PR: ryzyko zmian, zależne, recenzenci
 js/tests-ui.js             # testy i pokrycie w aplikacji: nakładki, panel, Inspect, ChatBot, wczytywanie raportów
 js/deeplink.js  js/links.js  # linki #repo= / #gist= / #share= (walidacja, wczytanie), okno publicznych linków
 js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)
+js/vscode-bridge.js        # most do rozszerzenia VS Code (poza jego webview nic nie robi)
+integrations/vscode/       # rozszerzenie VS Code: diagnostyki, pasek stanu, CodeLens, panel z mapą
 cli/                       # CLI headless (runtime vm z tymi samymi js/*.js, analiza, SARIF, raporty); action.yml — GitHub Action
 sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
 ```

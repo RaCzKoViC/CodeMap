@@ -7,7 +7,7 @@ const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js'
   'js/analysis.js','js/graph.js','js/physics.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/testmap.js','js/git-core.js','js/git-remote.js','js/git.js','js/pr-core.js','js/pr.js','js/live.js','js/renderer.js','js/overlays.js','js/loaders.js','js/storage.js',
   'js/ui.js','js/ui-kit.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js',
   'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/tests-ui.js','js/app.js','js/sim-worker.js','js/analysis-worker.js',
-  'js/symbols-core.js','js/symbols.js','js/symbols-worker.js','js/git-local.js','js/git-worker.js','js/rag.js','js/deeplink.js','js/links.js'];
+  'js/symbols-core.js','js/symbols.js','js/symbols-worker.js','js/git-local.js','js/git-worker.js','js/rag.js','js/deeplink.js','js/links.js','js/vscode-bridge.js'];
 
 self.addEventListener('install', (e)=>{
   e.waitUntil((async()=>{
