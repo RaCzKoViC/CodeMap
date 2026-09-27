@@ -72,6 +72,18 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 - **Zapis / odczyt** całej mapy z pozycjami (`.codemap.json`), porównywanie kilku schematów obok siebie,
   hotspoty (rozmiar × zależności × złożoność).
 
+### Historia git
+- Folder wczytany **razem z katalogiem `.git`** jest analizowany od razu — w przeglądarce, w Web Workerze,
+  bez sieci (czytnik obiektów, paczek i delt gita napisany od zera). Repozytorium z GitHub / GitLab /
+  Bitbucket: Projekt → **Historia git** (API hostingu; bez tokenu pliki dla ~50 najnowszych commitów).
+- **Właściciel** każdego pliku i udziały autorów, **bus factor** projektu i każdego folderu, zmiany nazw
+  śledzone wstecz, boty pomijane przy własności; awatary właścicieli na węzłach.
+- **Hotspoty churn × złożoność** — pliki często zmieniane i jednocześnie złożone (jak w CodeScene).
+- **Kolorowanie** węzłów (lewy panel): właściciel, częstość zmian, hotspoty, ostatnia zmiana — obok
+  języka, złożoności i daty modyfikacji; legenda z licznikami, klik podświetla pliki.
+- **Oś czasu** — animowana ewolucja projektu (Gource-lite): pliki pojawiają się w kolejności powstania,
+  zmiany świecą kolorem autora; bez historii git — oś czasu z migawek.
+
 ### Inspect — analiza statyczna
 16 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
 głębokie zagnieżdżenie, minifikaty, **zduplikowany kod** — winnowing na treści plików…) z progami
@@ -136,6 +148,7 @@ na Twoje wyraźne żądanie:
 | Kiedy | Dokąd | Co |
 |---|---|---|
 | wczytanie repozytorium | api.github.com / gitlab.com / api.bitbucket.org | adres repo, opcjonalny token (tylko w pamięci karty) |
+| Historia git repozytorium z URL — na żądanie | te same API + avatars.githubusercontent.com | zapytania o listę commitów i zmienione pliki; awatary autorów. Lokalny `.git` jest czytany wyłącznie w przeglądarce |
 | klucz API (chmura) | API wybranego dostawcy (api.mistral.ai, api.openai.com, api.anthropic.com, …) | Twój klucz i struktura projektu (nazwy, liczby) |
 | WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
 | Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
@@ -167,8 +180,11 @@ js/layouts.js              # 13 układów (+ fizyka), js/sim-worker.js — Web W
 js/export.js               # eksport widocznego grafu: DOT (Graphviz), Mermaid, GraphML (yEd)
 js/metrics.js              # sprzężenia Ca/Ce/I per plik i folder, duplikaty kodu (winnowing)
 js/rules.js                # reguły architektury z .codemap.rules.json (warstwy, forbid, noCycles)
-js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa
-js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral
+js/git-core.js             # historia git bez DOM: autorzy, własność, bus factor, hotspoty, oś czasu
+js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
+js/overlays.js             # kolorowanie węzłów wg danych (język, złożoność, git, pokrycie) + legenda
+js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral; pliki boczne (.git, lcov)
+js/git-remote.js           # historia commitów z API GitHub / GitLab / Bitbucket
 js/storage.js              # migawki i sesja (IndexedDB)
 js/ui.js                   # panele szczegółów, filtry, historia, diff
 js/settings.js             # ustawienia, samouczek, instrukcja
@@ -183,7 +199,8 @@ js/chrome.js               # okablowanie DOM: toolbar, menu, panele, wygląd/ust
 js/repo-hosts.js           # GitHub/GitLab/Bitbucket: autorzy, deep-linki, gałęzie, gist, udostępnialny widok (#v=)
 js/compare.js              # porównywanie schematów, cykle, historia migawek i diff, hotspoty/Inspect
 js/navigation.js           # radar okolicy, minimapa, tarcza obrotu, nawigacja WASD, menu kontekstowe, eksport obrazu
-js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec), paleta Ctrl+K, dane demo
+js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec, registerAction), paleta Ctrl+K, dane demo
+js/git.js                  # historia git na mapie: uruchamianie, nakładki, panel, awatary, oś czasu, akcje ChatBota
 js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)
 sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
 ```

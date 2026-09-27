@@ -63,12 +63,15 @@ Publikacja:
 - [x] Wyszukiwanie w treści plików z wynikami na mapie (narzędzie ChatBota `/findText`; POZOSTAŁO: pole w UI i regex); parsery Swift/Dart/Elixir/Lua/Zig/Haskell/Shell (Kotlin/Scala już w rodzinie Java).
 - [x] Eksport DOT / GraphML / Mermaid (`js/export.js`, menu Projekt, paleta Ctrl+K, akcja ChatBota `exportGraph`).
 
-## Faza 3 — inteligencja git
+## Faza 3 — inteligencja git — W TOKU 2026-09-27
 
-- Hotspoty churn × złożoność z API GitHub/GitLab (`commits?path=`), wpięte w `hotspotScore`.
-- Ownership per plik i bus factor; awatary autorów na węzłach.
-- Suwak czasu: animowana ewolucja na bazie migawek i porównania gałęzi (Gource-lite).
-- Mapowanie testów do kodu (`*.test`/`*.spec` → podmiot) i nakładka pokrycia z lcov.
+- [x] Hotspoty churn × złożoność — z lokalnego `.git` (czytnik obiektów i paczek w przeglądarce) albo z API
+  GitHub/GitLab/Bitbucket (lista commitów + zmienione pliki per commit w budżecie limitu, zamiast
+  `commits?path=` per plik); wpięte w okno „Hotspoty", nakładkę i `topFiles`.
+- [x] Ownership per plik i bus factor (projekt i folder); awatary / inicjały właścicieli na węzłach.
+- [x] Suwak czasu: animowana ewolucja z historii git albo z migawek (Gource-lite: pojawianie się plików,
+  poświata zmian w kolorze autora, etykiety autorów).
+- [ ] Mapowanie testów do kodu (`*.test`/`*.spec` → podmiot) i nakładka pokrycia z lcov.
 
 ## Faza 4 — ekosystem
 

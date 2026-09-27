@@ -5,9 +5,30 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
-Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Fazy 2 i 3 planu rozwoju — głębsza analiza i inteligencja git ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
-### Dodane
+### Dodane — Faza 3 (historia git)
+- **Historia git** (`js/git-core.js`, `js/git-remote.js`, `js/git.js`): folder wczytany razem z katalogiem
+  `.git` jest analizowany sam, lokalnie i bez sieci; repozytorium z GitHub / GitLab / Bitbucket — na żądanie
+  (Projekt → Historia git) przez API hostingu, z oszczędzaniem limitu zapytań (pliki dla najnowszych commitów,
+  pełna historia z tokenem). Zmiany nazw plików są śledzone wstecz, tożsamości autorów scalane (e-maile,
+  login z noreply GitHuba, imię), boty nie zostają właścicielami.
+- **Własność i bus factor**: właściciel każdego pliku, udziały autorów w panelu szczegółów (plik, folder,
+  projekt), bus factor projektu i każdego folderu (zachłannie wg Avelino i in. 2016); awatary (API) albo
+  inicjały (lokalnie) właścicieli na węzłach.
+- **Hotspoty churn × złożoność** (jak CodeScene): okno „Hotspoty" liczy (zmiany + zmiany z 90 dni) ×
+  (1 + złożoność), gdy jest historia; `topFiles {metric:"churn"|"hotspot"}` w ChatBocie.
+- **Kolorowanie węzłów wg danych** (`js/overlays.js`, lewy panel „Kolorowanie"): język, złożoność, data
+  modyfikacji, a z historią — właściciel, częstość zmian, hotspoty, ostatnia zmiana; legenda z licznikami,
+  klik podświetla pliki; akcja ChatBota `colorBy {mode}`.
+- **Oś czasu — ewolucja projektu** (Gource-lite): pliki pojawiają się na mapie w kolejności powstania,
+  zmienione świecą kolorem autora, nad nimi etykiety autorów z promieniami; odtwarzanie 0,5×–40×, suwak;
+  bez historii git — oś czasu z migawek projektu.
+- ChatBot: `gitHistory`, `owners {query?}`, `busFactor {query?}`, `churn {n?}`, `timeline {action}`, `colorBy`.
+- Loader przekazuje „pliki boczne" (uchwyty katalogu `.git` i raportów pokrycia, także z pomijanego
+  `coverage/`) bez ich czytania; historia i dane git zapisują się w pliku mapy.
+
+### Dodane — Faza 2
 - Eksport widocznego grafu do **DOT** (Graphviz, klastry = foldery, kolory wg języka), **Mermaid**
   (`flowchart LR`, subgraph per folder) i **GraphML** (yEd: atrybuty type/lang/size/lines, grupy) —
   menu Projekt, paleta Ctrl+K, akcja ChatBota `exportGraph {format}` (`js/export.js`).
