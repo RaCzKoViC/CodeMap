@@ -27,3 +27,19 @@ describe('listPRs — otwarte pull / merge requesty', () => {
     assert.equal(calls.length, n);
   });
 });
+
+describe('fetchPR — łatki do asystenta przeglądu i widoku przed/po', () => {
+  test('GitHub `patch` i GitLab `diff` trafiają do plików jako patch; plik bez łatki (binarny) — bez pola', async () => {
+    routes['https://api.github.com/repos/o/r/pulls/12'] = { number: 12, title: 'Nowy parser', user: { login: 'ala' }, base: { ref: 'main' }, head: { ref: 'parser' }, html_url: 'https://github.com/o/r/pull/12' };
+    routes['https://api.github.com/repos/o/r/pulls/12/files?per_page=100&page=1'] = [
+      { filename: 'src/a.js', status: 'modified', additions: 1, deletions: 1, patch: '@@ -1 +1 @@\n-a\n+b' },
+      { filename: 'img.png', status: 'added', additions: 0, deletions: 0 }];
+    const gh = host(await R.fetchPR({ host: 'github', repo: 'o/r' }, 12));
+    assert.deepEqual(gh.files, [{ path: 'src/a.js', status: 'M', add: 1, del: 1, patch: '@@ -1 +1 @@\n-a\n+b' }, { path: 'img.png', status: 'A', add: 0, del: 0 }]);
+    assert.deepEqual([gh.pr.base, gh.pr.head, gh.pr.author.login], ['main', 'parser', 'ala']);
+    routes['https://gitlab.com/api/v4/projects/g%2Fp/merge_requests/7'] = { iid: 7, title: 'MR', author: { username: 'bob' }, target_branch: 'main', source_branch: 'fix' };
+    routes['https://gitlab.com/api/v4/projects/g%2Fp/merge_requests/7/changes'] = { changes: [{ new_path: 'x.py', old_path: 'x.py', diff: '@@ -1 +1 @@\n-1\n+2\n' }] };
+    const gl = host(await R.fetchPR({ host: 'gitlab', repo: 'g/p' }, 7));
+    assert.deepEqual(gl.files, [{ path: 'x.py', status: 'M', add: 1, del: 1, patch: '@@ -1 +1 @@\n-1\n+2\n' }]);
+  });
+});

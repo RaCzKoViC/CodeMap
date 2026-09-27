@@ -599,6 +599,28 @@ const tgRes = await evalJs(`(async()=>{ try{
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 check(tgRes && !tgRes.error && /^Szkielet testów: /.test(tgRes.out) && tgRes.path && tgRes.describe && tgRes.imp && tgRes.btn,
   `szkielet testów: akcja, okno z kodem (describe, import), przycisk w sekcji Doktora: ${JSON.stringify(tgRes)}`);
+// asystent przeglądu PR i przed/po (faza 11): łatka w pamięci (nie w zapisie mapy) → przycisk „Przed / po" przy
+// zmienionym pliku, okno z wierszami usuniętymi / dodanymi; prompt z fragmentem diff [1]; ChatBot bez modelu lokalnego → uwaga
+const prrRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); CMApp.loadDemo(); await sleep(900);
+  const g=CMApp.graph; g.meta=Object.assign({}, g.meta, {host:'github', repo:'o/demo', branch:'main'});
+  const patch='@@ -1,3 +1,4 @@ export function fmt(x)\\n export function fmt(x){\\n-  return x;\\n+  if (x == null) return \"\";\\n+  return String(x);\\n }';
+  CM.PR._patchStore.set(g, new Map([['src/utils/format.js', patch]]));
+  CM.PR.apply(g, {number:12, title:'Demo PR', author:{login:'ala'}}, [{path:'src/utils/format.js', status:'M', add:2, del:1}]);
+  CMApp.focusNode('src/utils/format.js'); await sleep(250);
+  const btn=document.querySelector('#details-body .prd-btn'); if(btn) btn.click(); await sleep(200);
+  const del=document.querySelectorAll('#prd-body td.prd-t.del').length, add=document.querySelectorAll('#prd-body td.prd-t.add').length;
+  const mx=document.querySelector('#modal-prdiff .modal-x'); if(mx) mx.click();
+  const pr=CM.PRReview.prompt(g, g.prInfo, CM.PR.patches(g), {local:true});
+  const saved=JSON.stringify(g.toJSON()).includes('String(x)');
+  CMApp.exec('prAssist',{}); await sleep(400);
+  const conv=CM.ChatBot._convs()[0], u=conv.messages.find(m=>m.role==='user'), a=conv.messages.find(m=>m.role==='assistant');
+  CM.ChatBot.close(); CM.PR.clear();
+  return {btn:!!btn, del, add, sources:pr.sources.length, diff:pr.user.includes('\\x60\\x60\\x60diff'), saved, ask:u?u.content:'', note:!!(a&&a.noKey)};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(prrRes && !prrRes.error && prrRes.btn && prrRes.del === 1 && prrRes.add === 2 && prrRes.sources === 1 && prrRes.diff && !prrRes.saved
+  && /^🔍 Przegląd PR #12/.test(prrRes.ask) && prrRes.note,
+  `asystent przeglądu PR: przed/po z łatki, prompt z diffem, łatka poza zapisem mapy, ChatBot tylko lokalnie: ${JSON.stringify(prrRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

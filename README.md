@@ -214,6 +214,11 @@ English and Polish, dark/light theme, 8 color presets, “liquid glass” appear
 an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an installable PWA.
 
 ### PR review — impact map
+- **PR review assistant** (local model — the diff is code): “🔍 Review assistant” in the PR card or the `prAssist` action —
+  the impact map (risk per file and why, dependents, missing tests, reviewers) plus numbered diff fragments [n] from the
+  host's patches, riskiest files first, within the model's budget; answer in four sections: summary, risks citing [n],
+  missing tests, questions for the author. **Before / after**: a side-by-side view of a changed file from its patch.
+  Patches stay in memory only — never in saved maps or share links.
 - Project → **PR review — impact map…** (a PR / MR number or URL from GitHub, GitLab or Bitbucket) or the link
   `#repo=owner/name&pr=N`: changed files (A/M/D/R markers on the nodes), the files that depend on them, and the
   **risk of each change** (0–100) based on change frequency, complexity, number of dependents, tests / coverage,
@@ -317,6 +322,7 @@ js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: patterns, owners → git au
 js/vulns.js  js/vulns-ui.js     # vulnerable dependencies: lockfile/manifest versions, OSV.dev querybatch, CVSS 3 (pure) + window, coloring
 js/mapquery.js                  # map questions in natural language (PL/EN) → spec → files, no model; mapQuery action
 js/testgen.js                   # test skeletons: framework + location from the project's conventions, cases by complexity (pure)
+js/pr-review.js                 # PR review assistant: patch → hunks → before/after rows, review prompt with [n] fragments (pure)
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

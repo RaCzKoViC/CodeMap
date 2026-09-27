@@ -576,7 +576,7 @@ CM.ChatBot = (function(){
   // Zwykły tryb wymusza JSON {actions, reply} i krótkie odpowiedzi (sterowanie aplikacją); pytanie o kod potrzebuje
   // swobodnego tekstu z cytatami [n] — dlatego osobna ścieżka: wyszukiwanie (CM.RAG) → prompt z fragmentami → strumień.
   // prep (opcjonalnie): własny kontekst zamiast wyszukiwania RAG — async (local)=>({sys, user, sources, mode}) (Doktor hotspotów)
-  async function runRag(conv, lastUser, prep){
+  async function runRag(conv, lastUser, prep, labels){   // labels: {prep, none} — etykiety etapu przygotowania (Doktor / przegląd PR)
     streaming=true; setSending(true); abortCtl=new AbortController();
     const tStart=performance.now(), local=useLocal(), pl=I.getLang()!=='en';
     const typing=V.typingRow();
@@ -593,8 +593,8 @@ CM.ChatBot = (function(){
     try{
       let sys, userContent, hist=[];
       if(prep){
-        setStage(t('doctorPrep'));
-        const p=await prep(local); if(!p || !p.sources.length){ finish(t('doctorNoFile')); return; }
+        setStage(t((labels&&labels.prep)||'doctorPrep'));
+        const p=await prep(local); if(!p || !p.sources.length){ finish(t((labels&&labels.none)||'doctorNoFile')); return; }
         ctx={sources:p.sources, mode:p.mode||'doctor', text:''}; sys=p.sys; userContent=p.user;
       } else {
       setStage(t('ragSearching'));
@@ -669,6 +669,18 @@ CM.ChatBot = (function(){
       const p=D.prompt(d, I.getLang()); return {sys:p.sys, user:p.user, sources:d.sources, mode:'doctor'}; });
     return n.path;
   }
+  // asystent przeglądu PR (pr-review.js): mapa wpływu + fragmenty zmian [n] → model LOKALNY (diff to kod), cztery sekcje
+  function reviewPR(){
+    const g=CM.App&&CM.App.graph, R=CM.PRReview, pi=g&&g.prInfo; if(!g || !R || !pi) return false;
+    open(); const conv=newConversation(false);
+    const lastUser={id:uid(), role:'user', content:t('prAsk')+pi.number+(pi.title?' — '+pi.title:''), ts:Date.now()};
+    conv.messages.push(lastUser); conv.title='🔍 PR #'+pi.number; conv.titled=true; conv.updatedAt=Date.now(); saveConvs(); renderMessages(); renderSidebar();
+    if(useCloud()){ conv.messages.push({id:uid(), role:'assistant', content:t('prLocalOnly'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages(); return pi.number; }
+    if(useLocal() && !CM.LocalAI.hasWebGPU()){ conv.messages.push({id:uid(), role:'assistant', content:t('noWebGPU'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages(); return pi.number; }
+    runRag(conv, lastUser, async(local)=>{ const cur=CM.App.graph, p=R.prompt(cur, cur.prInfo, CM.PR&&CM.PR.patches?CM.PR.patches(cur):null, {lang:I.getLang(), local:local||useOllama()});
+      return p?{sys:p.sys, user:p.user, sources:p.sources, mode:'review'}:null; }, {prep:'prPrep', none:'prNone'});
+    return pi.number;
+  }
   function agentOn(){ try{ return localStorage.getItem('codemap_chatbot_agent')!=='0'; }catch(e){ return true; } }
 
   function setSending(on){ if(!sendBtn) return;
@@ -710,7 +722,7 @@ CM.ChatBot = (function(){
     if(wasOpen){ panel.classList.remove('hidden'); panel.classList.add('cb-open'); if(launcher) launcher.classList.add('cb-hidden'); } });
 
   // narzędzia modułów ładowanych później — rejestr w chatbot-core.js (C.addTool)
-  return { init, open, close, toggle, isOpen:()=>isOpen, votes:getVotes, refresh:refreshModelUI, acceptDrop, dragOver, tools:()=>TOOLS.slice(), addTool:C.addTool, diagnose,
+  return { init, open, close, toggle, isOpen:()=>isOpen, votes:getVotes, refresh:refreshModelUI, acceptDrop, dragOver, tools:()=>TOOLS.slice(), addTool:C.addTool, diagnose, reviewPR,
     _check:{validAction, looksLikeCommand, isHelpRequest, friendlyError, parseStructured},   // do testów / smoke
     _newChat:()=>newConversation(), _convs:()=>convs, _thumb:thumb, _exec:(a,g)=>CMApp.exec(a,g) };
 })();

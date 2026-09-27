@@ -52,7 +52,11 @@
     try{
       const r=await CM.GitRemote.fetchPR(meta, pr.number, {token:tokenFor(), signal:ctrl.signal});
       if(job!==my || g!==A.graph) return null;
-      const info=apply(g, r.pr, stripSub(r.files, meta.sub), {truncated:!!r.truncated});
+      // łatki tylko w pamięci (kod — poza zapisem mapy i linkami udostępniania), do asystenta przeglądu i widoku przed/po
+      const files=stripSub(r.files, meta.sub), pm=new Map();
+      for(const f of files) if(f.patch){ pm.set(f.path, f.patch); delete f.patch; }
+      patchStore.set(g, pm);
+      const info=apply(g, r.pr, files, {truncated:!!r.truncated});
       U.toast(T('pr.done','PR #')+info.number+T('pr.doneRisk',' — ryzyko ')+levelText(info.level)+' ('+info.risk+'/100)'
         +T('pr.doneFiles',', plików: ')+(info.changed.length+info.outside.length)+T('pr.doneDeps',', zależnych: ')+info.impacted.length, info.level==='high'?'error':'success', 7000);
       return info;
@@ -71,6 +75,22 @@
   }
   // historia git doszła (albo zmieniła się) → przelicz ryzyko tego samego PR
   document.addEventListener('codemap:git', ()=>{ const g=A.graph, pi=g&&g.prInfo; if(pi&&pi.files) apply(g, pi, pi.files, pi); });
+  const patchStore=new WeakMap();   // graf → Map ścieżka → łatka (unified diff)
+  const patches=(g)=>patchStore.get(g||A.graph)||null;
+  // widok przed / po jednego pliku z łatki (CM.PRReview.sideBySide): numery linii i treść po obu stronach
+  function openDiff(path){
+    const pm=patches(), patch=pm&&pm.get(path); if(!patch||!CM.PRReview) return;
+    const d=CM.UIKit.modal('modal-prdiff','share-modal prdiff-modal','prd').title(T('pr.beforeAfter','Przed / po')+' — '+path); d.clear();
+    const tbl=el('table',{class:'prd-table'}, el('colgroup',{}, el('col',{class:'prd-cn'}), el('col',{}), el('col',{class:'prd-cn'}), el('col',{})));   // układ fixed bierze szerokości z <col>, nie z nagłówka hunka
+    const cell=(side, cls)=>[el('td',{class:'prd-n',text:side?String(side.n):''}), el('td',{class:'prd-t '+cls,text:side?side.text:''})];
+    for(const h of CM.PRReview.parsePatch(patch)){
+      tbl.appendChild(el('tr',{class:'prd-hunk'}, el('td',{colspan:'4',text:'@@ −'+h.oldStart+' +'+h.newStart+' @@ '+(h.header||'')})));
+      for(const r of CM.PRReview.sideBySide(h)){ const tr=el('tr',{class:'prd-'+r.kind});
+        cell(r.left, r.left&&r.kind!=='ctx'?'del':'').forEach(x=>tr.appendChild(x)); cell(r.right, r.right&&r.kind!=='ctx'?'add':'').forEach(x=>tr.appendChild(x)); tbl.appendChild(tr); }
+    }
+    d.body.appendChild(el('div',{class:'prd-head muted small'}, el('span',{text:T('pr.before','przed')}), el('span',{text:T('pr.after','po')})));
+    d.body.appendChild(el('div',{class:'prd-wrap'}, tbl)); d.open();
+  }
   function clear(){ const g=A.graph; if(g&&g.prInfo){ delete g.prInfo; A.refreshView(); if(OV.current()==='pr') OV.set('lang'); } }
   const levelText=(l)=>T('pr.lvl.'+l, {high:'wysokie', med:'średnie', low:'niskie'}[l]||l);
   const LEVEL_COL={high:'#ef4444', med:'#f97316', low:'#34d399'};
@@ -175,6 +195,7 @@
         Math.max(3,c.risk), OV.ramp(RISK)(c.risk/100), String(c.risk), {class:'bar-row pr-file',title:c.path,onclick:()=>A.focusNode(c.id)}));
       sec.appendChild(list); }
     const acts=el('div',{class:'git-acts'});
+    if(CM.PRReview && CM.ChatBot && CM.ChatBot.reviewPR) acts.appendChild(el('button',{class:'tb-btn primary',text:'🔍 '+T('pr.assist','Asystent przeglądu'),title:T('pr.assistHint','Recenzja modelem lokalnym: mapa wpływu i fragmenty zmian z cytatami [n] — podsumowanie, ryzyka, brakujące testy, pytania do autora'),onclick:()=>CM.ChatBot.reviewPR()}));
     acts.appendChild(el('button',{class:'tb-btn',text:T('pr.copyMd','Kopiuj raport (Markdown)'),onclick:()=>copy(markdown(g))}));
     acts.appendChild(el('button',{class:'tb-btn',text:'🔗 '+T('pr.copyLink','Kopiuj link do mapy'),onclick:()=>copy(mapLink(g))}));
     if(!g.gitInfo && CM.Git && CM.Git.sourceOf && CM.Git.sourceOf()) acts.appendChild(el('button',{class:'tb-btn',text:T('pr.addGit','Dodaj historię git (dokładniejsze ryzyko)'),onclick:()=>CM.Git.run()}));
@@ -189,7 +210,9 @@
     if(c){ const sec=el('div',{class:'det-section git-card pr-card'}, el('h5',{}, T('pr.changedFile','Zmieniony w PR #')+pi.number));
       const tags=el('div',{}); tags.appendChild(el('span',{class:'tag',text:({A:'dodany',M:'zmieniony',D:'usunięty',R:'przeniesiony'}[c.status]||c.status)+(c.from?(' ← '+c.from):'')}));
       tags.appendChild(el('span',{class:'tag',text:'+'+c.add+' / −'+c.del})); tags.appendChild(riskTag(c.risk>=60?'high':c.risk>=35?'med':'low', c.risk));
-      sec.appendChild(tags); sec.appendChild(partBars(c.parts)); return sec; }
+      sec.appendChild(tags); sec.appendChild(partBars(c.parts));
+      const pm=patches(g); if(pm && pm.get(c.path)) sec.appendChild(el('button',{class:'tb-btn prd-btn',type:'button',text:'⇄ '+T('pr.beforeAfter','Przed / po'),onclick:()=>openDiff(c.path)}));
+      return sec; }
     const d=new Map(pi.impacted).get(n.id);
     if(d){ const via=(n.importsOut||[]).filter(id=>pi.changed.some(x=>x.id===id)).map(id=>(g.nodes.get(id)||{}).name||id);
       return el('div',{class:'det-section git-card pr-card'}, el('h5',{}, T('pr.dependsOn','Zależy od zmian w PR #')+pi.number),
@@ -211,7 +234,9 @@
       run:(a)=>{ const ref=a&&(a.pr!=null?a.pr:(a.number!=null?a.number:a.url)); run(ref); return T('cb.prRun','Analizuję PR ')+ref; }});
     A.registerAction({name:'prRisk', sig:'', desc:'summary of the analysed PR: risk, riskiest files, dependents, reviewers (Markdown)', descPl:'podsumowanie ryzyka przeanalizowanego PR', auto:true, info:true,
       run:()=>{ const g=A.graph; if(!g||!g.prInfo) throw new Error(T('cb.prNone','Brak przeanalizowanego PR — użyj prReview {pr}.')); return markdown(g); }});
+    A.registerAction({name:'prAssist', sig:'', desc:'review the analysed PR with a LOCAL model: impact map + numbered change fragments → summary, risks citing [n], missing tests, questions for the author (opens a new conversation)', descPl:'asystent przeglądu PR — recenzja modelem lokalnym', auto:false,
+      run:()=>{ const g=A.graph; if(!g||!g.prInfo) throw new Error(T('cb.prNone','Brak przeanalizowanego PR — użyj prReview {pr}.')); setTimeout(()=>{ if(CM.ChatBot&&CM.ChatBot.reviewPR) CM.ChatBot.reviewPR(); }, 0); return T('pr.assist','Asystent przeglądu')+': PR #'+g.prInfo.number; }});
   }
-  CM.PR={run, apply, clear, openDialog, markdown, mapLink, cancel};
+  CM.PR={run, apply, clear, openDialog, markdown, mapLink, cancel, patches, openDiff, _patchStore:patchStore};
   setTimeout(wire, 0);
 })();

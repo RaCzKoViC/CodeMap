@@ -1174,6 +1174,18 @@ body.light .mm-tpl-frame .mm-node-body,body.light .mm-tpl-frame .mm-tpl-chip-lbl
 .det-ver .ic{color:#a78bfa;flex-shrink:0}
 .det-ver span{font-family:var(--mono)}
 /* hotspots list */
+/* przed / po w PR (pr.js + pr-review.js) */
+.prdiff-modal{max-width:min(98vw,1200px)}
+.prd-head{display:grid;grid-template-columns:1fr 1fr;margin-bottom:4px}
+.prd-wrap{max-height:64vh;overflow:auto;border:1px solid rgba(148,163,184,.15);border-radius:8px}
+table.prd-table{width:100%;border-collapse:collapse;table-layout:fixed;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.prd-table td{padding:0 6px;vertical-align:top;white-space:pre-wrap;word-break:break-all}
+.prd-table td.prd-n{width:44px;text-align:right;color:var(--text-mute);user-select:none;border-right:1px solid rgba(148,163,184,.12)}
+.prd-table td.prd-t.del{background:rgba(239,68,68,.16)}
+.prd-table td.prd-t.add{background:rgba(34,197,94,.16)}
+.prd-table tr.prd-hunk td{background:rgba(34,211,238,.08);color:var(--text-mute);padding:3px 8px}
+.prd-btn{margin-top:6px}
+.prd-table col.prd-cn{width:46px}
 /* szkielet testów (doctor-ui.js + testgen.js) */
 .tg-modal{max-width:min(96vw,900px)}
 .tg-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}

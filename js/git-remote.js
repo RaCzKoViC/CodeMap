@@ -143,6 +143,8 @@ CM.GitRemote = (function(){
   async function fetchPR(meta, number, opts){
     opts=opts||{}; const n=Math.floor(+number); if(!supported(meta)||!(n>0)) throw new Error(T('git.prBad','Podaj numer PR w repozytorium z GitHub / GitLab / Bitbucket.'));
     const rate={remaining:null, limited:false}, sig=opts.signal;
+    // łatki (unified diff) do asystenta przeglądu i widoku przed/po — z limitem: 12 KB na plik, 200 KB na PR
+    let ptot=0; const cap=(d)=>{ if(!d || ptot>=200000) return undefined; const x=String(d).slice(0,12000); ptot+=x.length; return x; };
     if(meta.host==='gitlab'){
       const h={}; if(opts.token) h['PRIVATE-TOKEN']=opts.token;
       const get=client(h, sig, rate), api='https://gitlab.com/api/v4/projects/'+encodeURIComponent(meta.repo)+'/merge_requests/'+n;
@@ -150,7 +152,7 @@ CM.GitRemote = (function(){
       let list=null; try{ const ch=await get(api+'/changes'); list=ch&&ch.changes; }catch(e){ if(e.code==='cancelled') throw e; }
       if(!list){ list=[]; for(let p=1;p<=30;p++){ const arr=await get(api+'/diffs?per_page=100&page='+p); if(!Array.isArray(arr)||!arr.length) break; list.push(...arr); if(arr.length<100) break; } }
       for(const f of list){ const {add,del}=diffLines(f.diff); const s=f.new_file?'A':f.deleted_file?'D':f.renamed_file?'R':'M';
-        const r={path:s==='D'?f.old_path:f.new_path, status:s, add, del}; if(s==='R') r.from=f.old_path; files.push(r); }
+        const r={path:s==='D'?f.old_path:f.new_path, status:s, add, del}; if(s==='R') r.from=f.old_path; const pt=cap(f.diff); if(pt) r.patch=pt; files.push(r); }
       return {pr:{number:m.iid||n, title:m.title||'', state:m.state||'', draft:!!(m.draft||m.work_in_progress), url:m.web_url||'',
         author:{login:m.author&&m.author.username||null, name:m.author&&m.author.name||'', avatar:m.author&&m.author.avatar_url||null},
         base:m.target_branch||'', head:m.source_branch||''}, files, truncated:false};
@@ -174,7 +176,7 @@ CM.GitRemote = (function(){
     const m=await get(api); const files=[]; let page=1, last=0;
     for(; page<=30; page++){ const arr=await get(api+'/files?per_page=100&page='+page); last=Array.isArray(arr)?arr.length:0;
       for(const f of (arr||[])){ const s=STATUS_GH[f.status]||'M'; const r={path:f.filename, status:s, add:f.additions||0, del:f.deletions||0};
-        if(s==='R'&&f.previous_filename) r.from=f.previous_filename; files.push(r); }
+        if(s==='R'&&f.previous_filename) r.from=f.previous_filename; const pt=cap(f.patch); if(pt) r.patch=pt; files.push(r); }
       if(last<100) break; }
     const u=m.user||{};
     return {pr:{number:m.number||n, title:m.title||'', state:m.merged_at?'merged':(m.state||''), draft:!!m.draft, url:m.html_url||'',

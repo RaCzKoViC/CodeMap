@@ -214,6 +214,11 @@ Polski i angielski, motyw ciemny/jasny, 8 presetów kolorystycznych, suwaki wygl
 interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainstalowania.
 
 ### Przegląd PR — mapa wpływu
+- **Asystent przeglądu PR** (model lokalny — diff to kod): „🔍 Asystent przeglądu” w karcie PR albo akcja `prAssist` —
+  mapa wpływu (ryzyko pliku i jego powody, zależne, brakujące testy, recenzenci) oraz ponumerowane fragmenty diffu [n]
+  z łatek hostingu, od najbardziej ryzykownych plików, w budżecie modelu; odpowiedź w czterech sekcjach: podsumowanie,
+  ryzyka z cytatami [n], brakujące testy, pytania do autora. **Przed / po**: widok zmienionego pliku obok siebie z łatki.
+  Łatki są tylko w pamięci — nigdy w zapisanej mapie ani w linku udostępniania.
 - Projekt → **Przegląd PR** (numer albo adres PR / MR z GitHub, GitLab, Bitbucket) albo link
   `#repo=owner/nazwa&pr=N`: zmienione pliki (znaczniki A/M/D/R na węzłach), pliki od nich zależne i **ryzyko
   każdej zmiany** (0–100) z częstości zmian, złożoności, liczby zależnych, testów / pokrycia, rozmiaru zmiany
@@ -316,6 +321,7 @@ js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: wzorce, właściciele → a
 js/vulns.js  js/vulns-ui.js     # podatne zależności: wersje z blokad/manifestów, querybatch OSV.dev, CVSS 3 (czyste) + okno, kolorowanie
 js/mapquery.js                  # pytania o mapę językiem naturalnym (PL/EN) → spec → pliki, bez modelu; akcja mapQuery
 js/testgen.js                   # szkielety testów: framework i położenie wg konwencji projektu, przypadki wg złożoności (czyste)
+js/pr-review.js                 # asystent przeglądu PR: łatka → hunki → wiersze przed/po, prompt z fragmentami [n] (czyste)
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

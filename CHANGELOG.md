@@ -21,6 +21,13 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   porównanie trafia do podsumowania.
 
 ### Dodane — Faza 11 (AI dalej lokalnie)
+- **Asystent przeglądu PR i porównanie przed / po** (`js/pr-review.js`): `fetchPR` zachowuje łatki (GitHub `patch`, GitLab
+  `diff`; 12 KB na plik, 200 KB na PR) — trzymane tylko w pamięci, poza `graph.prInfo`, zapisem mapy i linkami
+  udostępniania. „🔍 Asystent przeglądu" w karcie PR (i akcja `prAssist`) otwiera rozmowę z modelem LOKALNYM (diff to
+  kod — jak Doktor): nagłówek z ryzykiem, pliki od najbardziej ryzykownych z powodami (częste zmiany, złożoność, wielu
+  zależnych, słabe testy, duża zmiana, autor nie zna pliku), pliki spoza mapy, recenzenci i ponumerowane fragmenty [n]
+  z hunków w budżecie modelu (bez łatek — fragmenty bieżącej treści); odpowiedź w czterech sekcjach z cytatami [n].
+  „⇄ Przed / po" przy zmienionym pliku: widok obok siebie z numerami linii, usunięcia i dodania sparowane.
 - **Agent z narzędziami także dla WebLLM** (model w przeglądarce): `CM.Agent.jsonChat` — każdy krok to jeden obiekt JSON
   wymuszony gramatyką WebLLM (`response_format` ze schematem: nazwa narzędzia z `enum` albo `"answer"`), więc mały model
   nie wymyśli narzędzia ani nie przejdzie w prozę w połowie wywołania; wywołanie idzie przez ten sam `toolCalls`, co
