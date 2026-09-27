@@ -61,17 +61,26 @@ jobs:
   # złożone pliki), więc job niczego nie blokuje; SARIF nie jest wysyłany do code scanning.
   codemap:
     runs-on: ubuntu-latest
+    # jakość własnego kodu: próg health score, a w PR — „nie pogarszaj" względem bazy i komentarz z ryzykiem zmian
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0          # pełna historia git → hotspoty zmian, bus factor
+          fetch-depth: 0          # pełna historia git → hotspoty zmian, bus factor, baza PR
       - id: codemap
         uses: ./
         with:
           sarif: codemap.sarif
           markdown: codemap.md
+          args: --exclude .claude
+          min-score: 40
+          max-score-drop: 0       # działa tylko z bazą, czyli w PR (na push baza jest pusta)
+          pr-comment: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
       - name: Wynik
-        run: echo "CodeMap health score ${{ steps.codemap.outputs.score }}/100, znalezisk ${{ steps.codemap.outputs.findings }}"
+        if: always()
+        run: echo "CodeMap health score ${{ steps.codemap.outputs.score }}/100, znalezisk ${{ steps.codemap.outputs.findings }}, ryzyko zmian ${{ steps.codemap.outputs.risk }}, zmiana wyniku ${{ steps.codemap.outputs.score-delta }}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
