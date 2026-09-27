@@ -239,7 +239,8 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
   `innerHTML` → bezpieczne budowanie elementów, duplikaty w testach → wspólne fixture'y.
 - ✅ Znane błędy: dwa węzły w dokładnie tym samym miejscu nie rozsuwają się (physics — kierunek antysymetryczny +
   Barnes-Hut schodzi do liści); serwer po cichu obcinał metadane albumu (teraz limit 1 MB i 413).
-- Dostępność: nawigacja po mapie klawiaturą, tekstowe podsumowanie dla czytników ekranu.
+- ✅ Dostępność: nawigacja po mapie klawiaturą (Alt+strzałki, Enter, Alt+PageUp/PageDown), aria-live i tekstowe
+  podsumowanie mapy dla czytników ekranu (`js/a11y.js`).
 - Lista kontrolna ręcznego sprawdzenia agenta WebLLM (WebGPU).
 
 ## Kolejność

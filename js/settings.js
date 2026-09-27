@@ -207,6 +207,9 @@ CM.Settings = (function(){
     scRow(nav, t('sc.toggle3d'), ['T']);
     scRow(nav, t('sc.isolate'), ['I']);
     scRow(nav, t('sc.impact'), ['X']);
+    scRow(nav, t('sc.nodeNav'), ['Alt','+','←','↑','↓','→'], t('sc.nodeNavHint'));
+    scRow(nav, t('sc.nodeOpen'), ['Enter']);
+    scRow(nav, t('sc.nodeParent'), ['Alt','+','PgUp','/','PgDn']);
     // --- General ---
     const gen=scGroup(wrap,'sc.grp.general');
     scRow(gen, t('sc.search'), ['/']);

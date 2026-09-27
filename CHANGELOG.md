@@ -5,6 +5,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 16
+- **Dostępność mapy** (`js/a11y.js`, `CM.A11y`): nawigacja po węzłach klawiaturą — **Alt+strzałki** (najbliższy widoczny
+  węzeł w tym kierunku na ekranie, także przy obróconej kamerze), **Enter** (jak dwuklik: folder zwiń / rozwiń, plik
+  zaznacz i wyśrodkuj), **Alt+PageUp / PageDown** (folder nadrzędny / pierwsze dziecko), **Alt+Home** (korzeń); region
+  `aria-live` ogłasza zaznaczony węzeł (rodzaj, ścieżka, język, linie, importy w obie strony, testy) z polską odmianą,
+  a ukryta sekcja opisu płótna (`aria-describedby`) trzyma tekstowe podsumowanie mapy (pliki, foldery, zależności,
+  języki). Skróty w ściądze (Alt+S), klasa `.sr-only`, test jednostkowy i krok smoke z prawdziwymi zdarzeniami klawiatury.
+
 ### Bezpieczeństwo — Faza 16
 - **Jedno miejsce wstawiania HTML-a** (`CM.util.setHTML`, jak polityka Trusted Types) i szablon **`CM.util.html`**
   z escapowaniem wartości `${…}` (`raw(…)` tylko dla HTML-a z naszego kodu: ikon, kolorowania składni, markdownu czatu):

@@ -537,6 +537,23 @@ const rulesRes = await evalJs(`(async()=>{ try{
 check(rulesRes && !rulesRes.error && rulesRes.layers.length === 4 && rulesRes.forbid >= 1 && rulesRes.exc === 1 && rulesRes.file === '.codemap.rules.json'
   && rulesRes.same && rulesRes.draft && rulesRes.violations === 0 && /4 (warstw|layers)/.test(rulesRes.chat),
   `propozycja reguł w oknie DSM: JSON, wyjątek cyklu, zatwierdzenie jednym kliknięciem, Inspect bez naruszeń, akcja: ${JSON.stringify(rulesRes)}`);
+// dostępność (faza 16): tekstowe podsumowanie mapy w sekcji opisu płótna, Alt+→ wybiera węzeł i ogłasza go w aria-live,
+// Alt+PageUp — folder nadrzędny, Enter na folderze zwija go jak dwuklik
+const a11yRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)), A=CM.App, R=A.renderer;
+  const key=(k, alt)=>document.body.dispatchEvent(new KeyboardEvent('keydown',{key:k, altKey:!!alt, bubbles:true}));
+  for(let i=0;i<30 && !(document.getElementById('a11y-summary')||{}).textContent;i++) await sleep(100);
+  const summary=document.getElementById('a11y-summary').textContent, described=document.getElementById('map-canvas').getAttribute('aria-describedby');
+  A.select(null); await sleep(50);
+  key('ArrowRight', true); await sleep(80);
+  const first=R.selected, said1=document.getElementById('a11y-live').textContent;
+  let parent=null; if(first && first.parent!=null){ key('PageUp', true); await sleep(80); parent=R.selected; }
+  let toggled=null; if(parent && parent.type==='folder'){ const was=!!parent.collapsed; key('Enter'); await sleep(150); toggled=!!A.graph.nodes.get(parent.id).collapsed!==was; key('Enter'); await sleep(100); }
+  return {summary, described, first:first&&first.id, said1, parent:parent&&parent.id, toggled};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(a11yRes && !a11yRes.error && /(plików|files)/.test(a11yRes.summary) && a11yRes.described === 'a11y-summary' && a11yRes.first
+  && /^(Plik|Folder|File|Zależność|External|Symbol)/.test(a11yRes.said1) && a11yRes.parent && a11yRes.toggled === true,
+  `dostępność: podsumowanie mapy, Alt+strzałka + ogłoszenie, Alt+PageUp, Enter zwija folder: ${JSON.stringify(a11yRes)}`);
 // CODEOWNERS (faza 10): deklarowany @ala, a plik zmieniał tylko Bob → sekcja panelu z „rozjazd", nakładka
 // „Właściciel (CODEOWNERS)" z legendą (bez właściciela), akcja ChatBota codeOwners
 const coRes = await evalJs(`(async()=>{ try{

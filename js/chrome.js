@@ -641,6 +641,7 @@
       if(e.altKey && !e.ctrlKey && !e.metaKey && (e.code==='KeyS'||e.key==='s'||e.key==='S')){
         e.preventDefault(); toggleShortcutsOverlay(); return; }
       if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT') return;
+      if(e.altKey) return;   // Alt+strzałki / PageUp / PageDown / Home — nawigacja po węzłach (js/a11y.js)
       switch(e.key){
         case 'f': case 'F': A.renderer.fit(); break;
         case '+': case '=': A.renderer.zoomBy(1.3); break;
