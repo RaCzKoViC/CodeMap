@@ -1,10 +1,10 @@
 /* ===================== sw.js — CodeMap service worker (offline app shell) ===================== */
-const CACHE = 'codemap-shell-v177';
+const CACHE = 'codemap-shell-v179';
 const CORE = ['./', 'index.html', 'runner.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
 const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js','js/languages.js',
-  'js/analysis.js','js/analysis-cache.js','js/graph.js','js/physics.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/testmap.js','js/git-core.js','js/git-remote.js','js/git.js','js/pr-core.js','js/pr.js','js/live.js','js/doctor.js','js/doctor-ui.js','js/cochange.js','js/dsm.js','js/dsm-ui.js','js/codeowners.js','js/codeowners-ui.js','js/vulns.js','js/vulns-ui.js','js/mapquery.js','js/tour.js','js/tour-ui.js','js/gallery.js','js/gl-layer.js','js/renderer.js','js/overlays.js','js/loaders.js','js/prefs.js','js/storage.js',
+  'js/analysis.js','js/analysis-cache.js','js/graph.js','js/physics.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/testmap.js','js/git-core.js','js/git-remote.js','js/git.js','js/pr-core.js','js/pr.js','js/live.js','js/doctor.js','js/testgen.js','js/doctor-ui.js','js/cochange.js','js/dsm.js','js/dsm-ui.js','js/codeowners.js','js/codeowners-ui.js','js/vulns.js','js/vulns-ui.js','js/mapquery.js','js/tour.js','js/tour-ui.js','js/gallery.js','js/gl-layer.js','js/renderer.js','js/overlays.js','js/loaders.js','js/prefs.js','js/storage.js',
   'js/ui.js','js/ui-kit.js','js/settings-strings.js','js/settings.js','js/settings-ai.js','js/settings-docs.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap-strings.js','js/mindmap-templates.js','js/mindmap-layout.js','js/mindmap-io.js','js/mindmap-ui.js','js/mindmap.js','js/chatbot-strings.js','js/chatbot-core.js','js/chatbot-render.js','js/chatbot.js',
   'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/tests-ui.js','js/app.js','js/sim-worker.js','js/analysis-worker.js',
   'js/sri.js','js/symbols-core.js','js/symbols.js','js/symbols-worker.js','js/git-local.js','js/git-worker.js','js/rag.js','js/agent.js','js/deeplink.js','js/links.js','js/vscode-bridge.js'];

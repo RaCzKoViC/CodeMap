@@ -584,6 +584,21 @@ const mqRes = await evalJs(`(async()=>{ try{
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 check(mqRes && !mqRes.error && /^Pliki: \d+ \(pokazano 3\)/.test(mqRes.direct) && mqRes.hi1 === 3 && mqRes.act === 'mapQuery' && mqRes.ok && /^Pliki:/.test(mqRes.res) && mqRes.notConfident,
   `pytania o mapę: akcja mapQuery, ChatBot bez modelu, podświetlenie, pytanie spoza zakresu idzie dalej: ${JSON.stringify(mqRes)}`);
+// szkielet testów (faza 11): akcja testSkeleton na demo → najbardziej ryzykowny plik bez testów, okno z kodem
+// (describe/it, import), ścieżka i framework; przycisk „🧪 Szkielet testów" w sekcji Doktora
+const tgRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  CMApp.loadDemo(); for(let i=0;i<60 && !(CMApp.graph&&CMApp.graph.nodes.size>20);i++) await sleep(100); await sleep(300);
+  const out=String(CMApp.exec('testSkeleton',{})); await sleep(250);
+  const body=document.getElementById('tg-body'), code=(body&&body.querySelector('.tg-code')||{}).textContent||'';
+  const path=(body&&body.querySelector('.tg-meta code')||{}).textContent||'';
+  document.querySelector('#modal-testgen .modal-x').click();
+  const n=[...CMApp.graph.nodes.values()].find(x=>x.path===path.replace(/^.*?([^/]+)$/,'$1')) || null;
+  const btn=!!document.querySelector('#details-body .doc-tg');
+  return {out:out.slice(0,140), path, describe:/describe\\('/.test(code), imp:/^import /m.test(code), btn};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(tgRes && !tgRes.error && /^Szkielet testów: /.test(tgRes.out) && tgRes.path && tgRes.describe && tgRes.imp && tgRes.btn,
+  `szkielet testów: akcja, okno z kodem (describe, import), przycisk w sekcji Doktora: ${JSON.stringify(tgRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

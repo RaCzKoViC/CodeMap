@@ -1174,6 +1174,12 @@ body.light .mm-tpl-frame .mm-node-body,body.light .mm-tpl-frame .mm-tpl-chip-lbl
 .det-ver .ic{color:#a78bfa;flex-shrink:0}
 .det-ver span{font-family:var(--mono)}
 /* hotspots list */
+/* szkielet testów (doctor-ui.js + testgen.js) */
+.tg-modal{max-width:min(96vw,900px)}
+.tg-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.tg-meta code{font-size:12.5px;padding:2px 6px;border-radius:5px;background:rgba(148,163,184,.12)}
+.tg-code{max-height:56vh;overflow:auto;font-size:12px;line-height:1.45;padding:10px 12px;border-radius:8px;background:rgba(2,6,23,.55);border:1px solid rgba(148,163,184,.15);white-space:pre}
+.doc-tg{margin-top:6px}
 /* podatne zależności (vulns-ui.js) */
 .vu-modal{max-width:min(96vw,980px)}
 .vu-send{margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);font-size:13px}

@@ -151,6 +151,10 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
 - **Questions about the map without any model** — ChatBot answers questions like “untested files with complexity over 50
   in src”, “top 5 most changed files”, “files of author Ala changed in the last month” or “files in cycles” straight
   from the graph (metrics, git, tests, CODEOWNERS, OSV; Polish and English) and highlights them; the `mapQuery` action.
+- **Test skeletons** (hotspot doctor, no model): “🧪 Test skeleton” in a code file's panel or the `testSkeleton` action —
+  a test file following the project's own conventions (framework from package.json / existing tests: vitest, jest, mocha,
+  node:test; pytest / unittest; Go testing; Rust; JUnit 5), its location and suffix voted from existing test ↔ code pairs,
+  imports of the exported symbols and cases ordered by complexity; copy or download.
 - **WebLLM** — models that run in the browser (WebGPU), with weights cached and nothing sent anywhere.
 - **Ollama** — a local model server on your own computer.
 - **API keys (cloud)** — as many keys as you like: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
@@ -311,6 +315,7 @@ js/dsm.js  js/dsm-ui.js         # packages and dependency matrix: units, provide
 js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: patterns, owners → git authors, unowned / drift (pure) + panel, coloring, action
 js/vulns.js  js/vulns-ui.js     # vulnerable dependencies: lockfile/manifest versions, OSV.dev querybatch, CVSS 3 (pure) + window, coloring
 js/mapquery.js                  # map questions in natural language (PL/EN) → spec → files, no model; mapQuery action
+js/testgen.js                   # test skeletons: framework + location from the project's conventions, cases by complexity (pure)
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

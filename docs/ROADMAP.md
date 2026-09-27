@@ -178,7 +178,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 ## Faza 11 — AI dalej lokalnie — W TOKU 2026-09-27
 
 - Agent z narzędziami dla WebLLM (wymuszony JSON wywołania).
-- Szkielety testów dla hotspotów bez testów (rozszerzenie Doktora).
+- ✅ Szkielety testów dla hotspotów bez testów (rozszerzenie Doktora): `js/testgen.js` bez modelu — framework i położenie
+  z konwencji projektu (głosowanie par test ↔ kod), JS/TS/Python/Go/Rust/Java; przycisk w sekcji Doktora, akcja `testSkeleton`.
 - Asystent przeglądu PR (mapa wpływu + fragmenty zmian) i porównanie przed/po w aplikacji.
 - ✅ Pytania o mapę językiem naturalnym → podświetlenie: `js/mapquery.js` (parser PL/EN bez modelu: warunki liczbowe,
   flagi — bez testów, hotspoty, podatne, bez właściciela, cykle, osierocone, zduplikowane — autor, okres, język, folder,

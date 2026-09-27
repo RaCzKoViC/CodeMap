@@ -151,6 +151,10 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
 - **Pytania o mapę bez żadnego modelu** — ChatBot odpowiada na pytania typu „pliki bez testów o złożoności powyżej 50
   w src”, „top 5 najczęściej zmienianych plików”, „pliki autora Ala zmienione w ostatnim miesiącu” czy „pliki w cyklach”
   wprost z grafu (metryki, git, testy, CODEOWNERS, OSV; po polsku i angielsku) i podświetla wynik; akcja `mapQuery`.
+- **Szkielety testów** (Doktor hotspotów, bez modelu): „🧪 Szkielet testów” w panelu pliku z kodem albo akcja `testSkeleton`
+  — plik testów wg konwencji samego projektu (framework z package.json / istniejących testów: vitest, jest, mocha,
+  node:test; pytest / unittest; Go testing; Rust; JUnit 5), położenie i przyrostek wybrane głosowaniem z istniejących par
+  test ↔ kod, import eksportowanych symboli, przypadki od najbardziej złożonych funkcji; kopiowanie albo pobranie pliku.
 - **WebLLM** — modele uruchamiane w przeglądarce (WebGPU), wagi w cache, bez wysyłania czegokolwiek.
 - **Ollama** — lokalny serwer modeli na Twoim komputerze.
 - **Klucze API (chmura)** — dowolna liczba kluczy: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
@@ -310,6 +314,7 @@ js/dsm.js  js/dsm-ui.js         # pakiety i macierz zależności: jednostki, kol
 js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: wzorce, właściciele → autorzy git, bez właściciela / rozjazd (czyste) + panel, kolorowanie, akcja
 js/vulns.js  js/vulns-ui.js     # podatne zależności: wersje z blokad/manifestów, querybatch OSV.dev, CVSS 3 (czyste) + okno, kolorowanie
 js/mapquery.js                  # pytania o mapę językiem naturalnym (PL/EN) → spec → pliki, bez modelu; akcja mapQuery
+js/testgen.js                   # szkielety testów: framework i położenie wg konwencji projektu, przypadki wg złożoności (czyste)
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

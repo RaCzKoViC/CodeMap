@@ -21,6 +21,15 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   porównanie trafia do podsumowania.
 
 ### Dodane — Faza 11 (AI dalej lokalnie)
+- **Szkielety testów** (`js/testgen.js`, przycisk „🧪 Szkielet testów" w sekcji Doktora hotspotów pliku bez testów, akcja
+  ChatBota `testSkeleton {query?}` — domyślnie najbardziej ryzykowny plik bez testów): bez modelu. Framework z projektu
+  (package.json najbliższy plikowi: vitest / jest / mocha / `node --test`, potem importy istniejących testów; pytest z
+  conftest / wymagań, inaczej unittest; Go `testing` z tabelą przypadków; Rust `#[cfg(test)] mod tests`; JUnit 5 w
+  src/test/java). Położenie i przyrostek wybrane głosowaniem z istniejących par test ↔ kod (obok pliku, `__tests__/`,
+  płaski `test/`, lustrzane drzewo; `.test.mjs` dla `.js` zostaje, `.test.jsx` dopasowuje się do `.jsx`), import
+  wyeksportowanych funkcji i klas (moduł bez eksportów — uwaga), przypadki od najbardziej złożonych funkcji z
+  podpowiedzią „złożoność N — co najmniej N przypadków", przypadek błędu, gdy plik rzuca wyjątki. Okno z podświetleniem
+  składni, kopiowaniem i pobraniem pliku.
 - **Pytania o mapę językiem naturalnym, bez modelu** (`js/mapquery.js`): „pliki bez testów o złożoności powyżej 50 w src",
   „top 5 najczęściej zmienianych plików", „pliki autora Ala zmienione w ostatnim miesiącu", „files with more than 300
   lines in lib", „pliki nieruszane od 3 miesięcy", „hotspoty w cyklach", „podatne zależności" — warunki liczbowe (linie,
