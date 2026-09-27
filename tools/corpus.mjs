@@ -22,15 +22,16 @@ const MIN_P = parseFloat(arg('min-precision', '0')) || 0, MIN_R = parseFloat(arg
 const REQUIRE_ALL = process.argv.includes('--require-all'), SUMMARY = process.argv.includes('--summary');
 
 // repozytoria z galerii (js/gallery.js) przypięte do wydań; scope = katalogi kodu, którego dotyczy porównanie
+// deadcode: nieużywane eksporty (CM.DeadCode) porównane z knip — tylko ESM (knip nie widzi użycia `require('x').y`)
 export const CORPUS = [
   { id: 'express', repo: 'expressjs/express', ref: 'v5.2.1', oracle: 'esbuild', scope: ['lib', 'index.js'] },
-  { id: 'preact', repo: 'preactjs/preact', ref: '10.29.8', oracle: 'esbuild', scope: ['src', 'hooks/src', 'compat/src', 'debug/src', 'devtools/src', 'jsx-runtime/src', 'test-utils/src'] },
-  { id: 'ky', repo: 'sindresorhus/ky', ref: 'v2.1.0', oracle: 'esbuild', scope: ['source'] },
-  { id: 'petite-vue', repo: 'vuejs/petite-vue', ref: 'v0.4.1', oracle: 'esbuild', scope: ['src'] },
+  { id: 'preact', repo: 'preactjs/preact', ref: '10.29.8', oracle: 'esbuild', deadcode: true, scope: ['src', 'hooks/src', 'compat/src', 'debug/src', 'devtools/src', 'jsx-runtime/src', 'test-utils/src'] },
+  { id: 'ky', repo: 'sindresorhus/ky', ref: 'v2.1.0', oracle: 'esbuild', deadcode: true, scope: ['source'] },
+  { id: 'petite-vue', repo: 'vuejs/petite-vue', ref: 'v0.4.1', oracle: 'esbuild', deadcode: true, scope: ['src'] },
   { id: 'flask', repo: 'pallets/flask', ref: '3.1.3', oracle: 'grimp', scope: ['src/flask'], pkg: 'flask', pyroot: 'src' },
   { id: 'gin', repo: 'gin-gonic/gin', ref: 'v1.12.0', oracle: 'golist', scope: ['.'] },
   // monorepo pnpm (13 pakietów, zagnieżdżone utils/runtime, importy po nazwie przez `paths` z tsconfig): także poziom pakietów
-  { id: 'signals', repo: 'preactjs/signals', ref: '@preact/signals@2.9.4', oracle: 'esbuild', tsconfig: 'tsconfig.json', workspaces: true,
+  { id: 'signals', repo: 'preactjs/signals', ref: '@preact/signals@2.9.4', oracle: 'esbuild', tsconfig: 'tsconfig.json', workspaces: true, deadcode: true,
     scope: ['core', 'debug', 'devtools-adapter', 'devtools-ui', 'eslint-plugin-signals', 'preact', 'preact/utils', 'preact-transform',
       'react', 'react/runtime', 'react/utils', 'react-transform', 'vite-plugin'].map((p) => 'packages/' + p + '/src') },
 ];
@@ -171,6 +172,48 @@ function esbuildPkgEdges(c, dir) {   // pakiety z plików package.json (niezale�
   }
   return { edges, packages: pkgs.map((p) => p.name) };
 }
+// ---------------- martwy kod: nieużywane eksporty CodeMap (CM.DeadCode) vs knip ----------------
+// Obie strony z tymi samymi wejściami: wejścia pakietów wg CodeMap + pliki kodu, których nikt nie importuje (skrypty,
+// konfiguracje) + testy — knip przechodzi graf od wejść, CodeMap liczy użycie z każdego importującego. Pluginy knipa
+// wykonujące pliki konfiguracyjne (vite, vitest…) wyłączone — bez node_modules nie wstaną; monorepo = config per workspace.
+const KNIP = { knip: '6.38.0', typescript: '7.0.2' };
+const KNIP_OFF = ['vite', 'vitest', 'rollup', 'webpack', 'jest', 'babel', 'eslint', 'prettier', 'playwright', 'storybook', 'mocha', 'ava',
+  'karma', 'tsup', 'nx', 'typescript', 'github-actions', 'husky', 'lint-staged', 'size-limit', 'xo'];
+function knipBin() {
+  const tools = join(CACHE, '_tools'), pkg = join(tools, 'node_modules/knip/package.json');
+  const ver = () => { try { return JSON.parse(readFileSync(pkg, 'utf8')).version; } catch { return null; } };
+  if (ver() !== KNIP.knip) {
+    mkdirSync(tools, { recursive: true });
+    if (!existsSync(join(tools, 'package.json'))) writeFileSync(join(tools, 'package.json'), '{ "private": true }');
+    execSync('npm i --no-audit --no-fund --silent ' + Object.entries(KNIP).map(([k, v]) => k + '@' + v).join(' '), { cwd: tools, stdio: 'ignore' });
+  }
+  return join(tools, 'node_modules/knip/bin/knip.js');
+}
+async function deadcodeSets(c, dir) {
+  const { runAnalysis } = await import('file:///' + join(ROOT, 'cli/analyze.mjs').replace(/\\/g, '/'));
+  const r = await runAnalysis(dir, { git: false, coverage: false, lang: 'en' });
+  const CM = r.CM, g = r.graph, entries = [...CM.DeadCode.entryFiles(g)];
+  const hasIn = new Set(g.edges.filter((e) => e.type === 'import').map((e) => e.target));
+  for (const n of g.nodes.values()) if (n.type === 'file' && /\.(m?[jt]sx?|c[jt]s)$/.test(n.path) && !/\.d\.[cm]?ts$/.test(n.path)
+    && (!hasIn.has(n.id) || n.isTest) && !entries.includes(n.path)) entries.push(n.path);
+  const cm = new Set();
+  for (const d of CM.DeadCode.analyze(g)) if (inScope(c, d.path)) for (const x of d.exports) cm.add(d.path + ' # ' + x.name);
+  const ws = (entry) => ({ entry, project: ['**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}'], ...Object.fromEntries(KNIP_OFF.map((p) => [p, false])) });
+  let cfg = ws(entries);
+  if (c.workspaces) {   // knip: każdy pakiet workspace'u to osobny workspace — wejścia muszą trafić do właściwego
+    const dirs = (g.packages || []).filter((p) => p.eco === 'npm' && p.dir).map((p) => p.dir).sort((a, b) => b.length - a.length);
+    const w = { '.': ws([]) }; for (const d of dirs) w[d] = ws([]);
+    for (const e of entries) { const d = dirs.find((x) => e.startsWith(x + '/')); w[d || '.'].entry.push(d ? e.slice(d.length + 1) : e); }
+    cfg = { workspaces: w };
+  }
+  const file = join(CACHE, c.id + '.knip.json'); writeFileSync(file, JSON.stringify(cfg, null, 1));
+  const out = sh(process.execPath, [knipBin(), '--config', file, '--include', 'exports,types,nsExports,nsTypes', '--reporter', 'json', '--no-progress', '--no-exit-code'], dir);
+  const kn = new Set();
+  for (const is of JSON.parse(out).issues) if (inScope(c, is.file) && !entries.includes(is.file))
+    for (const k of ['exports', 'types', 'nsExports', 'nsTypes']) for (const x of is[k] || []) kn.add(is.file + ' # ' + x.name);
+  return { cm, kn, entries: entries.filter((e) => inScope(c, e)).length };
+}
+
 const compare = (cm, or) => {
   const common = [...cm].filter((e) => or.has(e));
   return { common: common.length, precision: cm.size ? common.length / cm.size : 1, recall: or.size ? common.length / or.size : 1,
@@ -209,6 +252,15 @@ for (const c of CORPUS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
       console.log(`     pakiety: CodeMap ${pc.packages.length}, package.json ${po.packages.length}` + (lost.length ? ' · brak: ' + lost.join(', ') : '') + (extraPk.length ? ' · nadmiarowe: ' + extraPk.join(', ') : ''));
       diffs(k.extra, k.missing);
     }
+    if (c.deadcode) {   // nieużywane eksporty: CM.DeadCode vs knip (te same wejścia)
+      try {
+        const d = await deadcodeSets(c, dir), k = compare(d.cm, d.kn);
+        r.deadcode = { codemap: d.cm.size, oracleEdges: d.kn.size, common: k.common, precision: +k.precision.toFixed(4), recall: +k.recall.toFixed(4), extra: k.extra, missing: k.missing, entries: d.entries };
+        const label = '  martwy kod';
+        console.log(`${k.precision >= MIN_P && k.recall >= MIN_R ? '✔' : '✖'} ${label.padEnd(11)} knip    CodeMap ${String(d.cm.size).padStart(4)} · wyrocznia ${String(d.kn.size).padStart(4)} · wspólne ${String(k.common).padStart(4)} · precyzja ${pct(k.precision)} · kompletność ${pct(k.recall)}`);
+        diffs(k.extra, k.missing);
+      } catch (e) { r.deadcode = { error: String((e && e.message) || e).split('\n')[0].slice(0, 300) }; console.log(`✖   martwy kod  błąd: ${r.deadcode.error}`); }
+    }
   } catch (e) { console.log(`✖ ${c.id.padEnd(11)} błąd: ${String(e && e.message || e).split('\n')[0].slice(0, 200)}`); results.push({ id: c.id, error: String(e && e.message || e) }); }
 }
 const done = results.filter((r) => r.codemap != null);
@@ -221,11 +273,14 @@ if (SUMMARY && process.env.GITHUB_STEP_SUMMARY) {
   const pc = (x) => (x * 100).toFixed(1) + ' %';
   const rows = results.flatMap((r) => r.codemap != null
     ? [`| ${r.id} | \`${r.ref}\` | ${r.oracle} | ${r.codemap} | ${r.oracleEdges} | ${pc(r.precision)} | ${pc(r.recall)} |`,
-      ...(r.packages ? [`| ${r.id} — pakiety (${r.packages.found}/${r.packages.expected}) | | package.json + esbuild | ${r.packages.codemap} | ${r.packages.oracleEdges} | ${pc(r.packages.precision)} | ${pc(r.packages.recall)} |`] : [])]
+      ...(r.packages ? [`| ${r.id} — pakiety (${r.packages.found}/${r.packages.expected}) | | package.json + esbuild | ${r.packages.codemap} | ${r.packages.oracleEdges} | ${pc(r.packages.precision)} | ${pc(r.packages.recall)} |`] : []),
+      ...(r.deadcode ? [r.deadcode.error ? `| ${r.id} — nieużywane eksporty | | knip ${KNIP.knip} | — | — | błąd | |`
+        : `| ${r.id} — nieużywane eksporty | | knip ${KNIP.knip} | ${r.deadcode.codemap} | ${r.deadcode.oracleEdges} | ${pc(r.deadcode.precision)} | ${pc(r.deadcode.recall)} |`] : [])]
     : [`| ${r.id} | | ${r.skipped || ''} | — | — | ${r.error ? 'błąd' : 'pominięte'} | |`]);
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, ['### Korpus referencyjny — krawędzie importów CodeMap vs wyrocznia', '',
     '| repozytorium | wersja | wyrocznia | krawędzie CodeMap | krawędzie wyroczni | precyzja | kompletność |', '|---|---|---|--:|--:|--:|--:|', ...rows, ''].join('\n'));
 }
 const pkBad = (k) => !!k && (k.precision < MIN_P || k.recall < MIN_R || (MIN_P > 0 && (k.lostPackages.length || k.extraPackages.length)));
-const bad = results.filter((r) => r.error || (REQUIRE_ALL && r.skipped) || (r.codemap != null && (r.precision < MIN_P || r.recall < MIN_R || pkBad(r.packages))));
+const dcBad = (d) => !!d && (!!d.error || d.precision < MIN_P || d.recall < MIN_R);
+const bad = results.filter((r) => r.error || (REQUIRE_ALL && r.skipped) || (r.codemap != null && (r.precision < MIN_P || r.recall < MIN_R || pkBad(r.packages) || dcBad(r.deadcode))));
 if (bad.length && (MIN_P || MIN_R || REQUIRE_ALL || bad.some((r) => r.error))) process.exit(1);

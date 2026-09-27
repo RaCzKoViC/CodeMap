@@ -17,7 +17,7 @@ self.document = { body: el(), head: el(), documentElement: el(), readyState: 'co
   addEventListener(){}, removeEventListener(){}, dispatchEvent(){ return true; } };
 self.Worker = undefined;                              // bez zagnieżdżonych workerów: duplikaty liczone tutaj
 importScripts(...['util', 'i18n', 'languages', 'analysis', 'graph', 'metrics', 'git-core', 'rules', 'testmap', 'git-local',
-  'loaders', 'dsm', 'codeowners', 'vulns', 'inspect', 'health-trend'].map((f) => f + '.js' + (V ? '?v=' + V : '')));
+  'loaders', 'dsm', 'codeowners', 'vulns', 'deadcode', 'inspect', 'health-trend'].map((f) => f + '.js' + (V ? '?v=' + V : '')));
 
 self.onmessage = async (e) => {
   const d = e.data || {};

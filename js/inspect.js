@@ -23,6 +23,7 @@ CM.Inspect = (function(){
     'r.god':'God-file (hub o zbyt wielu połączeniach)','r.god.d':'Plik powiązany z nienaturalnie dużą liczbą innych — zmiana w nim dotyka wszystkiego.',
     'r.fanout':'Zbyt wiele zależności wychodzących','r.fanout.d':'Plik importuje bardzo dużo modułów — prawdopodobnie robi zbyt wiele naraz.',
     'r.unstable':'Niestabilny hub (duży fan-in i fan-out)','r.unstable.d':'Wiele plików od niego zależy, a on sam zależy od wielu — najbardziej ryzykowne miejsce na zmiany.',
+    'r.unusedexport':'Nieużywane eksporty','r.unusedexport.d':'Eksporty JS/TS, których żaden plik projektu nie importuje (także przez barrel `export *`) — do usunięcia albo do zdjęcia `export`. Pomijane: wejścia pakietów (exports, main, bin, index/main/cli), testy i pliki, których nikt nie importuje (to osierocone pliki).','unexp':'{n} nieużywanych: {names}',
     'r.orphan':'Osierocone pliki (podejrzenie martwego kodu)','r.orphan.d':'Pliki kodu bez żadnych importów w obie strony — być może nieużywane.',
     'r.huge':'Bardzo długie pliki','r.huge.d':'Pliki o ekstremalnej liczbie linii — kandydaci do podziału.',
     'r.complex':'Wysoka złożoność cyklomatyczna','r.complex.d':'Bardzo dużo rozgałęzień (if/for/case/&&) w jednym pliku.',
@@ -66,6 +67,7 @@ CM.Inspect = (function(){
     'r.god':'God-file (over-connected hub)','r.god.d':'A file linked to an unnaturally high number of others — changing it touches everything.',
     'r.fanout':'Too many outgoing dependencies','r.fanout.d':'The file imports a lot of modules — it probably does too much at once.',
     'r.unstable':'Unstable hub (high fan-in AND fan-out)','r.unstable.d':'Many files depend on it while it depends on many — the riskiest place to change.',
+    'r.unusedexport':'Unused exports','r.unusedexport.d':'JS/TS exports no project file imports (also through an `export *` barrel) — remove them or drop `export`. Skipped: package entry points (exports, main, bin, index/main/cli), tests and files nobody imports (those are orphan files).','unexp':'{n} unused: {names}',
     'r.orphan':'Orphan files (dead-code suspects)','r.orphan.d':'Code files with no imports either way — possibly unused.',
     'r.huge':'Very long files','r.huge.d':'Files with an extreme line count — candidates for splitting.',
     'r.complex':'High cyclomatic complexity','r.complex.d':'A very large number of branches (if/for/case/&&) in one file.',
@@ -125,7 +127,7 @@ CM.Inspect = (function(){
   // real programming languages only — manifests/docs/styles being "orphans" is normal, not a smell
   const CODE_RE=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte|py|java|go|rb|php|cs|cpp|cxx|cc|c|h|hpp|rs|kt|kts|swift|scala|dart|lua|pl|r|jl|ex|exs|erl|hs|ml|fs|clj|groovy|zig|nim|v|sol)$/i;
   // kolejność reguł w raporcie (= wszystkie identyfikatory reguł; CLI waliduje nimi --fail-on)
-  const ORDER=['archviolation','vulndep','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','ownerdrift','unowned','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+  const ORDER=['archviolation','vulndep','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','ownerdrift','unowned','risky','dupcode','orphan','unusedexport','emptycatch','debug','todo','deep','crowded','minified','archrules'];
 
   // returns {findings:[{rule,sev,items:[{id,name,path,detail,sev,related?}],count}], score, files, ms}
   // item.sev = ważność tej pozycji (f.sev = pierwszej; liczy się do wyniku), related = id powiązanych węzłów (SARIF)
@@ -234,6 +236,16 @@ CM.Inspect = (function(){
       for(const [a,b,p] of hidden.slice(0,LIMIT)) add(F,'hiddencoupling','low',a, t('coupled',{b:b.name, n:p.shared, d:Math.round(p.degree*100)}), [b.id]);
       if(hidden.length>LIMIT){ const f=F.get('hiddencoupling'); if(f) f.count=hidden.length; }
     }catch(e){ /* brak osi czasu w starszej mapie — reguła pominięta */ } }
+
+    // ---- nieużywane eksporty JS/TS (CM.DeadCode): nazwy z klauzul importu, barrel `export *`, wejścia pakietów ----
+    if(CM.DeadCode && hasDeps){ try{
+      const dead=CM.DeadCode.analyze(graph);
+      for(const d of dead.slice(0,LIMIT)){
+        const names=d.exports.slice(0,6).map(x=>x.name+':'+x.line).join(', ')+(d.exports.length>6?', …':'');
+        add(F,'unusedexport','low',graph.nodes.get(d.id), t('unexp',{n:d.exports.length, names}));
+      }
+      if(dead.length>LIMIT){ const f=F.get('unusedexport'); if(f) f.count=dead.length; }
+    }catch(e){ ruleFail('unusedexport', e); } }
 
     // ---- podatne zależności: wynik sprawdzenia OSV.dev zapisany na grafie (CM.Vulns.applyToGraph) ----
     if(graph.vulnInfo && Array.isArray(graph.vulnInfo.items)){ try{

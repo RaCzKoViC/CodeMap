@@ -23,7 +23,7 @@ const TAGS = {
   archviolation: ['architecture'], cycles: ['architecture'], god: ['architecture'], unstable: ['architecture'],
   fanout: ['architecture'], gitHotspot: ['maintainability', 'git'], huge: ['maintainability'], complex: ['maintainability'],
   lowcov: ['testing'], untested: ['testing'], silo: ['maintainability', 'git'], risky: ['security'],
-  dupcode: ['maintainability', 'duplication'], orphan: ['maintainability', 'dead-code'], emptycatch: ['reliability'],
+  dupcode: ['maintainability', 'duplication'], orphan: ['maintainability', 'dead-code'], unusedexport: ['maintainability', 'dead-code'], emptycatch: ['reliability'],
   debug: ['maintainability'], todo: ['maintainability'], deep: ['structure'], crowded: ['structure'],
   minified: ['build-artifact'], archrules: ['configuration'],
 };
@@ -94,6 +94,7 @@ export function toSarif({ CM, graph, rep, lang = 'pl', uriPrefix = '' }) {
           if (e.source === n.id && DEP.has(e.type) && members.has(e.target)) { line = importLine(graph, n, graph.nodes.get(e.target)); if (line) break; }
         }
       } else if (f.rule === 'archviolation' && rel.length) line = importLine(graph, n, rel[0]);
+      else if (f.rule === 'unusedexport') { const m = /[\w$]:(\d+)/.exec(it.detail || ''); if (m) line = +m[1]; }   // „nazwa:linia" pierwszego eksportu
       const title = t('r.' + f.rule);
       const r = {
         ruleId: f.rule,

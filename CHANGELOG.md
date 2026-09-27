@@ -35,6 +35,16 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   vs pliki package.json i krawędzie pakiet → pakiet (to, z czego powstaje macierz zależności) vs importy z metafile
   esbuilda (rozwiązane pliki i nazwy pakietów workspace'u). Wynik 100 % / 100 %. `paths` z tsconfig repozytorium
   trafiają do esbuilda (`tsconfigRaw` zastępuje plik). Preact Signals także w galerii przykładów.
+- **Reguła „Nieużywane eksporty" (`unusedexport`, JS/TS)** — `js/deadcode.js` (`CM.DeadCode`): eksport, którego żaden plik
+  projektu nie importuje. Analizator zapisuje nazwy z klauzul importu na zależnościach (`names`; `* as`, `require`,
+  `import()` = wszystko; `export *` = `star` przekazujący dalej żądania importujących barrel), `buildEdges` scala je na
+  krawędzi. Jak knip: `export {a} from` jest użyciem `a`, typ w sygnaturze eksportowanej wartości należy do API, typy
+  z JSDoc `import('./x').T` są zależnościami tylko typu, `./x` bez źródła rozwiązuje się do `x.d.ts`; pomijane wejścia
+  pakietów (exports / main / module / bin z mapowaniem `dist` → `src`, domyślne index/main/cli), testy, pliki bez
+  importujących (reguła osieroconych plików), treść napisów i regexów. Korpus porównuje wynik z **knip 6.38**
+  (te same wejścia po obu stronach, w monorepo konfiguracja per workspace): preact 17/17, ky 8/8, petite-vue 1/1,
+  Preact Signals 33/33 — 100 % / 100 %. Tylko ESM: knip nie widzi użycia `require('x').y`, więc CommonJS pominięty.
+  SARIF z linią pierwszego nieużywanego eksportu (tag `dead-code`).
 
 ### Zmienione — Faza 13 (wydajność)
 - **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym

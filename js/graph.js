@@ -66,8 +66,12 @@ CM.Graph = (function(){
       const all = Array.from(this.nodes.values());
       const {edges, externals} = A.buildEdges(all, manifests);
       // pakiety (monorepo): nazwa, ekosystem, katalog — jednostki widoku pakietów / macierzy zależności (CM.DSM)
-      this.packages = manifests.filter(m=>m && m.kind==='package' && m.name).map(m=>({name:m.name, eco:m.eco||'npm', dir:A.normPath(m.dir||'')}))
-        .sort((a,b)=>(a.dir<b.dir?-1:a.dir>b.dir?1:0));
+      this.packages = manifests.filter(m=>m && m.kind==='package' && m.name).map(m=>{
+        const p = {name:m.name, eco:m.eco||'npm', dir:A.normPath(m.dir||'')};
+        // wejścia pakietu npm (exports/main/module/bin) dla CM.DeadCode — nieenumerowalne: nie trafiają do zapisanej mapy
+        if(p.eco === 'npm' && A.packageEntries) Object.defineProperty(p, 'entries', {value:A.packageEntries(m), enumerable:false});
+        return p;
+      }).sort((a,b)=>(a.dir<b.dir?-1:a.dir>b.dir?1:0));
       for(const e of edges) this.edges.push(e);
       this.externals = externals;
 

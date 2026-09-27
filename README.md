@@ -142,7 +142,10 @@ Click **“✨ See demo”** or open `index.html#demo`.
 ### Inspect — static analysis
 16 anti-pattern rules (cycles, god-files, hubs, orphans, complexity, risky APIs, empty `catch` blocks, debug leftovers,
 deep nesting, minified files, **duplicated code** — winnowing over file contents…) with statistical
-thresholds, a **health score** and a Markdown report. An optional **`.codemap.rules.json`** file in the repository
+thresholds, a **health score** and a Markdown report. **Unused exports** (JS/TS): exported names no project file imports,
+following named imports, namespaces, `export *` barrels, JSDoc `import('./x').T` types and `.d.ts` files, with package
+entry points (exports / main / bin, `dist` → `src`) skipped — checked against knip on the reference corpus (100 %).
+An optional **`.codemap.rules.json`** file in the repository
 (layers = path globs, `forbid` between layers, `noCycles`) is enforced as the
 “Architecture rule violations” rule. In the details panel every file and folder shows its **coupling** — Ca / Ce / I
 (afferent, efferent, Martin's instability). The visible graph can be **exported** to DOT (Graphviz),
@@ -358,7 +361,8 @@ js/settings.js             # settings window: tab registry, general tabs, intera
 js/settings-strings.js     # settings and tutorial texts (PL / EN)
 js/settings-ai.js          # AI tab: providers, API keys, WebLLM, Ollama, code index (RAG)
 js/settings-docs.js        # built-in specification and user manual
-js/inspect.js              # static analysis (16 rules + architecture rules, health score)
+js/inspect.js              # static analysis (rules + architecture rules, health score)
+js/deadcode.js             # unused JS/TS exports: import names on edges, barrels, package entry points (pure)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
 js/chatbot-strings.js  js/chatbot-core.js  js/chatbot-render.js   # ChatBot: PL/EN strings, pure logic (tools, prompts, action validation), rendering
 js/mindmap.js  js/mmdraw.js  # MindMap mode: editor, rendering, interaction + drawing layer

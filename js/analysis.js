@@ -98,13 +98,33 @@ CM.Analysis = (function(){
   }
   function matchAll(re, str, cb){ let m; re.lastIndex=0; while((m = re.exec(str)) !== null){ cb(m); if(m.index===re.lastIndex) re.lastIndex++; } }
 
+  // nazwy pobierane z modułu przez klauzulę importu / reeksportu (CM.DeadCode — nieużywane eksporty):
+  // `import d, {a, b as c}` → ['default','a','b'], `* as ns` → ['*'] (wszystko), `import 'x'` → [] (efekt uboczny),
+  // `export {a as b} from` → ['a'], `export * from` → null (gwiazdka: przekazuje dalej to, o co pytają importujący)
+  function clauseNames(kind, clause){
+    if(clause == null) return [];
+    const c = clause.trim().replace(/^type\s+(?=[\w${*])/, '');
+    if(/^\*$/.test(c)) return null;
+    const out = [], br = c.indexOf('{');
+    for(const part of (br >= 0 ? c.slice(0, br) : c).split(',').map(s => s.trim()).filter(Boolean)){
+      if(/^\*\s+as\s/.test(part)) out.push('*');
+      else if(kind === 'import' && /^[\w$]+$/.test(part)) out.push('default');
+    }
+    if(br >= 0) for(const item of c.slice(br + 1, c.lastIndexOf('}') > br ? c.lastIndexOf('}') : undefined).split(',')){
+      const m = /^\s*(?:type\s+)?([\w$]+)/.exec(item); if(m) out.push(m[1]);
+    }
+    return out;
+  }
   function jsDeps(c, d){
     // `export … from './x'` = reexport (barrel) — ta sama krawędź, flaga dla przyszłego grafu symboli;
-    // `import type` / `export type … from` (TypeScript) = zależność tylko w czasie kompilacji → typeOnly
-    matchAll(/(import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>{
+    // `import type` / `export type … from` (TypeScript) = zależność tylko w czasie kompilacji → typeOnly;
+    // names / star — co importujący bierze z modułu (CM.DeadCode); bez nich (require, import()) = wszystko
+    matchAll(/(import|export)\s+(?:([\w$*{}\s,]+)\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>{
       const extra = m[1]==='export' ? {reexport:true} : {};
       if(/^(?:import|export)\s+type\s+(?!from\b)[\w*{]/.test(m[0])) extra.typeOnly = true;
-      add(d,m[2], jsKind(m[2]), 'import', (extra.reexport || extra.typeOnly) ? extra : null);
+      const names = clauseNames(m[1], m[2]);
+      if(names) extra.names = names; else extra.star = true;
+      add(d,m[3], jsKind(m[3]), 'import', extra);
     });
     matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], jsKind(m[1]), 'import'));
     matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], jsKind(m[1]), 'import'));
@@ -324,7 +344,7 @@ CM.Analysis = (function(){
       if(n === 'package.json'){
         const j = looseJSON(content);
         const imports = (j.imports && typeof j.imports === 'object' && !Array.isArray(j.imports)) ? j.imports : undefined;
-        if(typeof j.name === 'string' && j.name.trim()) return {kind:'package', eco:'npm', dir, name:j.name.trim(), main:j.main, module:j.module, exports:j.exports, imports};
+        if(typeof j.name === 'string' && j.name.trim()) return {kind:'package', eco:'npm', dir, name:j.name.trim(), main:j.main, module:j.module, exports:j.exports, bin:j.bin, imports};
         if(imports) return {kind:'package', eco:'npm', dir, name:'', imports};   // aplikacja bez nazwy — tylko „imports"
         return null;
       }
@@ -424,6 +444,17 @@ CM.Analysis = (function(){
     }
     return null;
   }
+  // wszystkie ścieżki wejściowe pakietu npm (exports z warunkami i podścieżkami, main, module, bin) — publiczne API,
+  // którego eksporty nie są „nieużywane" (CM.DeadCode); wzorce `*` pominięte
+  function packageEntries(m){
+    const out = [], walk = (x) => {
+      if(typeof x === 'string'){ if(!x.includes('*') && !out.includes(x)) out.push(x); }
+      else if(Array.isArray(x)) x.forEach(walk);
+      else if(x && typeof x === 'object') for(const k in x) walk(x[k]);
+    };
+    walk(m.exports); walk(m.main); walk(m.module); walk(m.bin);
+    return out;
+  }
   // wpis exports dla podścieżki `.` / `./x` (dokładny klucz, potem wzorce `./feat/*`)
   function exportFor(exports, sub){
     if(!exports || typeof exports !== 'object' || Array.isArray(exports)) return sub === '.' ? exportTarget(exports) : null;
@@ -496,12 +527,24 @@ CM.Analysis = (function(){
     return tryExact(idx.byPath, expand(normPath(joinPath(cfg.baseDir, spec)), 'js'));
   }
 
-  function extractDeps(content, key){ if(content == null) return []; return depsFromStripped(stripNonCode(content, key), key); }
+  function extractDeps(content, key){ if(content == null) return []; return depsFromStripped(stripNonCode(content, key), key, content); }
+  // typy z JSDoc: `@param {import('./x').T}` w komentarzu = zależność tylko typu z nazwą T (TypeScript z checkJs i knip
+  // też je widzą). Komentarz = miejsce, które stripNonCode wygasił (ta sama długość tekstu).
+  function jsDocDeps(raw, stripped, d){
+    const bySpec = new Map();
+    matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)\s*\.\s*([A-Za-z_$][\w$]*)/g, raw, m=>{
+      if(stripped.slice(m.index, m.index + 6) === 'import') return;    // kod, nie komentarz (np. import('./x').then)
+      if(!bySpec.has(m[1])) bySpec.set(m[1], []);
+      if(!bySpec.get(m[1]).includes(m[2])) bySpec.get(m[1]).push(m[2]);
+    });
+    for(const [spec, names] of bySpec) add(d, spec, jsKind(spec), 'import', {typeOnly:true, names});
+  }
   // wariant na tekście już oczyszczonym z komentarzy (analyzeFile robi stripNonCode RAZ dla deps i symbols)
-  function depsFromStripped(content, key){
+  function depsFromStripped(content, key, raw){
     const d = [];
     const fam = family(key);
     if(fam === 'js' || ['vue','svelte','astro'].includes(key)) jsDeps(content, d);
+    if(fam === 'js' && raw && raw.length === content.length && raw.includes('import(')) jsDocDeps(raw, content, d);
     if(fam === 'py') pyDeps(content, d);
     if(fam === 'c') cDeps(content, d);
     if(fam === 'go') goDeps(content, d);
@@ -574,7 +617,8 @@ CM.Analysis = (function(){
   }
 
   // ---------- resolution / edge building ----------
-  const JS_EXT = ['', '.js','.jsx','.ts','.tsx','.mjs','.cjs','.mts','.cts','.vue','.svelte','.astro','.json','.css','.scss'];
+  // .d.ts na końcu: `./types` bez pliku źródłowego = sama deklaracja (TypeScript rozwiązuje tak samo)
+  const JS_EXT = ['', '.js','.jsx','.ts','.tsx','.mjs','.cjs','.mts','.cts','.vue','.svelte','.astro','.json','.css','.scss','.d.ts'];
   const JS_IDX = ['/index.js','/index.jsx','/index.ts','/index.tsx','/index.mjs','/index.vue'];
 
   function expand(base, fam){
@@ -834,20 +878,30 @@ CM.Analysis = (function(){
     const seen = new Map();
     const externals = new Map();
     // typeOnly: każdy import między tą parą plików jest `import type` — wystarczy jeden zwykły, by flaga znikła
-    function addEdge(s,t,type,typeOnly){
+    // names (tylko JS/TS): suma nazw ze wszystkich importów pary; '*' = wszystko (namespace, require, import());
+    // star = `export * from` — importujący pytają ten plik o nazwy, których sam nie ma (CM.DeadCode)
+    function addEdge(s,t,type,typeOnly,dep){
       if(s===t) return;
       const k = type+'|'+s+'|'+t, old = seen.get(k);
-      if(old){ if(old.typeOnly && !typeOnly) delete old.typeOnly; return; }
-      const e = {id:'imp'+edges.length, source:s, target:t, type}; if(typeOnly) e.typeOnly = true;
-      seen.set(k, e); edges.push(e);
+      const e = old || {id:'imp'+edges.length, source:s, target:t, type};
+      if(old){ if(old.typeOnly && !typeOnly) delete old.typeOnly; }
+      else { if(typeOnly) e.typeOnly = true; seen.set(k, e); edges.push(e); }
+      if(dep){
+        if(dep.star) e.star = true;
+        else if(!dep.names) e.names = ['*'];
+        else if(!e.names) e.names = dep.names.slice();
+        else if(e.names[0] !== '*') for(const n of dep.names) if(!e.names.includes(n)) e.names.push(n);
+        if(e.names && e.names.includes('*')) e.names = ['*'];
+      }
     }
     for(const f of nodes){
       if(f.type!=='file' || !f.deps || !f.deps.length) continue;
+      const jsFam = family(f.lang) === 'js';
       for(const dep of f.deps){
         if(dep.kind === 'decl') continue;                          // deklaracja (namespace) — tylko cel dla innych
         const tgt = resolveDep(f, dep, idx);                       // węzeł, tablica węzłów (glob, namespace) albo null
         const tgts = Array.isArray(tgt) ? tgt : (tgt ? [tgt] : []);
-        if(tgts.length){ for(const t of tgts) addEdge(f.id, t.id, dep.etype==='reference'?'reference':'import', dep.typeOnly); }
+        if(tgts.length){ for(const t of tgts) addEdge(f.id, t.id, dep.etype==='reference'?'reference':'import', dep.typeOnly, jsFam ? dep : null); }
         else if(isExternal(dep)){
           const name = family(f.lang) === 'go' ? goModuleName(dep.spec) : externalName(dep.spec);
           if(!name) continue;
@@ -865,9 +919,9 @@ CM.Analysis = (function(){
   function analyzeFile(content, key){
     if(content==null) return {metrics:null, deps:[], symbols:[]};
     const stripped=stripNonCode(content, key);
-    return {metrics:analyzeContent(content, key), deps:depsFromStripped(stripped, key), symbols:symbolsFromStripped(stripped, key)};
+    return {metrics:analyzeContent(content, key), deps:depsFromStripped(stripped, key, content), symbols:symbolsFromStripped(stripped, key)};
   }
 
   return {analyzeContent, analyzeFile, extractDeps, extractSymbols, buildEdges, manifestEntry, family, stripNonCode, looseJSON,
-          normPath, dirname, basename, joinPath, externalName, goModuleName};
+          normPath, dirname, basename, joinPath, externalName, goModuleName, packageEntries};
 })();

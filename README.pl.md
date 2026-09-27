@@ -143,7 +143,10 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 ### Inspect — analiza statyczna
 16 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
 głębokie zagnieżdżenie, minifikaty, **zduplikowany kod** — winnowing na treści plików…) z progami
-statystycznymi, **health score** i raportem Markdown. Opcjonalny plik **`.codemap.rules.json`** w repozytorium
+statystycznymi, **health score** i raportem Markdown. **Nieużywane eksporty** (JS/TS): nazwy eksportowane, których żaden
+plik projektu nie importuje — z importami nazwanymi, namespace, barrelami `export *`, typami z JSDoc `import('./x').T`
+i plikami `.d.ts`, bez wejść pakietów (exports / main / bin, `dist` → `src`); sprawdzane knipem na korpusie (100 %).
+Opcjonalny plik **`.codemap.rules.json`** w repozytorium
 (warstwy = globy ścieżek, `forbid` między warstwami, `noCycles`) jest egzekwowany jako reguła
 „naruszenia architektury". W panelu szczegółów każdy plik i folder ma **sprzężenia** Ca / Ce / I
 (afferent, efferent, niestabilność wg Martina). Widoczny graf da się **wyeksportować** do DOT (Graphviz),
@@ -359,7 +362,8 @@ js/settings.js             # okno ustawień: rejestr zakładek, zakładki ogóln
 js/settings-strings.js     # teksty ustawień i samouczka (PL / EN)
 js/settings-ai.js          # zakładka AI: dostawcy, klucze API, WebLLM, Ollama, indeks kodu (RAG)
 js/settings-docs.js        # wbudowana specyfikacja i instrukcja obsługi
-js/inspect.js              # analiza statyczna (16 reguł + reguły architektury, health score)
+js/inspect.js              # analiza statyczna (reguły + reguły architektury, health score)
+js/deadcode.js             # nieużywane eksporty JS/TS: nazwy importów na krawędziach, barrele, wejścia pakietów (czyste)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
 js/chatbot-strings.js  js/chatbot-core.js  js/chatbot-render.js   # ChatBot: teksty PL/EN, czysta logika (narzędzia, prompty, walidacja akcji), renderowanie
 js/mindmap.js  js/mmdraw.js  # tryb MindMap: edytor, renderowanie, interakcja + warstwa rysowania
