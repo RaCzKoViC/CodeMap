@@ -19,6 +19,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   zakresem właściciela (`npm publish dist/npm/<plik>.tgz --access public`).
 
 ### Zmienione — Faza 8 (jakość własna)
+- Usunięte 20 układów nieosiągalnych z interfejsu, ChatBota i linków (tree, radial, grid, honeycomb, vortex…):
+  `layouts.js` 899 → ~400 linii; test pilnuje, że lista w UI = układy obsługiwane przez `apply` (bez martwych
+  i brakujących). Zapisany widok z usuniętym układem przywraca się z bieżącym (nieznana nazwa jest pomijana).
 - Testy renderera (`test/renderer.test.mjs`, 9): kamera świat ↔ ekran przy obrocie i pochyleniu, pamięć macierzy,
   przybliżanie z punktem pod kursorem, trafianie węzłów (billboard przy pochyleniu) i krawędzi (prosta / łuk), `fit`
   z panelami, wybór backendu bez WebGL, rysowanie na atrapie kontekstu, eksport SVG z escapowaniem.

@@ -17,135 +17,13 @@ CM.Layouts = (function(){
     return {children, roots, vis};
   }
 
-  // ---------- TREE (layered, tidy) ----------
-  function tree(graph, nodes){
-    const {children, roots} = hierarchy(graph, nodes);
-    const map = byId(nodes);
-    const xGap = Math.max(52, 60 - Math.min(nodes.length/60, 1)*20), yGap = 110;
-    let cursor = 0;
-    function walk(id, depth){
-      const n = map.get(id); const kids = children.get(id);
-      n.depthL = depth;
-      if(!kids || kids.length===0){ n._lx = cursor++; }
-      else {
-        kids.forEach(k=>walk(k, depth+1));
-        n._lx = (map.get(kids[0])._lx + map.get(kids[kids.length-1])._lx)/2;
-      }
-    }
-    roots.forEach((r,i)=>{ walk(r, 0); cursor += 1.5; });
-    for(const n of nodes){ n.x = n._lx*xGap; n.y = n.depthL*yGap; n.vx=0; n.vy=0; }
-    centerNodes(nodes);
-  }
 
-  // ---------- RADIAL ----------
-  function radial(graph, nodes){
-    const {children, roots} = hierarchy(graph, nodes);
-    const map = byId(nodes);
-    let leaf = 0; let maxDepth = 0;
-    function countLeaves(id, depth){
-      maxDepth=Math.max(maxDepth,depth);
-      const kids=children.get(id);
-      if(!kids||!kids.length){ map.get(id)._leaf=leaf++; map.get(id)._d=depth; return; }
-      kids.forEach(k=>countLeaves(k,depth+1));
-      const f=map.get(kids[0]), l=map.get(kids[kids.length-1]);
-      map.get(id)._leaf=(f._leaf+l._leaf)/2; map.get(id)._d=depth;
-    }
-    roots.forEach(r=>countLeaves(r,0));
-    const total = Math.max(1, leaf);
-    const ring = 150;
-    for(const n of nodes){
-      const ang = (n._leaf/total)*Math.PI*2;
-      const rad = n._d*ring;
-      n.x = Math.cos(ang)*rad; n.y = Math.sin(ang)*rad; n.vx=0;n.vy=0;
-    }
-    centerNodes(nodes);
-  }
 
-  // ---------- GRID ----------
-  function grid(graph, nodes){
-    const arr = nodes.slice().sort((a,b)=> (a.path<b.path?-1:1));
-    // Adaptive gap: bigger when nodes have large radii
-    const avgR = arr.reduce((s,n)=>s+(n.r||8),0)/Math.max(1,arr.length);
-    const gap = Math.max(52, avgR*3.2);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(arr.length * (1 + arr.length/300))));
-    arr.forEach((n,i)=>{ n.x=(i%cols)*gap; n.y=Math.floor(i/cols)*gap; n.vx=0;n.vy=0; });
-    centerNodes(nodes);
-  }
 
-  // ---------- CLUSTER by language ----------
-  function cluster(graph, nodes){
-    const groups = new Map();
-    for(const n of nodes){
-      const k = n.type==='folder' ? '__folder__' : (n.type==='external'?'__external__':n.lang);
-      if(!groups.has(k)) groups.set(k,[]);
-      groups.get(k).push(n);
-    }
-    const keys = Array.from(groups.keys());
-    const R = 130 + keys.length*45;
-    keys.forEach((k,gi)=>{
-      const ga = (gi/keys.length)*Math.PI*2;
-      const cx = Math.cos(ga)*R, cy = Math.sin(ga)*R;
-      const arr = groups.get(k);
-      const maxR=arr.reduce((m,n)=>Math.max(m,n.r||8),8);
-      const cols = Math.ceil(Math.sqrt(arr.length))||1, gap=Math.max(40, maxR*2.4);
-      arr.forEach((n,i)=>{
-        n.x = cx + ((i%cols)-cols/2)*gap;
-        n.y = cy + (Math.floor(i/cols)-cols/2)*gap;
-        n.vx=0;n.vy=0;
-      });
-    });
-    centerNodes(nodes);
-  }
 
-  // ---------- HORIZONTAL TREE ----------
-  function treeH(graph, nodes){
-    const {children, roots} = hierarchy(graph, nodes);
-    const map = byId(nodes);
-    const yGap = 46, xGap = 165;
-    let cursor = 0;
-    function walk(id, depth){
-      const n = map.get(id); const kids = children.get(id); n.depthL = depth;
-      if(!kids || !kids.length){ n._lx = cursor++; }
-      else { kids.forEach(k=>walk(k, depth+1)); n._lx = (map.get(kids[0])._lx + map.get(kids[kids.length-1])._lx)/2; }
-    }
-    roots.forEach(r=>{ walk(r,0); cursor += 1.5; });
-    for(const n of nodes){ n.y = n._lx*yGap; n.x = n.depthL*xGap; n.vx=0; n.vy=0; }
-    centerNodes(nodes);
-  }
 
-  // ---------- CONCENTRIC (rings by hierarchy depth) ----------
-  function concentric(graph, nodes){
-    const {children, roots} = hierarchy(graph, nodes);
-    const depth = new Map(); const q = [];
-    roots.forEach(r=>{ depth.set(r,0); q.push(r); });
-    while(q.length){ const id=q.shift(); for(const c of children.get(id)){ depth.set(c,(depth.get(id)||0)+1); q.push(c); } }
-    const groups = new Map();
-    for(const n of nodes){ const d=depth.get(n.id)||0; if(!groups.has(d)) groups.set(d,[]); groups.get(d).push(n); }
-    const ringGap = 135;
-    for(const [d,arr] of groups){
-      const R = d*ringGap + (d?30:0);
-      const step = (Math.PI*2)/Math.max(1,arr.length);
-      arr.forEach((n,i)=>{ if(d===0 && arr.length===1){ n.x=0; n.y=0; } else { n.x=Math.cos(i*step+ d*0.3)*R; n.y=Math.sin(i*step+ d*0.3)*R; } n.vx=0; n.vy=0; });
-    }
-    centerNodes(nodes);
-  }
 
-  // ---------- CIRCLE (single ring) ----------
-  function circle(graph, nodes){
-    const arr = nodes.slice().sort((a,b)=> a.path<b.path?-1:1);
-    const R = Math.max(130, arr.length*8.5);
-    const step = (Math.PI*2)/Math.max(1,arr.length);
-    arr.forEach((n,i)=>{ n.x=Math.cos(i*step)*R; n.y=Math.sin(i*step)*R; n.vx=0; n.vy=0; });
-    centerNodes(nodes);
-  }
 
-  // ---------- SPIRAL (phyllotaxis / sunflower) ----------
-  function spiral(graph, nodes){
-    const arr = nodes.slice().sort((a,b)=> (b.totalSize||b.size||0)-(a.totalSize||a.size||0));
-    const GA = 2.39996323, sp = 23;
-    arr.forEach((n,i)=>{ const r=sp*Math.sqrt(i+1); const a=i*GA; n.x=Math.cos(a)*r; n.y=Math.sin(a)*r; n.vx=0; n.vy=0; });
-    centerNodes(nodes);
-  }
 
   // ---------- MODULES (force-in-clusters by top-level folder) ----------
   function modules(graph, nodes, edges){
@@ -183,56 +61,7 @@ CM.Layouts = (function(){
     return sim;
   }
 
-  // ---------- FLOW (left-to-right dependency) ----------
-  function flow(graph, nodes, edges){
-    const map=byId(nodes);
-    const outE=new Map(); nodes.forEach(n=>outE.set(n.id,[]));
-    for(const e of (edges||[])){
-      if((e.type==='import'||e.type==='reference') && outE.has(e.source) && map.has(e.target))
-        outE.get(e.source).push(e.target);
-    }
-    const rank=new Map(), st=new Map();
-    function dfs(id){ if(rank.has(id)) return rank.get(id); if(st.get(id)==='v') return 0; st.set(id,'v'); let mx=-1; for(const t of outE.get(id)) mx=Math.max(mx,dfs(t)); const r=mx+1; rank.set(id,r); st.set(id,'d'); return r; }
-    for(const n of nodes) dfs(n.id);
-    const groups=new Map();
-    for(const n of nodes){ const r=rank.get(n.id)||0; if(!groups.has(r))groups.set(r,[]); groups.get(r).push(n); }
-    const xGap=200, yGap=60;
-    for(const [r,arr] of groups){
-      arr.sort((a,b)=>a.path<b.path?-1:1).forEach((n,i)=>{
-        n.x=r*xGap; n.y=(i-(arr.length-1)/2)*yGap; n.vx=0; n.vy=0;
-      });
-    }
-    centerNodes(nodes);
-  }
 
-  // ---------- COMPACT TREE (Reingold-Tilford inspired, adaptive gaps) ----------
-  function compactTree(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    // Compute subtree extents
-    const lExt=new Map(), rExt=new Map();
-    function extent(id){
-      const kids=children.get(id); if(!kids||!kids.length){ lExt.set(id,0); rExt.set(id,0); return; }
-      kids.forEach(k=>extent(k));
-      let l=Infinity, r=-Infinity, cur=0;
-      kids.forEach((k,i)=>{ if(i>0) cur+=Math.max(1,(rExt.get(kids[i-1])+(lExt.get(k)||0))*0+1)*52; l=Math.min(l,-cur/2); r=Math.max(r,cur/2); });
-      lExt.set(id, l); rExt.set(id, r);
-    }
-    roots.forEach(r=>extent(r));
-    const placed=new Map();
-    function place(id, depth, ox){
-      const kids=children.get(id)||[];
-      placed.set(id,{x:ox, y:depth*105});
-      if(!kids.length) return;
-      let totalW=(kids.length-1)*52; kids.forEach(()=>{});
-      let x=ox-totalW/2;
-      kids.forEach((k)=>{ place(k,depth+1,x); x+=52; });
-    }
-    let xOff=0;
-    roots.forEach(r=>{ place(r,0,xOff); xOff+=200; });
-    for(const n of nodes){ const p=placed.get(n.id)||{x:0,y:0}; n.x=p.x; n.y=p.y; n.vx=0; n.vy=0; }
-    centerNodes(nodes);
-  }
 
   // ---------- LAYERED (dependency rank — leaves on top, dependents below) ----------
   function layered(graph, nodes, edges){
@@ -257,63 +86,8 @@ CM.Layouts = (function(){
     centerNodes(nodes);
   }
 
-  // ---------- BALLOON (radial tree; each subtree gets its own circle) ----------
-  function balloon(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    function radiusOf(id){ const kids=children.get(id)||[]; let s=0; for(const k of kids) s+=radiusOf(k)+50; const n=map.get(id); n._sr=Math.max((n.r||8)+18, s/(Math.PI)); return n._sr; }
-    roots.forEach(r=>radiusOf(r));
-    function place(id, cx, cy, a0, a1){
-      const n=map.get(id); n.x=cx; n.y=cy; n.vx=0; n.vy=0;
-      const kids=children.get(id)||[]; if(!kids.length) return;
-      let tot=0; kids.forEach(k=>tot+=map.get(k)._sr);
-      let a=a0;
-      for(const k of kids){ const span=(a1-a0)*(map.get(k)._sr/tot); const mid=a+span/2;
-        const rr=n._sr + map.get(k)._sr*0.9;
-        place(k, cx+Math.cos(mid)*rr, cy+Math.sin(mid)*rr, mid-span/2, mid+span/2); a+=span; }
-    }
-    let ox=0; roots.forEach(r=>{ const rad=map.get(r)._sr; place(r, ox, 0, -Math.PI, Math.PI); ox+=rad*3; });
-    centerNodes(nodes);
-  }
 
-  // ---------- MINDMAP (root centre; branches fan left & right) ----------
-  function mindmap(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    const yGap=30, xGap=190;
-    let cursor=0;
-    function leaves(id){ const k=children.get(id)||[]; if(!k.length) return 1; let s=0; k.forEach(c=>s+=leaves(c)); return s; }
-    function walk(id, depth, side){
-      const n=map.get(id); const kids=children.get(id)||[];
-      if(!kids.length){ n._row=cursor++; } else { kids.forEach(k=>walk(k,depth+1,side)); n._row=(map.get(kids[0])._row+map.get(kids[kids.length-1])._row)/2; }
-      n._depth=depth; n._side=side;
-    }
-    roots.forEach(r=>{
-      const kids=children.get(r)||[];
-      // split top-level children into left / right halves
-      const half=Math.ceil(kids.length/2);
-      map.get(r)._depth=0; map.get(r)._row=0; map.get(r)._side=0;
-      kids.forEach((k,i)=>walk(k,1, i<half?1:-1));
-    });
-    for(const n of nodes){ const side=n._side||0; n.x=(n._depth||0)*xGap*(side||1)*(side?1:0); n.y=(n._row||0)*yGap; n.vx=0; n.vy=0; if((n._depth||0)===0){ n.x=0; n.y=0; } }
-    centerNodes(nodes);
-  }
 
-  // ---------- GENEALOGY (tidy top-down family tree; generations as rows, parents centred) ----------
-  function genealogy(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    const xGap=72, yGap=160;
-    let cursor=0;
-    function walk(id, depth){
-      const n=map.get(id); const kids=children.get(id); n.depthL=depth;
-      if(!kids || !kids.length){ n._lx=cursor++; }
-      else { kids.forEach(k=>walk(k, depth+1)); n._lx=(map.get(kids[0])._lx + map.get(kids[kids.length-1])._lx)/2; }
-    }
-    roots.forEach(r=>{ walk(r,0); cursor += 2.4; });   // breathing room between separate family trees
-    for(const n of nodes){ n.x=n._lx*xGap; n.y=n.depthL*yGap; n.vx=0; n.vy=0; }
-    centerNodes(nodes);
-  }
 
   // ---------- GALAXY (Siła — spiral arms per top-level folder, then a force settle) ----------
   function galaxy(graph, nodes, edges){
@@ -383,20 +157,6 @@ CM.Layouts = (function(){
       nd._cosmic=Math.min(1, Math.sqrt(i/Math.max(1,n-1))); });
     centerNodes(nodes);
   }
-  // SPIRAL GALAXY — multi-arm logarithmic spiral with a dense bright core
-  function spiralGalaxy(graph, nodes){
-    const arr=nodes.slice().sort((a,b)=>(b.totalSize||b.size||0)-(a.totalSize||a.size||0));
-    const n=arr.length, arms=3; const avgR=arr.reduce((s,x)=>s+(x.r||6),0)/Math.max(1,n);
-    const spread=avgR*1.0+6; let maxR=1;
-    arr.forEach((nd,i)=>{ const arm=i%arms, k=Math.floor(i/arms);
-      const r=26+Math.sqrt(k+1)*spread*2.0; const theta=(arm/arms)*Math.PI*2 + r*0.019;
-      const jt=Math.sin(i*2.3)*spread*0.7;
-      nd.x=Math.cos(theta)*r+Math.cos(theta+1.5708)*jt; nd.y=Math.sin(theta)*r+Math.sin(theta+1.5708)*jt;
-      nd.vx=0; nd.vy=0; maxR=Math.max(maxR,r); });
-    let mn=1e9,mx=0; for(const nd of arr){ const rr=Math.hypot(nd.x,nd.y); mn=Math.min(mn,rr); mx=Math.max(mx,rr); }
-    const dr=(mx-mn)||1; for(const nd of arr){ nd._cosmic=Math.max(0,Math.min(1,(Math.hypot(nd.x,nd.y)-mn)/dr)); }
-    centerNodes(nodes);
-  }
   // GALACTIC RINGS — concentric orbits by hierarchy depth, each ring its own cosmic hue
   function cosmicRings(graph, nodes){
     const {children, roots}=hierarchy(graph, nodes);
@@ -443,13 +203,6 @@ CM.Layouts = (function(){
     centerNodes(nodes);
   }
 
-  // ============ NEW LAYOUTS (10) ============
-  // small deterministic hash from a string id -> [0,1)
-  function hash01(id){
-    let h=2166136261>>>0; const s=String(id);
-    for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
-    return (h>>>8)/16777216;
-  }
 
   // ---------- 1) SUNBURST (rings by depth; angle = leaf position) ----------
   function sunburst(graph, nodes){
@@ -566,110 +319,7 @@ CM.Layouts = (function(){
     centerNodes(nodes);
   }
 
-  // ---------- 4) SOLAR SYSTEM (top-folders = suns; files orbit) ----------
-  function solar(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    // top-level groups: each root (or root's children if single root)
-    let suns = roots;
-    if(roots.length===1){ const rc=children.get(roots[0])||[]; if(rc.length) suns=rc; }
-    const S=Math.max(1, suns.length);
-    // big ring radius for the suns
-    const sunRing=Math.max(360, S*150);
-    let globalMaxR=1;
-    // place a node and its subtree as concentric orbits around (cx,cy); returns max radius used
-    function orbit(id, cx, cy, baseAng){
-      const n=map.get(id);
-      const kids=children.get(id)||[];
-      // place this node at center of its little system
-      n.x=cx; n.y=cy; n.vx=0; n.vy=0; n._cosmicR=Math.hypot(cx,cy);
-      globalMaxR=Math.max(globalMaxR, n._cosmicR);
-      if(!kids.length) return 0;
-      // separate folders (further orbits) from files (inner orbit)
-      const files=kids.filter(k=>(map.get(k).type)!=='folder');
-      const folders=kids.filter(k=>(map.get(k).type)==='folder');
-      let used=0;
-      // files on one orbit
-      if(files.length){
-        const fr=Math.max(70, files.length*9);
-        files.forEach((k,i)=>{
-          const a=baseAng + (i/files.length)*Math.PI*2;
-          const fx=cx+Math.cos(a)*fr, fy=cy+Math.sin(a)*fr;
-          const fn=map.get(k); fn.x=fx; fn.y=fy; fn.vx=0; fn.vy=0; fn._cosmicR=Math.hypot(fx,fy);
-          globalMaxR=Math.max(globalMaxR, fn._cosmicR);
-        });
-        used=Math.max(used, fr);
-      }
-      // nested folders on further orbits, each a sub-system
-      if(folders.length){
-        const baseFr=Math.max(70, files.length*9)+150;
-        folders.forEach((k,i)=>{
-          const a=baseAng + (i/folders.length)*Math.PI*2 + 0.5;
-          const fr=baseFr;
-          const fx=cx+Math.cos(a)*fr, fy=cy+Math.sin(a)*fr;
-          const sub=orbit(k, fx, fy, a);
-          used=Math.max(used, fr+sub);
-        });
-      }
-      return used;
-    }
-    suns.forEach((s,i)=>{
-      const a=(i/S)*Math.PI*2;
-      const cx=Math.cos(a)*sunRing*(S===1?0:1), cy=Math.sin(a)*sunRing*(S===1?0:1);
-      orbit(s, cx, cy, a);
-    });
-    // if single root acts as a master sun, put it at very center
-    if(roots.length===1 && suns!==roots){ const rn=map.get(roots[0]); rn.x=0; rn.y=0; rn.vx=0; rn.vy=0; rn._cosmicR=0; }
-    // normalize _cosmic from radius
-    for(const n of nodes){ n._cosmic=Math.max(0, Math.min(1, (n._cosmicR||0)/globalMaxR)); delete n._cosmicR; }
-    centerNodes(nodes);
-  }
 
-  // ---------- 5) HONEYCOMB (hex grid clustered by top-folder) ----------
-  function honeycomb(graph, nodes){
-    // group by top-level folder
-    const groups=new Map();
-    for(const n of nodes){
-      let top='__root__';
-      if(n.type==='external'){ top='__ext__'; }
-      else { let cur=n,p; while(cur.parent!=null){ p=graph.nodes.get(cur.parent); if(!p||p.parent==null) break; cur=p; } top=cur.parent!=null?cur.parent:cur.id; }
-      if(!groups.has(top)) groups.set(top,[]); groups.get(top).push(n);
-    }
-    const keys=Array.from(groups.keys());
-    const avgR=nodes.reduce((s,x)=>s+(x.r||8),0)/Math.max(1,nodes.length);
-    const cell=Math.max(34, avgR*2.4);            // hex spacing
-    const hexW=cell*Math.sqrt(3), hexH=cell*1.5;
-    // lay each group as a compact hex block, then place blocks on a coarse grid
-    const blocks=keys.map(k=>{
-      const arr=groups.get(k).slice().sort((a,b)=> a.path<b.path?-1:1);
-      const cols=Math.max(1, Math.ceil(Math.sqrt(arr.length)));
-      let w=0,h=0;
-      arr.forEach((n,i)=>{
-        const col=i%cols, row=Math.floor(i/cols);
-        const ox=col*hexW + (row%2)*(hexW/2);
-        const oy=row*hexH;
-        n._hx=ox; n._hy=oy;
-        w=Math.max(w, ox); h=Math.max(h, oy);
-      });
-      return {arr, w:w+hexW, h:h+hexH};
-    });
-    // arrange blocks in a grid with padding
-    const bCols=Math.max(1, Math.ceil(Math.sqrt(blocks.length)));
-    const pad=cell*2;
-    let colX=new Array(bCols).fill(0);
-    // compute row heights / column widths greedily
-    let cx=0, cy=0, rowMaxH=0, bcol=0;
-    blocks.forEach((b)=>{
-      b.ox=cx; b.oy=cy;
-      cx += b.w+pad; rowMaxH=Math.max(rowMaxH, b.h);
-      bcol++;
-      if(bcol>=bCols){ bcol=0; cx=0; cy+=rowMaxH+pad; rowMaxH=0; }
-    });
-    blocks.forEach(b=>{
-      b.arr.forEach(n=>{ n.x=(b.ox||0)+(n._hx||0); n.y=(b.oy||0)+(n._hy||0); n.vx=0; n.vy=0; delete n._hx; delete n._hy; });
-    });
-    centerNodes(nodes);
-  }
 
   // ---------- 6) ARC DIAGRAM (nodes on a baseline, grouped by folder) ----------
   function arcdiagram(graph, nodes){
@@ -691,134 +341,9 @@ CM.Layouts = (function(){
     centerNodes(nodes);
   }
 
-  // ---------- 7) DENDRITE (radial dendrogram / cluster) ----------
-  function dendrite(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    let leaf=0, maxDepth=0;
-    const ang=new Map(), dep=new Map();
-    function walk(id, depth){
-      maxDepth=Math.max(maxDepth, depth); dep.set(id, depth);
-      const kids=children.get(id);
-      if(!kids || !kids.length){ ang.set(id, leaf++); return; }
-      kids.forEach(k=>walk(k, depth+1));
-      ang.set(id, (ang.get(kids[0])+ang.get(kids[kids.length-1]))/2);
-    }
-    roots.forEach(r=>walk(r,0));
-    const total=Math.max(1, leaf);
-    const avgR=nodes.reduce((s,x)=>s+(x.r||8),0)/Math.max(1,nodes.length);
-    const outerR=Math.max(200, total*(avgR*2+14)/(2*Math.PI));
-    const step=outerR/Math.max(1, maxDepth);
-    for(const n of nodes){
-      const a=(ang.get(n.id)/total)*Math.PI*2;
-      // leaves outermost; internal nodes pulled toward center by (maxDepth-depth)
-      const d=dep.get(n.id)||0;
-      const rad=d*step;
-      if(maxDepth===0){ n.x=0; n.y=0; }
-      else { n.x=Math.cos(a)*rad; n.y=Math.sin(a)*rad; }
-      n.vx=0; n.vy=0;
-    }
-    centerNodes(nodes);
-  }
 
-  // ---------- 8) HELIX (columnar spiral, DFS order) ----------
-  function helix(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    const order=[];
-    const seen=new Set();
-    function dfs(id){ if(seen.has(id)) return; seen.add(id); order.push(id); for(const k of (children.get(id)||[])) dfs(k); }
-    roots.forEach(dfs);
-    for(const n of nodes){ if(!seen.has(n.id)){ order.push(n.id); seen.add(n.id); } }
-    const N=Math.max(1, order.length);
-    const baseR=Math.max(160, N*1.4);
-    const pitch=Math.max(26, (nodes.reduce((s,x)=>s+(x.r||8),0)/N)*2.0+8);
-    const turn=0.45;     // radians per step
-    order.forEach((id,i)=>{
-      const t=i*turn;
-      const R=baseR*(0.82+0.18*Math.sin(i*0.21));    // gentle oscillation
-      const n=map.get(id);
-      n.x=Math.cos(t)*R;
-      n.y=i*pitch;
-      n.vx=0; n.vy=0;
-      n._cosmic=N>1 ? i/(N-1) : 0;
-    });
-    centerNodes(nodes);
-  }
 
-  // ---------- 9) CONSTELLATION (modules scattered; files orbit module centroid) ----------
-  function constellation(graph, nodes){
-    const groups=new Map();
-    for(const n of nodes){
-      let top='__root__';
-      if(n.type==='external'){ top='__ext__'; }
-      else { let cur=n,p; while(cur.parent!=null){ p=graph.nodes.get(cur.parent); if(!p||p.parent==null) break; cur=p; } top=cur.parent!=null?cur.parent:cur.id; }
-      if(!groups.has(top)) groups.set(top,[]); groups.get(top).push(n);
-    }
-    const keys=Array.from(groups.keys());
-    const G=Math.max(1, keys.length);
-    const field=Math.max(700, G*260);     // big plane span
-    let globalMaxR=1;
-    keys.forEach((k,gi)=>{
-      // deterministic scatter of module centroid using hash of key
-      const h1=hash01(k+'#x'), h2=hash01(k+'#y');
-      // mix golden-angle ring + hash jitter for even-but-organic spread
-      const ringA=(gi/G)*Math.PI*2;
-      const ringR=field*(0.35+0.55*hash01(k+'#r'));
-      const cx=Math.cos(ringA)*ringR + (h1-0.5)*field*0.25;
-      const cy=Math.sin(ringA)*ringR + (h2-0.5)*field*0.25;
-      const arr=groups.get(k);
-      const avgR=arr.reduce((s,x)=>s+(x.r||8),0)/Math.max(1,arr.length);
-      const inner=Math.max(60, arr.length*(avgR*0.9+4)/Math.PI);
-      arr.forEach((n,i)=>{
-        // small constellation around centroid: golden-angle + per-node hash jitter
-        const a=i*2.39996323 + hash01(n.id)*0.9;
-        const rr=inner*Math.sqrt((i+0.5)/Math.max(1,arr.length));
-        const jx=(hash01(n.id+'jx')-0.5)*avgR*1.4;
-        const jy=(hash01(n.id+'jy')-0.5)*avgR*1.4;
-        n.x=cx+Math.cos(a)*rr+jx;
-        n.y=cy+Math.sin(a)*rr+jy;
-        n.vx=0; n.vy=0;
-        n._cosmicR=Math.hypot(n.x,n.y);
-        globalMaxR=Math.max(globalMaxR, n._cosmicR);
-      });
-    });
-    for(const n of nodes){ n._cosmic=Math.max(0, Math.min(1, (n._cosmicR||0)/globalMaxR)); delete n._cosmicR; }
-    centerNodes(nodes);
-  }
 
-  // ---------- 10) VORTEX (logarithmic spiral, folders->files / DFS) ----------
-  function vortex(graph, nodes){
-    const {children, roots}=hierarchy(graph, nodes);
-    const map=byId(nodes);
-    // DFS order but folders before files at each level
-    const order=[]; const seen=new Set();
-    function dfs(id){
-      if(seen.has(id)) return; seen.add(id); order.push(id);
-      const kids=(children.get(id)||[]).slice().sort((a,b)=>{
-        const ta=(map.get(a).type)==='folder'?0:1, tb=(map.get(b).type)==='folder'?0:1;
-        if(ta!==tb) return ta-tb;
-        return (map.get(a).path||a)<(map.get(b).path||b)?-1:1;
-      });
-      for(const k of kids) dfs(k);
-    }
-    roots.forEach(dfs);
-    for(const n of nodes){ if(!seen.has(n.id)){ order.push(n.id); seen.add(n.id); } }
-    const N=Math.max(1, order.length);
-    const avgR=nodes.reduce((s,x)=>s+(x.r||8),0)/Math.max(1,N);
-    const b=0.18;                 // spiral tightness
-    const sp=avgR*2.2+7;
-    let maxR=1;
-    order.forEach((id,i)=>{
-      const a=i*0.5;              // angle increment (twist)
-      const r=sp*Math.exp(b*Math.sqrt(i))*0.6 + sp*Math.sqrt(i+0.5)*0.4; // log-ish growth, bounded
-      const n=map.get(id);
-      n.x=Math.cos(a)*r; n.y=Math.sin(a)*r; n.vx=0; n.vy=0;
-      n._vr=r; maxR=Math.max(maxR, r);
-    });
-    for(const id of order){ const n=map.get(id); n._cosmic=Math.max(0, Math.min(1, (n._vr||0)/maxR)); delete n._vr; }
-    centerNodes(nodes);
-  }
 
   function centerNodes(nodes){
     if(!nodes.length) return;
@@ -858,36 +383,16 @@ CM.Layouts = (function(){
     if(!nodes.length) return {animated:false};
     const stat=(fn)=>{ fn(); scaleNodes(nodes, spacing); return {animated:false}; };
     switch(name){
-      case 'tree':       return stat(()=>tree(graph, nodes));
-      case 'tree-h':     return stat(()=>treeH(graph, nodes));
-      case 'radial':     return stat(()=>radial(graph, nodes));
-      case 'concentric': return stat(()=>concentric(graph, nodes));
-      case 'circle':     return stat(()=>circle(graph, nodes));
-      case 'spiral':     return stat(()=>spiral(graph, nodes));
-      case 'grid':       return stat(()=>grid(graph, nodes));
-      case 'cluster':    return stat(()=>cluster(graph, nodes));
       case 'layered':    return stat(()=>layered(graph, nodes, edges));
-      case 'flow':       return stat(()=>flow(graph, nodes, edges));
-      case 'compact':    return stat(()=>compactTree(graph, nodes));
-      case 'balloon':    return stat(()=>balloon(graph, nodes));
-      case 'mindmap':    return stat(()=>mindmap(graph, nodes));
-      case 'genealogy':  return stat(()=>genealogy(graph, nodes));
       case 'pack':       return stat(()=>circlePack(graph, nodes));
       case 'structtree': return stat(()=>structTree(graph, nodes));
       case 'structradial':return stat(()=>structRadial(graph, nodes));
       case 'nebula':     return stat(()=>nebula(graph, nodes));
-      case 'spiralgalaxy':return stat(()=>spiralGalaxy(graph, nodes));
       case 'cosmicrings':return stat(()=>cosmicRings(graph, nodes));
       case 'sunburst':   return stat(()=>sunburst(graph, nodes));
       case 'treemap':    return stat(()=>treemap(graph, nodes));
       case 'icicle':     return stat(()=>icicle(graph, nodes));
-      case 'solar':      return stat(()=>solar(graph, nodes));
-      case 'honeycomb':  return stat(()=>honeycomb(graph, nodes));
       case 'arcdiagram': return stat(()=>arcdiagram(graph, nodes));
-      case 'dendrite':   return stat(()=>dendrite(graph, nodes));
-      case 'helix':      return stat(()=>helix(graph, nodes));
-      case 'constellation':return stat(()=>constellation(graph, nodes));
-      case 'vortex':     return stat(()=>vortex(graph, nodes));
       case 'galaxy':     { const sim=galaxy(graph, nodes, edges); sim.spacing=spacing; return {animated:true, sim}; }
       case 'modules':    { const sim=modules(graph, nodes, edges); sim.spacing=spacing; return {animated:true, sim}; }
       case 'force':
@@ -895,5 +400,5 @@ CM.Layouts = (function(){
     }
   }
 
-  return {apply, forceSim, bhRepulse, circlePack, nebula, spiralGalaxy, cosmicRings, structTree, structRadial, tree, treeH, radial, concentric, circle, spiral, grid, cluster, layered, modules, flow, compactTree, balloon, mindmap, genealogy, galaxy, hierarchy, sunburst, treemap, icicle, solar, honeycomb, arcdiagram, dendrite, helix, constellation, vortex};
+  return {apply,forceSim, bhRepulse, circlePack, nebula, cosmicRings, structTree, structRadial, layered, modules, galaxy, hierarchy, sunburst, treemap, icicle, arcdiagram};
 })();

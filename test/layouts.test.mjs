@@ -2,16 +2,18 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCM, ALL_FILTERS, host } from './harness.mjs';
 import { FILES, META } from './fixtures/sample-project.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT } from './harness.mjs';
 
 const CM = loadCM();
 const { Graph } = CM.Graph;
 const Layouts = CM.Layouts;
 
-// wszystkie nazwy obsługiwane przez Layouts.apply (13 z UI + reszta dostępna programowo)
-export const LAYOUT_NAMES = ['tree', 'tree-h', 'radial', 'concentric', 'circle', 'spiral', 'grid', 'cluster', 'layered', 'flow',
-  'compact', 'balloon', 'mindmap', 'genealogy', 'pack', 'structtree', 'structradial', 'nebula', 'spiralgalaxy', 'cosmicrings',
-  'sunburst', 'treemap', 'icicle', 'solar', 'honeycomb', 'arcdiagram', 'dendrite', 'helix', 'constellation', 'vortex',
-  'galaxy', 'modules', 'force'];
+// wszystkie nazwy obsługiwane przez Layouts.apply = dokładnie układy z listy w UI (index.html #sel-layout);
+// 20 nieosiągalnych układów usunięto w fazie 8 — test niżej pilnuje, żeby martwe nie wracały
+export const LAYOUT_NAMES = ['pack', 'structtree', 'structradial', 'treemap', 'icicle', 'sunburst', 'force', 'layered', 'modules',
+  'arcdiagram', 'galaxy', 'nebula', 'cosmicrings'];
 const ANIMATED = new Set(['galaxy', 'modules', 'force']);
 
 function fresh() {
@@ -28,6 +30,16 @@ const bbox = (nodes) => {
 };
 
 describe('Layouts.apply', () => {
+  test('lista w UI = układy obsługiwane przez apply (bez martwych i bez brakujących)', () => {
+    const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
+    const sel = /<select[^>]*id="sel-layout"[^>]*>([\s\S]*?)<\/select>/.exec(html)[1];
+    const ui = [...sel.matchAll(/value="([a-z0-9-]+)"/g)].map((m) => m[1]).sort();
+    assert.deepEqual(ui, [...LAYOUT_NAMES].sort());
+    const src = readFileSync(join(ROOT, 'js/layouts.js'), 'utf8');
+    const cases = [...src.matchAll(/case '([a-z0-9-]+)':/g)].map((m) => m[1]).sort();
+    assert.deepEqual(cases, [...LAYOUT_NAMES].sort());
+  });
+
   for (const name of LAYOUT_NAMES) {
     test(`${name}: każdy węzeł dostaje skończone współrzędne`, () => {
       const { g, vis } = fresh();
