@@ -10,7 +10,7 @@ CM.UI = (function(){
     'void int long short float double char bool boolean string byte unsigned signed auto var let '+
     'null nil none None undefined true false True False and or not lambda pass with elif except raise '+
     'extends implements impl trait where match when then begin end echo print').split(' '));
-  function hlEsc(s){ return s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function hlEsc(s){ return U.escapeText(s); }   // bez cudzysłowów — kolorowanie szuka ich w wyniku
   function highlight(code, lang){
     lang=((lang||'')+'').toLowerCase();
     const hash=/(py|python|rb|ruby|sh|bash|zsh|fish|yaml|yml|toml|ini|conf|cfg|r|pl|perl|makefile|dockerfile|coffee|nim|elixir|ex)/.test(lang);
@@ -605,7 +605,7 @@ CM.UI = (function(){
   }
   function stat(cls,val,lbl){ return el('div',{class:'diff-stat '+cls}, el('div',{class:'ds-val',text:val}), el('div',{class:'ds-lbl',text:lbl})); }
   function signed(n,bytes){ const s=n>0?'+':''; return s+(bytes?U.fmtBytes(Math.abs(n)).replace(/^/,n<0?'-':''):U.fmtNum(n)); }
-  function esc(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function esc(s){ return U.escapeHtml(s); }
 
   // hotspots: files ranked by impact = lines × (1 + fan-in) × (1 + complexity)
   function hotspotScore(n){

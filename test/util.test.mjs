@@ -39,3 +39,14 @@ describe('util', () => {
     assert.equal(typeof U.throttle(() => {}, 10), 'function');
   });
 });
+
+describe('escapowanie HTML (jedno źródło)', () => {
+  test('escapeHtml: & < > " \' — bezpieczne w tekście i atrybutach; null → pusty napis', () => {
+    assert.equal(CM.util.escapeHtml(`<a href="x" title='y'>&</a>`), '&lt;a href=&quot;x&quot; title=&#39;y&#39;&gt;&amp;&lt;/a&gt;');
+    assert.equal(CM.util.escapeHtml(null), '');
+    assert.equal(CM.util.escapeHtml(42), '42');
+  });
+  test('escapeText: tylko & < > (cudzysłowy zostają dla kolorowania składni)', () => {
+    assert.equal(CM.util.escapeText('if (a < b && s === "x") {}'), 'if (a &lt; b &amp;&amp; s === "x") {}');
+  });
+});

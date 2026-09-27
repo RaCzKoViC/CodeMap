@@ -197,6 +197,12 @@ CM.util = (function(){
     return arr;
   }
 
-  return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,
+  // Escapowanie do HTML (jedno źródło zamiast kopii w modułach): escapeHtml — tekst i wartości atrybutów (& < > " '),
+  // escapeText — sam tekst (& < >), gdy dalsze przetwarzanie (kolorowanie składni) szuka w wyniku cudzysłowów
+  const HTML_ESC={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
+  function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>HTML_ESC[c]); }
+  function escapeText(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>HTML_ESC[c]); }
+
+  return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,escapeHtml,escapeText,
           clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera,mistralKeySlots};
 })();

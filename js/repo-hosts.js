@@ -105,7 +105,7 @@
       <a class="ac-open tb-btn primary" href="${escapeHtml(prof)}" target="_blank" rel="noopener">${CM.icons.svg('globe',{size:14})} ${I.t('ca.acOpenProfile','Otwórz pełny profil')}${hostLabel?(I.t('ca.acOnHost',' na ')+hostLabel):''}</a>`;
     card.querySelector('.ac-close').onclick=closeAuthorCard;
   }
-  function escapeHtml(s){ return String(s).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+  function escapeHtml(s){ return U.escapeHtml(s); }
   // only allow http(s) URLs into href/src (blocks javascript:/data: and any attribute-breakout)
   function safeUrl(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u) ? u : ''; }
   async function openAuthorCard(owner){

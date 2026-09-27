@@ -729,7 +729,7 @@ CM.Drive = (function(){
   function _pvEsc(e){ if(e.key==='Escape') closePreview(); }
   function closePreview(){ const pv=document.getElementById('drv-preview'); if(pv) pv.remove(); if(_pvUrl){ URL.revokeObjectURL(_pvUrl); _pvUrl=null; } window.removeEventListener('keydown', _pvEsc); }
 
-  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function esc(s){ return U.escapeHtml(s); }
   function escTxt(s){ return esc(s); }
 
   /* ---------------- photo gallery: thumbnails, heart, fullscreen viewer ---------------- */

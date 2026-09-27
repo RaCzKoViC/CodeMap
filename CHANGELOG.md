@@ -5,6 +5,10 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Zmienione — Faza 8 (jakość własna)
+- Escapowanie HTML z jednego miejsca: `U.escapeHtml` (tekst i atrybuty) i `U.escapeText` (sam tekst, dla kolorowania
+  składni) zamiast 8 lokalnych kopii w `ui.js`, `chatbot.js`, `drive.js`, `repo-hosts.js`, `mindmap.js`, `renderer.js`.
+
 ### Bezpieczeństwo — Faza 8
 - **CSP egzekwowane** z `<meta>` w `index.html` (GitHub Pages nie ustawia nagłówków): skrypty tylko z tej strony
   i z esm.run / jsDelivr, bez inline / `on…=` / `eval`, `wasm-unsafe-eval` dla WASM, `object-src 'none'`,

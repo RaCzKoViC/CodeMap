@@ -452,7 +452,7 @@ CM.ChatBot = (function(){
   function stripActions(text){ return String(text).replace(/```action\s*[\s\S]*?```/g,'').replace(/\n{3,}/g,'\n\n').trim(); }
 
   /* ---------------- safe light markdown ---------------- */
-  function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function esc(s){ return U.escapeHtml(s); }
   // languages the built-in runtime (CM.Runner) can execute in its sandboxed preview window
   const RUNNABLE=/^(html|htm|css|js|javascript|svg|json|md|markdown|php)$/i;
   function sniffLang(code){

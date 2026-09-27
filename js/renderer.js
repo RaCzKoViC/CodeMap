@@ -658,7 +658,7 @@ CM.Renderer = (function(){
       const W=Math.ceil(b.bw+pad*2), H=Math.ceil(b.bh+pad*2);
       const vx=b.minX-pad, vy=b.minY-pad;
       const bg=getCss('--bg')||'#0a0e14';
-      const esc=(s)=>String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+      const esc=U.escapeHtml;
       const out=[];
       out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${vx} ${vy} ${W} ${H}" font-family="Inter, sans-serif">`);
       out.push(`<rect x="${vx}" y="${vy}" width="${W}" height="${H}" fill="${bg}"/>`);

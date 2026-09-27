@@ -416,7 +416,7 @@ CM.MindMap = (function(){
   }
 
   // ---------- code template: auto-detected, syntax-highlighted, line-numbered, copyable code block ----------
-  function escCode(s){ return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function escCode(s){ return U.escapeText(s); }
   // lightweight language guess from the code itself (only structure-based heuristics)
   function detectCodeLang(code){
     const c=code||''; if(!c.trim()) return '';
@@ -1381,7 +1381,7 @@ CM.MindMap = (function(){
     if(db){ minX=Math.min(minX,db.minX); minY=Math.min(minY,db.minY); maxX=Math.max(maxX,db.maxX); maxY=Math.max(maxY,db.maxY); }
     if(minX>maxX){ minX=0;minY=0;maxX=300;maxY=200; }
     const W=Math.ceil(maxX-minX+pad*2), Ht=Math.ceil(maxY-minY+pad*2), vx=minX-pad, vy=minY-pad;
-    const esc=(s)=>String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    const esc=U.escapeHtml;
     const curved=state.line==='curved';
     const ept=(a,dir)=>{ const h=H(a),cx=a.x+a.w/2,cy=a.y+h/2; if(dir==='r')return{x:a.x+a.w,y:cy}; if(dir==='l')return{x:a.x,y:cy}; if(dir==='t')return{x:cx,y:a.y}; if(dir==='b')return{x:cx,y:a.y+h}; return{x:cx,y:cy}; };
     let edges='';
