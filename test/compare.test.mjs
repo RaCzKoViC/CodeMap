@@ -22,7 +22,12 @@ function load({ files = FILES_A, empty = false } = {}) {
     renderer: { setGroups: (g) => log.push(['groups', g.length]), setData() {}, setCycles: (e) => log.push(['cycles', e ? (e.size ?? e.length) : null]), fit() {} },
     countsInit: () => { A.state.counts.nodes = A.graph.nodes.size; }, apply: (o) => log.push(['apply', o]), updateStatus() {},
     loadFromJSON: (obj) => log.push(['loadFromJSON', obj.format]), openModal: (id) => log.push(['open', id]), closeModal() {},
-    showLoading: (s) => log.push(['loading', s]), hideLoading: () => log.push(['hide']), setProgress() {}, setLoadingText() {}, tick: async () => {} };
+    showLoading: (s) => log.push(['loading', s]), hideLoading: () => log.push(['hide']), setProgress() {}, setLoadingText() {}, tick: async () => {},
+    // pomocniki wczytywania z app-core.js (A.isMapFile / noFiles / loadError / needProject), których używa compare.js
+    isMapFile: (obj) => { if (obj && obj.format === 'codemap') return true; toasts.push(['To nie jest plik mapy CodeMap.', 'error']); return false; },
+    noFiles: (files) => { if (files && files.length) return false; toasts.push(['Nie znaleziono pasujących plików.', 'error']); A.hideLoading(); return true; },
+    loadError: (e) => { toasts.push(['Błąd wczytywania: ' + e.message, 'error']); },
+    needProject: () => { if (A.state.counts.nodes !== 0) return true; toasts.push(['Najpierw wczytaj projekt.', 'error']); return false; } };
   const UI = { renderDiff: (d, a, b) => log.push(['diff', d.added.length, d.removed.length, a.label, b.label]) };
   const CM = loadCM([...CORE, 'compare'], { CM: { App: A, UI, Loaders: {}, Storage: {} }, setTimeout: setTimeoutUnref, requestAnimationFrame: () => 0 });
   CM.util.toast = (m, k) => toasts.push([String(m), k || '']);

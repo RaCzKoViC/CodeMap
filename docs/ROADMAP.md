@@ -154,7 +154,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   ✅ puste `catch`: 229 miejsc → 0 (obsługa, wspólne pomocniki `CM.util.lsSet/lsDel/lsJSON` albo uzasadnienie; reguła
   liczy już tylko kod, bez napisów i komentarzy); ✅ duplikaty: prawdziwe bloki wyciągnięte do wspólnych funkcji
   (mindmap, ustawienia/Sejf, renderer, git/testy/PR, app-core/compare, serwer, smoke VS Code ↔ cdp), reguła liczy
-  ciągłe bloki ≥ 50 tokenów (78 → 24 par); zdrowie 45 → 56. W toku: testy nieprzetestowanych modułów (agent).
+  ciągłe bloki ≥ 50 tokenów (78 → 24 par); ✅ testy 35 nieprzetestowanych modułów (755 testów, serwer 43; pliki kodu z
+  testami 38 % → 63 %, dwa błędy znalezione i naprawione).
 
 ## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27 (poza wykresem trendu w aplikacji)
 

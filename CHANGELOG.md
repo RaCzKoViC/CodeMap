@@ -70,6 +70,20 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Cykle bez dokumentacji**: linki README.md ↔ README.pl.md to nawigacja, nie cykl zależności (także `noCycles`).
 - Wynik zdrowia CodeMap: 45 → 53 bez zmian w kodzie aplikacji (same poprawki reguł; `test/inspect.test.mjs`).
 
+### Dodane — testy (faza 9)
+- **Testy dla 35 wcześniej nieprzetestowanych modułów** (755 testów w repozytorium, 43 na serwerze): wczytywanie archiwów
+  ZIP / TAR / GZ i PDF zbudowanych w teście, hosty repozytoriów, deep-linki, porównanie schematów, nakładki, magazyn,
+  synchronizacja offline (409 / 507), logowanie, i18n, języki, fizyka, symbole na atrapie drzewa składni, runner, mapa
+  myśli, ChatBot (escapowanie HTML), dostawcy AI / Ollama / WebLLM na podstawionym fetch, tryb na żywo, nawigacja; CLI
+  (odmiana liczebników, SARIF, raport, fsload, gitdir, przegląd PR na tymczasowym repozytorium); serwer (konto, blokada
+  logowania, reset, sync, Sejf, bloby). Wspólny `test/minidom.mjs` dla testów UI. Pliki kodu z testami: 38 % → 63 %.
+
+### Poprawione — błędy znalezione testami
+- **Pliki bez rozszerzenia** (`LICENSE`, `README`, `CHANGELOG`, `AUTHORS`…) były rozpoznawane jako dokumenty Word i ich
+  treść nie była czytana — teraz to zwykły tekst; `go.mod` to konfiguracja (nie Modula), `go.sum` — plik blokady.
+- **Serwer**: domyślny limit Fastify 100 znaków na parametr URL odrzucał (414) pliki Sejfu o nazwach dłuższych niż 100
+  znaków, zanim trasa sprawdziła własny limit 255 — synchronizacja albumu z takim plikiem się nie udawała; limit 300.
+
 ### Zmienione — dług z własnej analizy (faza 9)
 - **Puste `catch`: 229 miejsc → 0** — ok. 40 dostało prawdziwą obsługę (`console.warn('[CodeMap] …')` albo istniejący
   komunikat: odzyskiwanie transakcji i usuwanie plików w Sejfie, synchronizacja, czyszczenie danych, autozapis sesji,
