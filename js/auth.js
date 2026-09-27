@@ -240,6 +240,9 @@ CM.Auth = (function(){
       c.appendChild(srow);
     }
 
+    // publiczne linki do map (links.js): lista z „Kopiuj link" i „Unieważnij"
+    if(CM.Links && CM.Links.renderAccountSection){ try{ CM.Links.renderAccountSection(c); }catch(e){} }
+
     // zmiana hasła
     c.appendChild(el('div',{class:'set-label',text:t('acct.changePass')}));
     const cp=el('div',{class:'auth-box compact'});

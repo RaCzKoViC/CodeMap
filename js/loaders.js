@@ -394,6 +394,7 @@ CM.Loaders = (function(){
     opts=opts||{};
     const src=parseSource(url);
     if(!src) throw new Error(CM.i18n.t('cl.ghBadUrl','Nie rozpoznano adresu. Użyj np. https://github.com/owner/repo lub owner/repo'));
+    if(!src.sub && opts.sub) src.sub=normSub(opts.sub);   // podkatalog z deep-linku (gałąź ze znakiem „/" nie mieści się w /tree/…)
     const headers={'Accept':'application/vnd.github+json'};
     if(opts.token) headers['Authorization']='Bearer '+opts.token;
     const api='https://api.github.com';
@@ -453,12 +454,16 @@ CM.Loaders = (function(){
             kind:'github', host:'github', repo:`${src.owner}/${src.repo}`, branch, sub:src.sub, html, repoInfo, owner, createdAt:Date.now()}};
   }
 
+  // podkatalog repozytorium (opts.sub): bez ukośników na brzegach; walidację znaków robi wywołujący (deeplink.js)
+  function normSub(s){ return String(s||'').replace(/^\/+|\/+$/g,''); }
+
   // ---------- GitLab (API v4, CORS-enabled) ----------
   async function fromGitLab(url, opts, onProgress, onStatus){
     opts=opts||{};
     let m=url.match(/gitlab\.com\/([^?#]+)/i);
     let path=(m?m[1]:url).replace(/\.git$/,'').replace(/\/-\/.*$/,'').replace(/^\/|\/$/g,'');
     if(!path) throw new Error(CM.i18n.t('cl.glBadUrl','Nie rozpoznano adresu GitLab.'));
+    const sub=normSub(opts.sub), pre=sub?sub+'/':'';   // podkatalog: drzewo z ?path=, ścieżki względem niego
     const enc=encodeURIComponent(path), api='https://gitlab.com/api/v4';
     const headers={}; if(opts.token) headers['PRIVATE-TOKEN']=opts.token;
     const gl=async(u)=>{ const r=await netFetch(u,{headers}); if(r.status===404) throw new Error(CM.i18n.t('cl.glNotFound','GitLab: nie znaleziono projektu (404).')); if(!r.ok) throw new Error('GitLab API: HTTP '+r.status); return r.json(); };
@@ -469,20 +474,20 @@ CM.Loaders = (function(){
     const owner={login:ns.path||path.split('/')[0], avatar:proj.avatar_url||ns.avatar_url||null, url:ns.web_url||('https://gitlab.com/'+(ns.path||path.split('/')[0])), host:'gitlab'};
     if(onStatus) onStatus(CM.i18n.t('cl.stFileTree','Pobieranie drzewa plików…'));
     let blobs=[], page=1;
-    while(page<=50){ const r=await fetch(`${api}/projects/${id}/repository/tree?recursive=true&ref=${encodeURIComponent(branch)}&per_page=100&page=${page}`,{headers}); if(!r.ok) break; const arr=await r.json(); if(!Array.isArray(arr)||!arr.length) break;
-      for(const t of arr) if(t.type==='blob' && !shouldSkip(t.path)) blobs.push(t.path);
+    while(page<=50){ const r=await fetch(`${api}/projects/${id}/repository/tree?recursive=true&ref=${encodeURIComponent(branch)}${sub?'&path='+encodeURIComponent(sub):''}&per_page=100&page=${page}`,{headers}); if(!r.ok) break; const arr=await r.json(); if(!Array.isArray(arr)||!arr.length) break;
+      for(const t of arr) if(t.type==='blob' && t.path.startsWith(pre) && !shouldSkip(t.path.slice(pre.length))) blobs.push(t.path.slice(pre.length));
       if(arr.length<100) break; page++; if(onStatus) onStatus(CM.i18n.t('cl.stTreeProgressA','Pobieranie drzewa… ')+blobs.length+CM.i18n.t('cl.stFilesSuffix',' plików')); }
     const files=blobs.map(p=>({path:p, size:0, content:null, mtime:null}));
     if(opts.fetchContent){
       const tf=files.filter(f=>isTextFile(f.path.split('/').pop(),0)).slice(0,MAX_CONTENT_FILES);
       if(onStatus) onStatus(CM.i18n.t('cl.stFetchContentA','Pobieranie zawartości ')+tf.length+CM.i18n.t('cl.stFetchContentB',' plików…')); let done=0;
-      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/projects/${id}/repository/files/${encodeURIComponent(f.path)}/raw?ref=${encodeURIComponent(branch)}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){} done++; if(onProgress) onProgress(done,tf.length); }, 12);
+      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/projects/${id}/repository/files/${encodeURIComponent(pre+f.path)}/raw?ref=${encodeURIComponent(branch)}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){} done++; if(onProgress) onProgress(done,tf.length); }, 12);
     }
     const glHtml=proj.web_url||('https://gitlab.com/'+path);
     const glInfo={desc:proj.description||'', stars:proj.star_count, forks:proj.forks_count, issues:proj.open_issues_count,
       lang:'', license:(proj.license&&(proj.license.nickname||proj.license.name))||'', url:glHtml,
       defaultBranch:proj.default_branch||branch, pushedAt:proj.last_activity_at||null, topics:proj.topics||proj.tag_list||[]};
-    return {files, meta:{name:path.split('/').pop(), source:`gitlab: ${path}@${branch}`, kind:'gitlab', host:'gitlab', repo:path, branch, html:glHtml, repoInfo:glInfo, owner, createdAt:Date.now()}};
+    return {files, meta:{name:path.split('/').pop()+(sub?'/'+sub:''), source:`gitlab: ${path}@${branch}${sub?'/'+sub:''}`, kind:'gitlab', host:'gitlab', repo:path, branch, sub, html:glHtml, repoInfo:glInfo, owner, createdAt:Date.now()}};
   }
 
   // ---------- Bitbucket (API 2.0, CORS-enabled; recursive src walk) ----------
@@ -491,21 +496,22 @@ CM.Loaders = (function(){
     const m=url.match(/bitbucket\.org\/([^/]+)\/([^/?#]+)/i);
     if(!m) throw new Error(CM.i18n.t('cl.bbBadUrl','Nie rozpoznano adresu Bitbucket (oczekiwano bitbucket.org/workspace/repo).'));
     const ws=m[1], repo=m[2].replace(/\.git$/,''), api='https://api.bitbucket.org/2.0';
+    const sub=normSub(opts.sub), pre=sub?sub+'/':'';   // podkatalog: przegląd drzewa zaczyna się od niego
     const headers={}; if(opts.token) headers['Authorization']='Bearer '+opts.token;
     const bb=async(u)=>{ const r=await netFetch(u,{headers}); if(r.status===404) throw new Error(CM.i18n.t('cl.bbNotFound','Bitbucket: nie znaleziono repozytorium (404).')); if(!r.ok) throw new Error('Bitbucket API: HTTP '+r.status); return r.json(); };
     if(onStatus) onStatus(CM.i18n.t('cl.stRepoInfo','Pobieranie informacji o repozytorium…'));
     const info=await bb(`${api}/repositories/${ws}/${repo}`);
     const branch=opts.branch||(info.mainbranch&&info.mainbranch.name)||'main';
     if(onStatus) onStatus(CM.i18n.t('cl.stFileStructure','Pobieranie struktury plików…'));
-    const files=[]; const queue=['']; let guard=0;
+    const files=[]; const queue=[pre]; let guard=0;
     while(queue.length && guard++<3000){
       const dir=queue.shift();
       let next=`${api}/repositories/${ws}/${repo}/src/${encodeURIComponent(branch)}/${dir}?pagelen=100`;
       let pg=0;
       while(next && pg++<40){ const r=await fetch(next,{headers}); if(!r.ok) break; const j=await r.json();
-        for(const e of (j.values||[])){ if(shouldSkip(e.path)) continue;
+        for(const e of (j.values||[])){ if(!e.path || !e.path.startsWith(pre)) continue; const rel=e.path.slice(pre.length); if(shouldSkip(rel)) continue;
           if(e.type==='commit_directory') queue.push(e.path+'/');
-          else if(e.type==='commit_file') files.push({path:e.path, size:e.size||0, content:null, mtime:null}); }
+          else if(e.type==='commit_file') files.push({path:rel, size:e.size||0, content:null, mtime:null}); }
         next=j.next||null; }
       if(onStatus) onStatus(CM.i18n.t('cl.stStructureProgressA','Pobieranie struktury… ')+files.length+CM.i18n.t('cl.stFilesSuffix',' plików'));
       if(files.length>MAX_CONTENT_FILES*2) break;
@@ -513,13 +519,13 @@ CM.Loaders = (function(){
     if(opts.fetchContent){
       const tf=files.filter(f=>isTextFile(f.path.split('/').pop(),0)).slice(0,MAX_CONTENT_FILES);
       if(onStatus) onStatus(CM.i18n.t('cl.stFetchContentA','Pobieranie zawartości ')+tf.length+CM.i18n.t('cl.stFetchContentB',' plików…')); let done=0;
-      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/repositories/${ws}/${repo}/src/${encodeURIComponent(branch)}/${f.path}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){} done++; if(onProgress) onProgress(done,tf.length); }, 10);
+      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/repositories/${ws}/${repo}/src/${encodeURIComponent(branch)}/${pre+f.path}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){} done++; if(onProgress) onProgress(done,tf.length); }, 10);
     }
     const owner={login:ws, avatar:(info.links&&info.links.avatar&&info.links.avatar.href)||null, url:`https://bitbucket.org/${ws}`, host:'bitbucket'};
     const bbHtml=(info.links&&info.links.html&&info.links.html.href)||`https://bitbucket.org/${ws}/${repo}`;
     const bbInfo={desc:info.description||'', stars:null, forks:null, issues:null, lang:info.language||'', license:'',
       url:bbHtml, defaultBranch:(info.mainbranch&&info.mainbranch.name)||branch, pushedAt:info.updated_on||null, topics:[]};
-    return {files, meta:{name:repo, source:`bitbucket: ${ws}/${repo}@${branch}`, kind:'bitbucket', host:'bitbucket', repo:`${ws}/${repo}`, branch, html:bbHtml, repoInfo:bbInfo, owner, createdAt:Date.now()}};
+    return {files, meta:{name:repo+(sub?'/'+sub:''), source:`bitbucket: ${ws}/${repo}@${branch}${sub?'/'+sub:''}`, kind:'bitbucket', host:'bitbucket', repo:`${ws}/${repo}`, branch, sub, html:bbHtml, repoInfo:bbInfo, owner, createdAt:Date.now()}};
   }
 
   // ---------- dispatcher: detect host from URL ----------
