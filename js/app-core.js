@@ -352,6 +352,7 @@
   // Shared by ingest / loadFromJSON / clearAll.
   function resetProjectState(){
     if(CM.Symbols) CM.Symbols.cancel();   // analiza symboli poprzedniego projektu — porzuć
+    if(CM.RAG) CM.RAG.reset();            // indeks fragmentów kodu (RAG) poprzedniego projektu
     if(state.sim){ if(state.sim._worker) state.sim.stop(); else state.sim.running=false; }
     state.sim=null;
     state.groups=[]; state.gidSeq=0; A.renderer.setGroups([]);

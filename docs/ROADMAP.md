@@ -76,10 +76,12 @@ Publikacja:
 - [x] Dodatkowo: czytnik lokalnego `.git` w przeglądarce (`js/git-local.js`, sonda zgodności z `git log`),
   kolorowanie węzłów wg danych (`js/overlays.js`), reguły Inspect „hotspoty zmian" i „wiedza w jednej głowie".
 
-## Faza 4 — ekosystem
+## Faza 4 — ekosystem — W TOKU 2026-09-27
 
 - Tryb headless/CLI + GitHub Action (fail na cyklach lub progu health score, raport SARIF).
-- RAG po grafie dla lokalnych modeli (Ollama `/api/embeddings`): odpowiedzi ugruntowane w kodzie, polityka „tylko lokalny dostawca" już istnieje.
+- [x] RAG dla lokalnych modeli (`js/rag.js`): fragmenty wg symboli, BM25 + embeddingi Ollamy (`/api/embed`),
+  indeks w IndexedDB z przeliczaniem zmienionych fragmentów, tryb 📚 w ChatBocie z cytatami i źródłami,
+  tylko dostawcy lokalni; `/codeSearch`.
 - Deep-linki `#repo=owner/name`, `#gist=id`; publiczne linki do map przez backend.
 - Rozszerzenie VS Code / integracja z LSP jako opcja.
 

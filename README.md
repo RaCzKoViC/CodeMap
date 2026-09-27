@@ -121,8 +121,15 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   szybką odpowiedź bez rozumowania.
   Modele lokalne (WebLLM, Ollama) odpowiadają w **trybie strukturalnym**: JSON `{reply, actions}` wymuszony
   schematem, więc nawet małe modele niezawodnie wykonują polecenia.
+- **Pytania o kod (RAG, tryb 📚)** — przełącznik w nagłówku czatu: ChatBot odpowiada na podstawie
+  fragmentów kodu wczytanego projektu i cytuje je jako `[1]`, `[2]` (klik = plik otwarty na tych liniach).
+  Wyszukiwanie słów działa od razu (identyfikatory rozbijane, pytania po polsku rozszerzane o angielskie
+  pojęcia); model embeddingów w Ollamie (`bge-m3`, `nomic-embed-text`) dodaje wyszukiwanie semantyczne —
+  indeks budowany w Ustawieniach → AI, wektory zapisane w przeglądarce i przeliczane tylko dla zmienionych
+  fragmentów. Narzędzie `/codeSearch` pokazuje trafienia bez modelu.
 - **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
-- Do modeli trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików.
+- Do modeli w chmurze trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików; fragmenty
+  kodu (tryb 📚, podgląd załączników) dostają tylko modele **lokalne** — WebLLM i Ollama.
 
 ### MindMap
 Drugi tryb pracy: 16 szablonów kart, **34 typy diagramów**, warstwa rysowania z 9 narzędziami
@@ -166,7 +173,7 @@ na Twoje wyraźne żądanie:
 | WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
 | Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
 | Symbole (tree-sitter) — po włączeniu | cdn.jsdelivr.net | pobranie parsera web-tree-sitter i gramatyk WASM; parsowanie lokalnie w Web Workerze |
-| Ollama | 127.0.0.1:11434 | lokalnie |
+| Ollama | 127.0.0.1:11434 | lokalnie — także fragmenty kodu w trybie 📚 i ich embeddingi (RAG) |
 | konto (opcjonalne) | Twój własny serwer | mapy, migawki, ustawienia; Sejf **tylko jako szyfrogram** |
 
 Klucze API są przechowywane w `localStorage` przeglądarki i nigdy nie są synchronizowane z serwerem.
@@ -195,6 +202,7 @@ js/metrics.js              # sprzężenia Ca/Ce/I per plik i folder, duplikaty k
 js/rules.js                # reguły architektury z .codemap.rules.json (warstwy, forbid, noCycles)
 js/git-core.js             # historia git bez DOM: autorzy, własność, bus factor, hotspoty, oś czasu
 js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, delty, packed-refs) w Web Workerze
+js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi Ollamy (IndexedDB), kontekst z cytatami
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
 js/overlays.js             # kolorowanie węzłów wg danych (język, złożoność, git, pokrycie) + legenda

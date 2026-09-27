@@ -42,6 +42,9 @@ CM.Settings = (function(){
     'ai.localUnload':'Zwolnij z pamięci (RAM/VRAM)','ai.localDelete':'Usuń pobrane wagi z dysku','ai.localDeleted':'Usunięto pobrane modele: ','ai.localCached':'Pobrane dane modeli w przeglądarce: ',
     'ai.localCancel':'Anuluj pobieranie / ładowanie',
     'ai.localAll':'Wszystkie modele silnika WebLLM','ai.localAllHint':'Pełna lista modeli czatu wbudowana w używaną wersję WebLLM (VRAM w MB). Wybór dopisuje model do listy powyżej.','ai.localAllShow':'Pokaż wszystkie modele','ai.localAllPick':'— wybierz model —',
+    'ai.rag':'Indeks kodu (RAG) — tryb „📚 kod" w ChatBocie','ai.ragDesc':'ChatBot w trybie 📚 odpowiada na podstawie fragmentów kodu wczytanego projektu. Wyszukiwanie słów działa zawsze; model embeddingów w Ollamie (np. bge-m3 — dobry po polsku, albo nomic-embed-text) dodaje wyszukiwanie semantyczne. Wektory liczy Ollama na Twoim komputerze i zapisują się w przeglądarce — przy kolejnym wczytaniu liczone są tylko zmienione fragmenty.',
+    'ai.ragModel':'Model embeddingów','ai.ragNoModel':'Brak modelu embeddingów w Ollamie — pobierz bge-m3 albo nomic-embed-text (propozycje wyżej).','ai.ragBuild':'Zbuduj / odśwież indeks semantyczny','ai.ragCancel':'Anuluj','ai.ragClear':'Usuń wektory',
+    'ai.ragStat':'Fragmenty: {c} z {f} plików · indeks semantyczny: {v}','ai.ragNoProject':'Wczytaj projekt z treścią plików, aby zbudować indeks.','ai.ragYes':'gotowy ({m}, {d} wym.)','ai.ragNo':'brak (tylko wyszukiwanie słów)','ai.ragDone':'Indeks semantyczny gotowy: ',
     'ai.ollamaPull':'Pobierz model do Ollamy','ai.ollamaPullHint':'Nazwa jak w bibliotece ollama.com (np. qwen2.5:3b). Pobieranie odbywa się w Ollamie, postęp poniżej.','ai.ollamaPullBtn':'Pobierz','ai.ollamaPullDone':'Pobrano: ','ai.ollamaPullCancel':'Anuluj','ai.ollamaSuggest':'Propozycje: ',
     'ai.localList':'Pobrane modele (zarządzanie)','ai.localNone':'Nie pobrano jeszcze żadnego modelu.','ai.localRun':'Uruchom (pobrany — bez ponownego pobierania)',
     'ai.localLoaded':'załadowany','ai.localDelOne':'Usuń','ai.localDelConfirm':'Usunąć pobrane wagi modelu „{n}” z dysku przeglądarki?',
@@ -149,6 +152,9 @@ CM.Settings = (function(){
     'ai.localUnload':'Release from memory (RAM/VRAM)','ai.localDelete':'Delete downloaded weights from disk','ai.localDeleted':'Deleted model downloads: ','ai.localCached':'Model data downloaded in this browser: ',
     'ai.localCancel':'Cancel download / load',
     'ai.localAll':'All WebLLM engine models','ai.localAllHint':'The full chat-model list built into the WebLLM version in use (VRAM in MB). Picking one adds it to the list above.','ai.localAllShow':'Show all models','ai.localAllPick':'— pick a model —',
+    'ai.rag':'Code index (RAG) — "📚 code" mode in ChatBot','ai.ragDesc':'In 📚 mode ChatBot answers from code snippets of the loaded project. Keyword search always works; an embedding model in Ollama (e.g. bge-m3 — multilingual, or nomic-embed-text) adds semantic search. Vectors are computed by Ollama on your machine and stored in the browser — on the next load only changed snippets are recomputed.',
+    'ai.ragModel':'Embedding model','ai.ragNoModel':'No embedding model in Ollama — pull bge-m3 or nomic-embed-text (suggestions above).','ai.ragBuild':'Build / refresh the semantic index','ai.ragCancel':'Cancel','ai.ragClear':'Delete vectors',
+    'ai.ragStat':'Snippets: {c} from {f} files · semantic index: {v}','ai.ragNoProject':'Load a project with file contents to build the index.','ai.ragYes':'ready ({m}, {d} dims)','ai.ragNo':'none (keyword search only)','ai.ragDone':'Semantic index ready: ',
     'ai.ollamaPull':'Pull a model into Ollama','ai.ollamaPullHint':'Name as in the ollama.com library (e.g. qwen2.5:3b). The download runs inside Ollama; progress below.','ai.ollamaPullBtn':'Pull','ai.ollamaPullDone':'Pulled: ','ai.ollamaPullCancel':'Cancel','ai.ollamaSuggest':'Suggestions: ',
     'ai.localList':'Downloaded models (manage)','ai.localNone':'No models downloaded yet.','ai.localRun':'Start (downloaded — no re-download)',
     'ai.localLoaded':'loaded','ai.localDelOne':'Delete','ai.localDelConfirm':'Delete the downloaded weights of "{n}" from this browser?',
@@ -535,9 +541,45 @@ CM.Settings = (function(){
             stat.textContent=t('ai.ollamaOnline')+list.length; stat.className='set-localai-stat ok';
           }catch(e){ mSel.innerHTML=''; stat.textContent=(e&&e.message)||String(e); stat.className='set-localai-stat err'; }
           if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh();
-          renderPull();
+          renderPull(); renderRag();
         };
         mSel.onchange=()=>{ CM.Ollama.setModel(mSel.value); if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh(); };
+        // ---- indeks kodu (RAG): model embeddingów + budowanie wektorów ----
+        const ragBox=el('div',{class:'set-localai-pull set-rag'}); ollamaBox.appendChild(ragBox);
+        const renderRag=async()=>{
+          if(!CM.RAG) return; ragBox.innerHTML='';
+          ragBox.appendChild(el('div',{class:'set-label set-mt',text:t('ai.rag')}));
+          ragBox.appendChild(el('p',{class:'set-desc',text:t('ai.ragDesc')}));
+          const eSel=el('select',{class:'set-ai-input'}), rstat=el('div',{class:'set-localai-stat'});
+          const rbar=el('div',{class:'set-localai-bar'}, el('div',{class:'set-localai-fill'})); rbar.style.display='none';
+          const brow=el('div',{class:'set-localai-row'});
+          const bBuild=el('button',{class:'tb-btn primary',html:ic.svg('refresh',{size:14})+' '+t('ai.ragBuild')});
+          const bClear=el('button',{class:'tb-btn',text:t('ai.ragClear')});
+          brow.appendChild(bBuild); brow.appendChild(bClear);
+          ragBox.appendChild(el('div',{class:'set-desc',text:t('ai.ragModel')})); ragBox.appendChild(eSel); ragBox.appendChild(brow); ragBox.appendChild(rbar); ragBox.appendChild(rstat);
+          const showStat=async()=>{
+            const g=window.CMApp&&CMApp.graph; if(!g||!g.nodes||g.nodes.size<2){ rstat.textContent=t('ai.ragNoProject'); return; }
+            await CM.RAG.ensure(g); const s=CM.RAG.stats();
+            rstat.textContent=t('ai.ragStat').replace('{c}',s.chunks).replace('{f}',s.files).replace('{v}', s.vectors?t('ai.ragYes').replace('{m}',s.model).replace('{d}',s.dim):t('ai.ragNo'));
+            rstat.className='set-localai-stat'+(s.vectors?' ok':'');
+          };
+          let models=[]; try{ models=await CM.RAG.embeddingModels(); }catch(e){}
+          eSel.innerHTML='';
+          if(!models.length){ eSel.appendChild(el('option',{value:'',text:'—'})); eSel.disabled=true; bBuild.disabled=true; rstat.textContent=t('ai.ragNoModel'); rstat.className='set-localai-stat err'; }
+          else { const cur=await CM.RAG.pickModel();
+            models.forEach(m=>{ const o=el('option',{value:m.name,text:m.name+(m.sizeGB?(' ('+m.sizeGB+' GB)'):'')}); if(m.name===cur) o.selected=true; eSel.appendChild(o); });
+            showStat(); }
+          eSel.onchange=()=>{ CM.RAG.setModelPref(eSel.value); showStat(); };
+          bBuild.onclick=async()=>{
+            if(CM.RAG.isBuilding()){ CM.RAG.cancelBuild(); return; }
+            bBuild.innerHTML=t('ai.ragCancel'); rbar.style.display='block'; rstat.className='set-localai-stat';
+            try{ const s=await CM.RAG.buildVectors({model:eSel.value, onProgress:(d,n)=>{ rstat.textContent=d+' / '+n; rbar.firstChild.style.width=Math.round(d/Math.max(1,n)*100)+'%'; }});
+              if(s){ rstat.textContent=t('ai.ragDone')+s.chunks+' · '+s.model; rstat.className='set-localai-stat ok'; } }
+            catch(e){ rstat.textContent=(e&&e.name==='AbortError')?'—':((e&&e.message)||String(e)); rstat.className='set-localai-stat err'; }
+            finally{ bBuild.innerHTML=ic.svg('refresh',{size:14})+' '+t('ai.ragBuild'); rbar.style.display='none'; }
+          };
+          bClear.onclick=async()=>{ await CM.RAG.clearVectors(); showStat(); };
+        };
         btn.onclick=()=>{ CM.Ollama.setBase(baseInp.value); fill(); };
         baseInp.onchange=()=>CM.Ollama.setBase(baseInp.value);
         fill();

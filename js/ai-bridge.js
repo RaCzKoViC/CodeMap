@@ -360,6 +360,14 @@
         const ids=CM.Overlays.list().map(o=>o.id);
         if(!m) throw new Error(I.t('cb.needMode','Podaj tryb kolorowania: ')+ids.join(', '));
         const lbl=CM.Overlays.set(m); return I.t('cb.execColorBy','Kolorowanie: ')+lbl; }
+      case 'codeSearch': { _needProject(); const q=String(args.query||'').trim(); if(!q) throw new Error(I.t('cb.needQuery','Podaj szukaną frazę.'));
+        if(!CM.RAG) throw new Error('RAG');
+        // asynchronicznie (indeks budowany przy pierwszym użyciu; z modelem embeddingów — wyszukiwanie hybrydowe)
+        return CM.RAG.search(q, {k:Math.max(1,Math.min(15,+args.k||8)), all:true}).then(r=>{
+          const ch=r.s?r.s.chunks:[]; if(!r.hits.length) return I.t('cb.findNone','Brak plików zawierających: ')+q;
+          if(A.renderer){ A.renderer.highlight=new Set(r.hits.map(h=>ch[h.i].id)); A.renderer.kick(); }
+          return (r.mode==='hybrid'?'📚 ':'🔎 ')+I.t('cb.codeSearch','Fragmenty kodu dla „')+q+'":\n'+r.hits.map((h,i)=>{ const c=ch[h.i];
+            return (i+1)+'. `'+c.path+':'+c.start+'-'+c.end+'`'+(c.sym?' — '+c.sym.slice(0,60):''); }).join('\n'); }); }
       case 'help': case 'listActions': return I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', ');
       default: if(EXT[action]) return EXT[action](args);
         throw new Error(I.t('cb.unknownAction','Nieznana akcja: ')+action+'. '+I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', '));
@@ -371,7 +379,7 @@
     'openSettings','openDrive','openHistory','openCompare','saveMap','snapshot','exportImage','exportGraph','copyLink','detectCycles',
     'hotspots','inspect','aiAnalyze','setTheme','setPreset','setAccent','setBackground','setGlass','setSpacing','setNodeScale','setFontScale',
     'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help',
-    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat','symbols','colorBy'];
+    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat','symbols','colorBy','codeSearch'];
   // akcje dopisywane przez moduły ładowane po ai-bridge (git.js, testmap.js…): wykonanie + wpis w ChatBocie
   //   A.registerAction({name, run(args)->tekst, sig, desc (EN, dla modelu), descPl, auto, info, required(args)->bool})
   const EXT={};

@@ -19,6 +19,7 @@ CM.Ollama = (function(){
   const offlineErr=()=>new Error(I.t('ol.offline','Ollama nie odpowiada pod ')+base()+I.t('ol.offlineHint',' — uruchom aplikację Ollama (lub `ollama serve`) i spróbuj ponownie.'));
 
   let _models=null;               // cache listy modeli (odświeżany przez models(true))
+  let _raw=null;                  // surowa lista /api/tags (także modele embeddingów — dla RAG)
   async function models(force){
     if(_models && !force) return _models;
     let r;
@@ -26,6 +27,7 @@ CM.Ollama = (function(){
     catch(e){ throw offlineErr(); }
     if(!r.ok) throw new Error('Ollama: HTTP '+r.status);
     const j=await r.json();
+    _raw=j.models||[];
     _models=(j.models||[])
       // embedding-only models (bge/nomic/bert…) cannot chat — never list them (no dead-end errors)
       .filter(m=>{ const fam=((m.details&&m.details.family)||'').toLowerCase();
@@ -37,6 +39,30 @@ CM.Ollama = (function(){
     return _models;
   }
   async function online(){ try{ await models(true); return true; }catch(e){ return false; } }
+
+  // ---- embeddingi (RAG w rag.js): modele embedujące z tej samej listy /api/tags ----
+  const isEmbedModel=(m)=>{ const fam=((m.details&&m.details.family)||'').toLowerCase(), n=String(m.name||'').toLowerCase();
+    return /bert|nomic/.test(fam) || /embed|bge-|minilm|e5-|gte-|arctic/.test(n); };
+  async function embeddingModels(force){
+    if(!_raw || force) await models(true);
+    return (_raw||[]).filter(isEmbedModel).map(m=>({name:m.name, sizeGB:m.size?(m.size/1073741824).toFixed(1):null})).sort((a,b)=>a.name.localeCompare(b.name));
+  }
+  // POST /api/embed {model, input:[…]} → [[…], …]; starsze Ollamy (bez /api/embed) — /api/embeddings po jednym tekście
+  let _legacyEmbed=false;
+  async function embed(texts, opts){
+    opts=opts||{}; const m=opts.model; if(!m) throw new Error('embed: model');
+    const post=(path, body)=>fetch(base()+path,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:opts.signal})
+      .catch(e=>{ if(e&&e.name==='AbortError') throw e; throw offlineErr(); });
+    if(!_legacyEmbed){
+      const r=await post('/api/embed', {model:m, input:texts, truncate:true});
+      if(r.ok){ const j=await r.json(); if(Array.isArray(j.embeddings) && j.embeddings.length===texts.length) return j.embeddings; }
+      else if(r.status!==404) throw new Error('Ollama embed: HTTP '+r.status+' '+((await r.text().catch(()=>'')).slice(0,160)));
+      _legacyEmbed=true;
+    }
+    const out=[];
+    for(const t of texts){ const r=await post('/api/embeddings', {model:m, prompt:t}); if(!r.ok) throw new Error('Ollama embeddings: HTTP '+r.status); out.push((await r.json()).embedding); }
+    return out;
+  }
   // rozmiar bieżącego modelu w GB z cache listy (null, gdy lista jeszcze nie pobrana)
   const modelSizeGB=(name)=>{ const m=(_models||[]).find(x=>x.name===(name||model())); return m&&m.sizeGB!=null?+m.sizeGB:null; };
 
@@ -130,10 +156,12 @@ CM.Ollama = (function(){
     {name:'qwen2.5-coder:7b', size:'4.7 GB', note:'do kodu'},
     {name:'llama3.1:8b', size:'4.9 GB', note:'uniwersalny, wywołania narzędzi'},
     {name:'mistral:7b', size:'4.1 GB', note:'Mistral 7B'},
+    {name:'bge-m3', size:'1.2 GB', note:'embeddingi do RAG („📚 kod"), wielojęzyczny'},
+    {name:'nomic-embed-text', size:'0.3 GB', note:'embeddingi do RAG, lekki (angielski)'},
     {name:'qwen3:8b', size:'5.2 GB', note:'myślący (szybka odpowiedź = bez myśli)'},
     {name:'deepseek-r1:8b', size:'4.9 GB', note:'myślący (pokazuje tok rozumowania)'},
     {name:'gemma3:4b', size:'3.3 GB', note:'Google, wielojęzyczny'},
     {name:'gpt-oss:20b', size:'13 GB', note:'OpenAI open-weight (myślący; 16 GB+ RAM)'},
   ];
-  return { base, setBase, model, setModel, models, online, chat, pull, modelSizeGB, SUGGESTED, DEF_BASE };
+  return { base, setBase, model, setModel, models, online, chat, pull, modelSizeGB, embeddingModels, embed, SUGGESTED, DEF_BASE };
 })();

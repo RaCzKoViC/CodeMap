@@ -5,7 +5,18 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
-Fazy 2 i 3 planu rozwoju — głębsza analiza i inteligencja git ([docs/ROADMAP.md](docs/ROADMAP.md)).
+Fazy 2–4 planu rozwoju — głębsza analiza, inteligencja git, ekosystem ([docs/ROADMAP.md](docs/ROADMAP.md)).
+
+### Dodane — Faza 4 (ekosystem)
+- **Pytania o kod — RAG dla modeli lokalnych** (`js/rag.js`, tryb 📚 w ChatBocie): pliki dzielone na fragmenty
+  wg granic symboli (scalanie krótkich, okno 60 linii dla długich), wyszukiwanie BM25 zawsze (rozbijanie
+  identyfikatorów camelCase/snake_case, polskie pojęcia rozszerzane o angielskie odpowiedniki) + semantyczne
+  z embeddingami Ollamy (`/api/embed`, `bge-m3`, `nomic-embed-text` z właściwymi prefiksami), ranking
+  hybrydowy, max 2 fragmenty z pliku, odcięcie słabych trafień. Wektory w IndexedDB per projekt i model,
+  przeliczane tylko dla zmienionych fragmentów (CodeMap: 596 fragmentów ≈ 46 s pierwszy raz, ≈ 6 s po zmianie
+  3 plików). Odpowiedź tekstowa z cytatami `[n]` i listą źródeł — klik otwiera plik przewinięty do linii.
+  Tylko WebLLM / Ollama; dla modeli w chmurze tryb 📚 odmawia (treść kodu nie opuszcza komputera).
+  Ustawienia → AI: wybór modelu embeddingów, budowanie / usuwanie indeksu; `/codeSearch {query}` bez modelu.
 
 ### Dodane — Faza 3 (historia git, testy i pokrycie)
 - **Czytnik lokalnego `.git` w przeglądarce** (`js/git-local.js` + `js/git-worker.js`, bez zależności): HEAD i refy

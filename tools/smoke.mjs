@@ -225,6 +225,23 @@ const testsRes = await evalJs(`(async()=>{ try{
     tSum, tFile, cSum, cFile, score:typeof rep.score, tE2, tb2, cov2:!!(cov2 && cov2.pct===100)};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// RAG (tryb „📚 kod"): indeks fragmentów demo, /codeSearch bez modelu, przełącznik w nagłówku czatu,
+// dostawca w chmurze (profil smoke: domyślny Mistral bez klucza) → komunikat o modelach lokalnych, bez wysyłania kodu
+const ragRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  await CM.RAG.ensure(CMApp.graph); const st=CM.RAG.stats();
+  const cs=await CMApp.exec('codeSearch',{query:'format date', k:3});
+  const lexHits=(await CM.RAG.search('reducer store state',{k:3})).hits.length;
+  CM.ChatBot.open(); await sleep(300); CM.ChatBot._newChat(); await sleep(100);
+  const btn=document.querySelector('#cb-panel .cb-rag'); const had=!!btn; if(btn && !btn.classList.contains('on')) btn.click();
+  const ta=document.querySelector('#cb-panel .cb-input'); ta.value='jak działa reducer?'; ta.dispatchEvent(new Event('input',{bubbles:true}));
+  document.querySelector('#cb-panel .cb-send').click(); await sleep(400);
+  const conv=CM.ChatBot._convs()[0]; const last=[...conv.messages].reverse().find(m=>m.role==='assistant');
+  const localOnly=!!(last && /lokaln|local/i.test(last.content||'') && !last.sources);
+  if(btn && btn.classList.contains('on')) btn.click(); CM.ChatBot.close();
+  return {chunks:st.chunks, files:st.files, cs:String(cs).slice(0,120), csOk:String(cs).includes('\u0060'), lexHits, had, localOnly};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -241,6 +258,8 @@ else check(symbolsRes && !symbolsRes.error && symbolsRes.count > 0 && symbolsRes
 check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitRes.ov.includes(m)) && gitRes.colored && gitRes.panel && gitRes.churn && gitRes.top
   && gitRes.first < gitRes.last && gitRes.total > 1 && gitRes.hot > 0 && gitRes.persisted,
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
+check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexHits > 0 && ragRes.had && ragRes.localOnly,
+  `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
 check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
   `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
 {

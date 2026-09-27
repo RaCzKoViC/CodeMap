@@ -363,6 +363,15 @@ body.light .code-preview,body.light .fv-codewrap{background:#0d1320;color:#aebac
 .ovl-cnt{color:var(--text-mute);font-family:var(--mono);font-size:11px}
 .ovl-note{margin:4px 2px 0}
 /* historia git (git.js): pigułka postępu, sekcje panelu, oś czasu */
+/* tryb „📚 kod" ChatBota (rag.js): źródła odpowiedzi, cytaty [n], zaznaczenie linii w podglądzie pliku */
+.cb-sources{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:6px}
+.cb-src-h{font-size:11px;color:var(--text-mute);margin-right:2px}
+.cb-src{font:11.5px var(--mono);padding:3px 8px;border-radius:7px;border:1px solid var(--glass-border);background:rgba(34,211,238,.08);color:var(--text);cursor:pointer}
+.cb-src:hover{background:rgba(34,211,238,.18)}
+.cb-cite{color:var(--accent);text-decoration:none;font-weight:600;cursor:pointer}
+.cb-cite:hover{text-decoration:underline}
+.fv-codewrap{position:relative}
+.fv-band{position:absolute;left:0;right:0;background:rgba(250,204,21,.13);border-left:3px solid #facc15;pointer-events:none}
 .git-pill{display:flex;align-items:center;gap:10px}
 .git-pill .gp-x{background:none;border:0;color:inherit;font-size:16px;line-height:1;cursor:pointer;opacity:.7;padding:0 2px}
 .git-pill .gp-x:hover{opacity:1}
@@ -2136,7 +2145,8 @@ body.light .set-ai-prov{background:rgba(20,30,45,.08)}
 .cb-att-ro{cursor:pointer}
 #cb-panel.cb-dropzone .cb-composer{outline:2px dashed var(--accent);outline-offset:-4px;background:color-mix(in srgb, var(--accent) 12%, transparent)}
 #cb-panel.cb-dropzone .cb-input::placeholder{color:var(--accent)}
-.cb-hbtn.cb-quick{font-size:15px;opacity:.55}
+.cb-hbtn.cb-quick,.cb-hbtn.cb-rag{font-size:15px;opacity:.55}
+.cb-hbtn.cb-rag.on{opacity:1;filter:drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent))}
 .cb-hbtn.cb-quick.on{opacity:1;color:var(--accent);text-shadow:0 0 8px color-mix(in srgb, var(--accent) 60%, transparent)}
 .cb-think-b{max-height:none;font-style:normal}
 .cb-think summary{position:sticky;top:0;background:inherit}

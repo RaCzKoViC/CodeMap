@@ -376,6 +376,16 @@ CM.UI = (function(){
     }
   }
 
+  // podgląd pliku: zaznacz i przewiń do linii start–end (źródła odpowiedzi ChatBota w trybie „📚 kod")
+  function revealLines(start, end){
+    const wrap=document.querySelector('#fileview-body .fv-codewrap'), pre=wrap&&wrap.querySelector('.fv-code'); if(!pre||!start) return false;
+    wrap.querySelectorAll('.fv-band').forEach(b=>b.remove());
+    const cs=getComputedStyle(pre), lh=parseFloat(cs.lineHeight)||18, top=pre.offsetTop+(parseFloat(cs.paddingTop)||0);
+    const band=el('div',{class:'fv-band',style:`top:${top+(start-1)*lh}px;height:${Math.max(1,(end||start)-start+1)*lh}px`});
+    wrap.appendChild(band); band.scrollIntoView({block:'center'});
+    return true;
+  }
+
   // edge / dependency details (shown when a connection line is clicked)
   function renderEdgeDetails(edge, s, t, graph, H){
     const body=$('#details-body'); body.innerHTML='';
@@ -636,5 +646,5 @@ CM.UI = (function(){
     });
   }
 
-  return {addDetailSection, renderDetails, renderEdgeDetails, renderFileView, highlight, renderLangFilters, renderSearch, tooltip, filePreview, ctxMenu, hideCtx, renderHistory, renderDiff, nodeIcon, renderHotspots};
+  return {addDetailSection, revealLines, renderDetails, renderEdgeDetails, renderFileView, highlight, renderLangFilters, renderSearch, tooltip, filePreview, ctxMenu, hideCtx, renderHistory, renderDiff, nodeIcon, renderHotspots};
 })();
