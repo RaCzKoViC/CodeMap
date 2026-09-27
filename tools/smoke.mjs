@@ -281,6 +281,17 @@ const cspRes = await evalJs(`(async()=>{ try{
 // celowe naruszenia z tego kroku (zablokowany skrypt inline i atrybut on*) nie są błędami aplikacji
 for (let k = errors.length - 1; k >= errBeforeCsp; k--) if (/Content Security Policy|Refused to/i.test(errors[k])) errors.splice(k, 1);
 
+// galeria przykładów (faza 8): okno z kartami, przycisk na ekranie startowym i w menu, akcja gallery (bez sieci —
+// otwarcie przykładu sprawdza link #repo= w teście jednostkowym i krok deep-linków z podstawionym fetch)
+const galRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const btn=!!document.getElementById('empty-gallery'), menu=!!document.getElementById('btn-gallery');
+  const act=await CMApp.exec('gallery',{}); await sleep(200);
+  const cards=document.querySelectorAll('#modal-gallery .gal-card').length, open=!document.getElementById('modal-gallery').classList.contains('hidden');
+  CM.UIKit.modal('modal-gallery','share-modal gallery-modal','gal').close();
+  return {btn, menu, cards, open, act:String(act), items:CM.Gallery.ITEMS.length, hash:CM.Gallery.hashFor(CM.Gallery.find('flask'))};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 // pamięć analizy w OPFS (faza 6): 80 plików wczytanych dwa razy z tymi samymi datami → drugi raz bez analizy
 // i bez workerów; zmieniony plik analizowany na nowo; te same daty inne, treść ta sama → trafienia po skrócie;
 // graf identyczny jak po pełnej analizie; „wyczyść" usuwa pamięć
@@ -417,6 +428,9 @@ check(tourRes && !tourRes.error && tourRes.steps >= 4 && /^readme,entry/.test(to
 check(cspRes && !cspRes.error && cspRes.strict && cspRes.blocked && cspRes.runner.ready && cspRes.runner.posted >= 1
   && cspRes.inner === 'allow-scripts allow-modals|true|izolacja' && cspRes.runnerViolations === 0,
   `CSP egzekwowane, Runner pod CSP (runner.html + ramka w piaskownicy): ${JSON.stringify(cspRes)}`);
+check(galRes && !galRes.error && galRes.btn && galRes.menu && galRes.cards === galRes.items && galRes.items >= 8 && galRes.open
+  && galRes.hash === '#repo=pallets/flask&path=src%2Fflask',
+  `galeria przykładów: okno z kartami, przyciski, akcja, link #repo=: ${JSON.stringify(galRes)}`);
 check(cacheRes && !cacheRes.error && cacheRes.a1 === 0 && cacheRes.a2[0] === 80 && cacheRes.a2[1] === 0 && cacheRes.same2
   && cacheRes.a3 === 79 && cacheRes.changed && cacheRes.a4 === 79 && cacheRes.same4 && cacheRes.cleared,
   `pamięć analizy (OPFS): ponowne wczytanie bez analizy, zmieniony plik od nowa, trafienia po skrócie: ${JSON.stringify(cacheRes)}`);

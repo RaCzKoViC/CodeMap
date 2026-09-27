@@ -2193,6 +2193,15 @@ body.light .set-ai-prov{background:rgba(20,30,45,.08)}
 .st-live-btn{background:none;border:0;color:inherit;cursor:pointer;font-size:11px;padding:0 3px;opacity:.8}
 .st-live-btn:hover{opacity:1}
 body.tour-on #toast-wrap{bottom:190px}
+body.tour-on #rot-dial,body.tour-on #rot-reopen{visibility:hidden}   /* tarcza obrotu nachodziłaby na kartę trasy */
+.gallery-modal{width:min(860px,calc(100vw - 32px))}
+.gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px;max-height:62vh;overflow:auto}
+.gal-card{border:1px solid rgba(148,163,184,.25);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:rgba(148,163,184,.06)}
+.gal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px}
+.gal-head b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gal-lang{font:600 10.5px var(--mono);padding:1px 7px;border-radius:9px;background:rgba(34,211,238,.14);color:var(--accent,#22d3ee);white-space:nowrap}
+.gal-desc{font-size:12.5px;line-height:1.45;flex:1}
+.gal-row{display:flex;gap:6px;flex-wrap:wrap}
 .tour-card{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:60;width:min(560px,calc(100vw - 32px));padding:10px 12px 10px;border-radius:14px;
   background:rgba(var(--glass-rgb,14,19,28),.92);border:1px solid rgba(250,204,21,.45);box-shadow:0 10px 40px rgba(0,0,0,.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--text,#e2e8f0)}
 .tour-head{display:flex;align-items:center;gap:8px;font-size:12px}

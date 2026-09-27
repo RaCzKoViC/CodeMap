@@ -5,6 +5,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 8 (społeczność)
+- **Galeria przykładowych repozytoriów** (`js/gallery.js`): 9 małych projektów open source w 7 językach (Express,
+  Preact, ky, petite-vue, Flask, Gin, serde json, Gson, Rake — 53–313 plików), karty z opisem, liczbą plików
+  i językiem; „Otwórz" (deep-link `#repo=`, z podkatalogiem dla Flask / Gson / Rake), „🧭 Z trasą" (po wczytaniu
+  trasa automatyczna), kopiowanie linku. Wejścia: „Przykłady" na ekranie startowym, Wczytaj → „Przykładowe
+  repozytoria…", akcja ChatBota `gallery {repo?, tour?}`. Sprawdzone na petite-vue z GitHuba: 53 pliki, trasa 7 kroków.
+  Tarcza obrotu chowa się, gdy trasa jest aktywna (nachodziła na kartę kroku).
+
 ### Zmienione — Faza 8 (jakość własna)
 - Testy renderera (`test/renderer.test.mjs`, 9): kamera świat ↔ ekran przy obrocie i pochyleniu, pamięć macierzy,
   przybliżanie z punktem pod kursorem, trafianie węzłów (billboard przy pochyleniu) i krawędzi (prosta / łuk), `fit`

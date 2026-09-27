@@ -134,8 +134,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   (`tools/sri.mjs`, weryfikacja bajtów przed wykonaniem). WebLLM / rough.js / php-wasm (+esm) — tylko przypięta wersja.
 - [x] README po angielsku jako główne (`README.md`), polskie w `README.pl.md`.
 - [x] Wspólny kod zamiast kopii wskazanych przez Inspect: `js/physics.js`, `tools/cdp.mjs`, `js/ui-kit.js`.
-- Społeczność: galeria przykładowych repozytoriów
-  (`#repo=`) w demo, publikacja CLI w npm (`npx codemap analyze`).
+- Społeczność: [x] galeria przykładowych repozytoriów (`js/gallery.js`, 9 projektów, `#repo=`, opcjonalnie z trasą),
+  publikacja CLI w npm (`npx codemap analyze`) — wymaga konta npm właściciela.
 - Dług z faz 1–3: 20 nieosiągalnych układów, migracja `codemap_settings`, `package.json#imports`,
   wykrywanie zmiany nazwy z edycją (podobieństwo treści).
 

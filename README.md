@@ -52,6 +52,9 @@ Click **“✨ See demo”** or open `index.html#demo`.
   the map, a new commit refreshes the git history. Secrets (`.env`, private keys) are shown but never read.
   After a page reload the status bar offers **↻ Resume live: <folder>** — one click (the browser asks for read
   permission again) and the folder is loaded and watched again, unchanged files straight from the analysis cache.
+- **Example repositories** (Examples on the start screen, Load → *Example repositories…*): nine small real projects
+  in seven languages (Express, Preact, ky, petite-vue, Flask, Gin, serde json, Gson, Rake), opened with one click —
+  optionally straight into a code tour.
 - **Archives** — ZIP, TAR, TGZ, GZ — unpacked right in the browser (`DecompressionStream`).
 - **PDF** — a map built from bookmarks and pages.
 - **Repositories** from GitHub, GitLab and Bitbucket by URL (public, or private with a token), with branch/tag
