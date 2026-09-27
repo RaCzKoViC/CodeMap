@@ -98,7 +98,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] CLI `--base` / `--baseline` / `--pr-md` / `--max-score-drop`: health score przed/po, próg „nie pogarszaj".
 - [ ] Zostało: wybór PR z listy otwartych PR w oknie, porównanie przed/po także w aplikacji (dziś tylko CLI).
 
-## Faza 6 — tryb na żywo i skala — W TOKU
+## Faza 6 — tryb na żywo i skala — WYKONANA 2026-09-27 (v1.3.0; zostały drobne: etykiety na GPU, pamięć tree-sittera, próg benchmarku)
 
 - [x] Obserwacja folderu (`js/live.js`): FileSystemObserver + skan dat modyfikacji, analiza tylko zmienionych plików,
   przebudowa z zachowaniem stanu, RAG (wektory po hashu) i historia git (nowy commit) na bieżąco.
@@ -112,7 +112,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] Benchmarki w CI (`tools/bench.mjs`: wczytanie + klatka canvas/WebGL na syntetycznych 5k/20k plików, tabela
   w podsumowaniu, JSON jako artefakt). POZOSTAŁO: prawdziwe repozytoria i próg regresji porównywany z bazą.
 
-## Faza 7 — agent kodu (lokalne AI) — W TOKU 2026-09-27
+## Faza 7 — agent kodu (lokalne AI) — WYKONANA 2026-09-27 (v1.3.0; zostało: agent dla WebLLM)
 
 - [x] ChatBot z narzędziami w pętli (`js/agent.js`): model sam woła `codeSearch`, `readFile`, `findFiles`,
   `dependencies`, `dependents`, `fileInfo`, `hotspots`, `owners`, `tests` przed odpowiedzią — natywne wywołania narzędzi Ollamy

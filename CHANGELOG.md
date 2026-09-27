@@ -5,6 +5,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-09-27
+
+Skala i lokalne AI: rysowanie na GPU, pamięć analizy, folder na żywo po przeładowaniu (faza 6) oraz agent kodu —
+narzędzia w pętli, Doktor hotspotów, trasy po kodzie, embeddingi w przeglądarce (faza 7) — [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ### Dodane — Faza 7 (agent z narzędziami)
 - Agent: narzędzie widokowe **`showOnMap {paths}`** — podświetla pliki, o których jest odpowiedź, i ustawia na nich
   kamerę (tylko widok, bez zmian w danych); prompt zachęca, by pokazywać pliki. qwen3:8b na „Które pliki importują
