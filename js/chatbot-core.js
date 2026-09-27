@@ -150,7 +150,8 @@ CM.ChatBotCore = (function(){
     if(/\b(nie|don'?t|do not|never|zamiast|instead|jeśli|jesli|gdyby|czy)\b/.test(s)) return null;
     // long, prose-y requests likely want more than a bare command → route through the model
     if(s.length>90) return null;
-    const verb=/\b(włącz|wlacz|przełącz|przelacz|ustaw|zmień|zmien|uruchom|pokaż|pokaz|otwórz|otworz|zrób|zrob|załaduj|zaladuj|wczytaj|wykonaj|zrestartuj|switch|turn|set|change|start|open|load|run|enable|show|make)\b/;
+    // granice słowa przez klasy Unicode: `\b` w JS (bez /u) nie widzi granicy po „ż”, „ń”, „ł” — „pokaż hotspoty” szło do modelu
+    const verb=/(?<![\p{L}\p{N}_])(włącz|wlacz|przełącz|przelacz|ustaw|zmień|zmien|uruchom|pokaż|pokaz|otwórz|otworz|zrób|zrob|załaduj|zaladuj|wczytaj|wykonaj|zrestartuj|switch|turn|set|change|start|open|load|run|enable|show|make)(?![\p{L}\p{N}_])/u;
     if(!verb.test(s)) return null;
     const has=(re)=>re.test(s);
     if(has(/motyw|theme/)){ if(has(/jasn|light|biał|bial/)) return {action:'setTheme',args:{theme:'light'}};

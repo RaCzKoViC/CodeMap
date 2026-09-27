@@ -110,6 +110,11 @@ describe('intentFallback: krótkie jednoznaczne polecenie → akcja bez modelu',
     assert.deepEqual(host(C.intentFallback('show hotspots')), { action: 'hotspots', args: {} });
     assert.deepEqual(host(C.intentFallback('otwórz ustawienia')), { action: 'openSettings', args: {} });
   });
+  test('czasownik kończący się polską literą (pokaż, zmień) — granica słowa działa (dawniej `\\b` jej nie widział)', () => {
+    assert.deepEqual(host(C.intentFallback('pokaż hotspoty')), { action: 'hotspots', args: {} });
+    assert.deepEqual(host(C.intentFallback('zmień motyw na jasny')), { action: 'setTheme', args: { theme: 'light' } });
+    assert.equal(C.intentFallback('pokażmy hotspoty'), null, 'dłuższe słowo to nie czasownik z listy');
+  });
   test('pytanie, przeczenie, brak czasownika albo długa prośba → null (decyduje model)', () => {
     assert.equal(C.intentFallback('czy możesz włączyć jasny motyw?'), null);
     assert.equal(C.intentFallback('nie włączaj jasnego motywu'), null);

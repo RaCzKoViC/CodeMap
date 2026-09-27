@@ -128,7 +128,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 ## Faza 8 — jakość własna i społeczność
 
 - Własny health score CodeMap (29/100 na kopii z GitHuba: duplikaty, złożone pliki bez testów, bardzo długie
-  pliki): podział `chatbot.js` / `settings.js` / `mindmap.js`, testy renderera i ChatBota, [x] usunięcie
+  pliki): podział [x] `chatbot.js` / [x] `settings.js` / `mindmap.js`, [x] testy renderera i ChatBota, [x] usunięcie
   duplikatów (`escapeHtml` ×8 → `U.escapeHtml` / `U.escapeText`), [x] próg CLI w naszym CI.
 - [x] Bezpieczeństwo: CSP egzekwowane (meta + nagłówek Caddy), Runner przez `runner.html`, SRI dla tree-sitter
   (`tools/sri.mjs`, weryfikacja bajtów przed wykonaniem). WebLLM / rough.js / php-wasm (+esm) — tylko przypięta wersja.
