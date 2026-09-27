@@ -470,6 +470,28 @@ check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good
     && r.bad === false && r.badCalls === 0 && r.foreign.length === 0;
   check(ok, `deep-linki #gist= / #share= / #repo= (podstawiony fetch, sanityzacja mapy, #v= z gistem i podkatalogiem, udostępnianie ukryte bez backendu)${ok ? '' : ': ' + JSON.stringify(r)}`);
 }
+// sprzężenie zmian (faza 10): syntetyczna historia (GitCore.analyze + applyToGraph) → sekcja „Zmieniany razem z"
+// w panelu szczegółów z oznaczeniem „bez importu", reguła Inspect i akcja ChatBota changeCoupling
+const cochangeRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const F=(p,c)=>({path:p,size:c.length,content:c,mtime:Date.now()});
+  await CMApp.loadFiles([F('src/a.js','export const a = 1;\\n'), F('src/b.js','export const b = window.A;\\n'),
+    F('src/c.js',"import { a } from './a.js';\\nexport const c = a;\\n")], {name:'cochange-demo', source:'smoke'});
+  for(let i=0;i<50;i++){ if(CMApp.graph&&CMApp.graph.meta&&CMApp.graph.meta.name==='cochange-demo'&&CMApp.graph.nodes.size>3) break; await sleep(100); }
+  const g=CMApp.graph, T0=Date.UTC(2026,0,1), cs=[];
+  for(let i=0;i<6;i++) cs.push({sha:'c'+i, parents:[], merge:false, author:{name:'Ala Kowalska',email:'a@x.pl'}, authorTime:T0+i*864e5, time:T0+i*864e5,
+    message:'m', files:[{path:'src/a.js',status:'M'},{path:'src/b.js',status:'M'},{path:'src/c.js',status:'M'}]});
+  CM.GitCore.applyToGraph(g, CM.GitCore.analyze(cs.reverse(), ['src/a.js','src/b.js','src/c.js']), {source:'smoke'});
+  CMApp.focusNode('src/a.js'); await sleep(250);
+  const sec=document.querySelector('#details-body .det-cochange'), txt=sec?sec.textContent:'';
+  const rows=sec?sec.querySelectorAll('.cc-row').length:0, hidden=sec?sec.querySelectorAll('.cc-row .tag').length:0;
+  const chat=CMApp.exec('changeCoupling',{query:'a.js'});
+  const rep=await CM.Inspect.run(g), h=rep.findings.find(f=>f.rule==='hiddencoupling');
+  return {sec:!!sec, rows, hidden, b:/b\\.js/.test(txt), chat:String(chat), rule:h?h.count:0, hi:CM.App.renderer&&CM.App.renderer.highlight?CM.App.renderer.highlight.size:null};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(cochangeRes && !cochangeRes.error && cochangeRes.sec && cochangeRes.rows === 2 && cochangeRes.hidden === 1 && cochangeRes.b
+  && /b\.js \(100 %, 6, bez importu\)/.test(cochangeRes.chat) && /c\.js \(100 %, 6\)/.test(cochangeRes.chat) && cochangeRes.rule === 2,
+  `sprzężenie zmian: panel „Zmieniany razem z", „bez importu", reguła Inspect, akcja ChatBota: ${JSON.stringify(cochangeRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

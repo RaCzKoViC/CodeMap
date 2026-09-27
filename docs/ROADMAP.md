@@ -152,9 +152,12 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Dług wskazany przez własną analizę: 57 złożonych plików bez testów (najpierw app-core, loaders, drive, sync),
   47 pustych `catch`, 76 zduplikowanych fragmentów; cel: zdrowie 45 → 60+.
 
-## Faza 10 — analiza, której nie ma konkurencja w przeglądarce
+## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — W TOKU 2026-09-27
 
-- Sprzężenie zmian (change coupling): pliki zmieniane razem bez importu — nakładka i reguła „ukryta zależność".
+- ✅ Sprzężenie zmian (change coupling): `GitCore.coupling` z osi czasu historii (stopień jak w code-maat, bez masowych
+  commitów), sekcja „Zmieniany razem z" w panelu z oznaczeniem „bez importu", reguła Inspect „ukryte sprzężenie zmian",
+  akcja ChatBota `changeCoupling` (`js/cochange.js`). Na historii CodeMap wskazuje m.in. i18n.js i ai-bridge.js — moduły
+  zależne przez globalne `CM.*` i klucze tekstów, których import nie pokazuje.
 - Trend zdrowia w czasie: `codemap analyze --history N` (wynik i znaleziska dla kolejnych commitów), wykres w aplikacji.
 - Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami.
 - CODEOWNERS a rzeczywista własność z git (rozjazdy, pliki bez właściciela).

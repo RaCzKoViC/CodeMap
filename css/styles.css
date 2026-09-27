@@ -1174,6 +1174,14 @@ body.light .mm-tpl-frame .mm-node-body,body.light .mm-tpl-frame .mm-tpl-chip-lbl
 .det-ver .ic{color:#a78bfa;flex-shrink:0}
 .det-ver span{font-family:var(--mono)}
 /* hotspots list */
+/* sprzężenie zmian (cochange.js) */
+.cc-list{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+.cc-row{position:relative;display:flex;align-items:center;gap:6px;padding:4px 7px;border-radius:7px;cursor:pointer;font-size:12px;overflow:hidden}
+.cc-row:hover{background:rgba(148,163,184,.1)}
+.cc-bar{position:absolute;left:0;top:0;bottom:0;background:rgba(34,211,238,.12);border-radius:7px;pointer-events:none}
+.cc-name{position:relative;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-row .tag{position:relative;margin:0;font-size:10px;padding:1px 6px}
+.cc-val{position:relative;color:var(--text-mute);font-variant-numeric:tabular-nums;white-space:nowrap}
 .hot-row{display:flex;align-items:center;gap:12px;padding:9px 11px;border-radius:10px;cursor:pointer;
   background:rgba(255,255,255,.035);border:1px solid var(--glass-border);margin-bottom:7px;transition:.12s}
 .hot-row:hover{border-color:var(--accent);background:rgba(34,211,238,.07)}

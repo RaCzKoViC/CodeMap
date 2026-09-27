@@ -113,7 +113,11 @@ Click **“✨ See demo”** or open `index.html#demo`.
   language, complexity and modification date; a legend with counts, and clicking an entry highlights its files.
 - **Timeline** — an animated evolution of the project (Gource-lite): files appear in the order they were
   created and changes glow in the author's color; without git history, the timeline is built from snapshots.
-- Inspect: the **Change hotspots** and **Knowledge in one head** rules (≥ 90 % of a complex file's changes come from one person).
+- **Change coupling** (as in code-maat / CodeScene): files changed in the same commits — degree = shared commits / average
+  changes of both, bulk commits (> 30 files) skipped. The details panel lists what a file changes together with, marking
+  pairs **without an import** between them (a hidden dependency: globals, config, string keys); the `changeCoupling` ChatBot action.
+- Inspect: the **Change hotspots**, **Knowledge in one head** (≥ 90 % of a complex file's changes come from one person) and
+  **Hidden change coupling** rules (code files changed together in ≥ 50 % of their commits with no import either way).
 
 ### Tests and coverage
 - CodeMap links **tests to the code they test** on its own — by name (including mirrored paths `test/` ↔ `src/`,
@@ -283,6 +287,7 @@ js/git-local.js  js/git-worker.js   # local .git reader (objects, packs, deltas,
 js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddings (IndexedDB), context with citations
 js/agent.js                # agent loop: read-only tools (codeSearch, readFile, dependents…), native tool_calls or JSON in text
 js/doctor.js  js/doctor-ui.js   # hotspot doctor: file record + prompt (pure), file-panel section and hotspotDoctor action
+js/cochange.js                  # change coupling (GitCore.coupling): "changes together with" panel section, changeCoupling action
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

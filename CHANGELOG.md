@@ -20,6 +20,16 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   wczytania, 1–5 ms klatki); w CI punktem odniesienia jest artefakt `bench` ostatniego zielonego przebiegu main,
   porównanie trafia do podsumowania.
 
+### Dodane — Faza 10 (sprzężenie zmian)
+- **Sprzężenie zmian** (`GitCore.coupling` / `couplingFor`, jak code-maat): pary plików zmieniane w tych samych commitach
+  osi czasu historii git; stopień = wspólne / średnia zmian obu plików, commity > 30 plików pomijane, progi minRevs 5,
+  minShared 3, minDegree 0,3 (opcje). Liczone z `gitInfo.timeline`, więc działa też dla zapisanych map.
+- **Panel szczegółów — „Zmieniany razem z"** (`js/cochange.js`): lista plików z paskiem stopnia i liczbą wspólnych
+  commitów, oznaczenie **„bez importu"** (ukryta zależność), klik przechodzi do pliku, „Pokaż na mapie" podświetla grupę;
+  akcja ChatBota `changeCoupling {query?}` (dla pliku albo najsilniejsze pary projektu).
+- **Reguła Inspect „ukryte sprzężenie zmian"**: pliki kodu zmieniane razem w ≥ 50 % commitów (min. 5 wspólnych) bez
+  importu w żadną stronę; bez testów (test ↔ kod zmieniają się razem z natury). Trafia też do CLI, SARIF i komentarza PR.
+
 ### Zmienione — precyzja reguł Inspect (fałszywe alarmy z analizy samego CodeMap)
 - **Duplikaty = ciągłe bloki**: para plików tylko z ciągłym wspólnym blokiem ≥ 50 tokenów (odciski winnowing z
   pozycjami, wyrównanie po przekątnej — jak jscpd), a nie suma rozsianych wspólnych idiomów; opis „tokeny: N,

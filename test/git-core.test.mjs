@@ -176,3 +176,30 @@ describe('zapis do grafu', () => {
     assert.equal(g2.gitInfo.authors.length, 2);
   });
 });
+
+describe('sprzężenie zmian (change coupling)', () => {
+  // a+b razem 6×, a sam 2×, c sam 5×, c+d razem 2× (za mało wspólnych), masowy commit 40 plików (pomijany)
+  const M = (p) => ({ path: p, status: 'M' });
+  const steps = [{ author: ala, files: ['a.js', 'b.js', 'c.js', 'd.js'].map((p) => ({ path: p, status: 'A' })) }];
+  for (let i = 0; i < 6; i++) steps.push({ author: ala, files: [M('a.js'), M('b.js')] });
+  for (let i = 0; i < 2; i++) steps.push({ author: bob, files: [M('a.js')] });
+  for (let i = 0; i < 5; i++) steps.push({ author: bob, files: [M('c.js')] });
+  for (let i = 0; i < 2; i++) steps.push({ author: bob, files: [M('c.js'), M('d.js')] });
+  steps.push({ author: ala, files: [M('a.js'), M('b.js'), M('c.js'), ...Array.from({ length: 37 }, (_, i) => ({ path: 'gen/f' + i + '.js', status: 'A' }))] });
+  const paths = ['a.js', 'b.js', 'c.js', 'd.js', ...Array.from({ length: 37 }, (_, i) => 'gen/f' + i + '.js')];
+  const gi = () => { const r = G.analyze(history(steps), paths); return { timeline: r.timeline }; };
+  test('stopień = wspólne / średnia zmian; bez masowych commitów i par z < 3 wspólnymi', () => {
+    const res = host(G.coupling(gi()));
+    // a: 1 (A) + 6 + 2 = 9 zmian, b: 1 + 6 = 7, wspólne 7 (z commitem dodającym) → 7 / 8 = 0.875
+    assert.deepEqual(res, [{ a: 'a.js', b: 'b.js', shared: 7, revsA: 9, revsB: 7, degree: 0.875 }]);
+    assert.deepEqual(host(G.couplingFor(gi(), 'b.js')), [{ path: 'a.js', shared: 7, degree: 0.875, revs: 9 }]);
+    assert.deepEqual(host(G.couplingFor(gi(), 'c.js')), []);
+  });
+  test('progi w opcjach: minShared 2 dopuszcza c ↔ d; maxFiles 50 wlicza masowy commit', () => {
+    const cd = host(G.coupling(gi(), { minShared: 2, minRevs: 1 })).find((p) => p.a === 'c.js' && p.b === 'd.js');
+    assert.equal(cd.shared, 3);   // commit dodający + 2 wspólne
+    const big = host(G.coupling(gi(), { maxFiles: 50 }));
+    assert.equal(big[0].shared, 8);
+    assert.deepEqual(host(G.coupling({})), []);
+  });
+});

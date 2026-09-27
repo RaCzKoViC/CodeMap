@@ -253,6 +253,50 @@ CM.GitCore = (function(){
 
   function initials(name){ const p=normName(name).split(' ').filter(Boolean); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:(p[0]||'')[1]||'')).toUpperCase(); }
 
+  // ---------------- sprzężenie zmian (change coupling, jak code-maat / CodeScene) ----------------
+  // Z osi czasu (gitInfo.timeline: bieżące ścieżki, commity bez merge'y, najnowsze ≤ 3000): pary plików zmieniane
+  // w tych samych commitach. Stopień = wspólne / średnia liczby zmian obu plików (0–1). Commity z > maxFiles plikami
+  // (formatowanie, przenosiny, masowe podbicia) pomijane; pary poniżej minShared wspólnych commitów albo z plikiem
+  // o < minRevs zmianach — za mało danych. → [{a, b, shared, revsA, revsB, degree}] malejąco po stopniu i wspólnych.
+  const COUPLING_DEFAULTS={maxFiles:30, minRevs:5, minShared:3, minDegree:0.3, limit:5000};
+  const couplingCache=new WeakMap();
+  function coupling(gitInfo, opts){
+    const o=Object.assign({}, COUPLING_DEFAULTS, opts||{});
+    const tl=gitInfo&&gitInfo.timeline; if(!tl||!Array.isArray(tl.commits)) return [];
+    const key=JSON.stringify(o), hit=couplingCache.get(tl); if(hit&&hit.key===key) return hit.res;
+    const revs=new Map(), pairs=new Map(), set=[];
+    for(const cm of tl.commits){
+      const ev=cm&&cm[3]; if(!ev||!ev.length) continue;
+      set.length=0;
+      for(let i=0;i<ev.length&&set.length<=o.maxFiles;i+=2) if(ev[i+1]!==ST_CODE.D && !set.includes(ev[i])) set.push(ev[i]);
+      if(!set.length || set.length>o.maxFiles) continue;
+      for(const f of set) revs.set(f,(revs.get(f)||0)+1);
+      set.sort((x,y)=>x-y);
+      for(let i=0;i<set.length;i++) for(let j=i+1;j<set.length;j++){ const k=set[i]*1048576+set[j]; pairs.set(k,(pairs.get(k)||0)+1); }
+    }
+    const res=[];
+    for(const [k,shared] of pairs){
+      if(shared<o.minShared) continue;
+      const i=Math.floor(k/1048576), j=k%1048576, ra=revs.get(i), rb=revs.get(j);
+      if(ra<o.minRevs||rb<o.minRevs) continue;
+      const degree=shared/((ra+rb)/2); if(degree<o.minDegree) continue;
+      res.push({a:tl.files[i], b:tl.files[j], shared, revsA:ra, revsB:rb, degree:+degree.toFixed(3)});
+    }
+    res.sort((x,y)=>(y.degree-x.degree)||(y.shared-x.shared)||(x.a<y.a?-1:x.a>y.a?1:x.b<y.b?-1:1));
+    if(res.length>o.limit) res.length=o.limit;
+    couplingCache.set(tl, {key, res});
+    return res;
+  }
+  // pliki sprzężone z danym: [{path, shared, degree, revs}] — z wyniku coupling() (te same opcje)
+  function couplingFor(gitInfo, path, opts){
+    const out=[];
+    for(const p of coupling(gitInfo, opts)){
+      if(p.a===path) out.push({path:p.b, shared:p.shared, degree:p.degree, revs:p.revsB});
+      else if(p.b===path) out.push({path:p.a, shared:p.shared, degree:p.degree, revs:p.revsA});
+    }
+    return out;
+  }
+
   return {analyze, identities, rebase, detectPrefix, prefixPaths, busFactor, busFactorFor, hotspotScore, births, timelineFromSnapshots, applyToGraph, folderStats,
-    initials, normName, loginFromEmail, isBot, ST_CODE, ST_CHAR, RECENT_DAYS};
+    coupling, couplingFor, COUPLING_DEFAULTS, initials, normName, loginFromEmail, isBot, ST_CODE, ST_CHAR, RECENT_DAYS};
 })();

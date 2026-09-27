@@ -113,7 +113,11 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   języka, złożoności i daty modyfikacji; legenda z licznikami, klik podświetla pliki.
 - **Oś czasu** — animowana ewolucja projektu (Gource-lite): pliki pojawiają się w kolejności powstania,
   zmiany świecą kolorem autora; bez historii git — oś czasu z migawek.
-- Inspect: reguły **hotspoty zmian** i **wiedza w jednej głowie** (≥ 90 % zmian złożonego pliku od jednej osoby).
+- **Sprzężenie zmian** (jak code-maat / CodeScene): pliki zmieniane w tych samych commitach — stopień = wspólne commity /
+  średnia zmian obu, bez masowych commitów (> 30 plików). Panel szczegółów pokazuje, z czym plik zmienia się razem, i oznacza
+  pary **bez importu** między nimi (ukryta zależność: globalne nazwy, konfiguracja, klucze tekstów); akcja ChatBota `changeCoupling`.
+- Inspect: reguły **hotspoty zmian**, **wiedza w jednej głowie** (≥ 90 % zmian złożonego pliku od jednej osoby) i **ukryte
+  sprzężenie zmian** (pliki kodu zmieniane razem w ≥ 50 % swoich commitów bez importu w żadną stronę).
 
 ### Testy i pokrycie
 - CodeMap sam wiąże **testy z testowanym kodem** — po nazwie (także ścieżki lustrzane `test/` ↔ `src/`,
@@ -282,6 +286,7 @@ js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, d
 js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi Ollamy (IndexedDB), kontekst z cytatami
 js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSearch, readFile, dependents…), tool_calls albo JSON w treści
 js/doctor.js  js/doctor-ui.js   # Doktor hotspotów: kartoteka pliku + prompt (czyste), sekcja w panelu pliku i akcja hotspotDoctor
+js/cochange.js                  # sprzężenie zmian (GitCore.coupling): sekcja „Zmieniany razem z" w panelu, akcja changeCoupling
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

@@ -42,6 +42,8 @@ CM.Inspect = (function(){
     'r.gitHotspot':'Hotspoty zmian (historia git)','r.gitHotspot.d':'Pliki jednocześnie często zmieniane i złożone (zmiany × złożoność, górne 10 %) — tu kumulują się błędy i koszt każdej zmiany; najlepsi kandydaci do refaktoryzacji.',
     'r.silo':'Wiedza w jednej głowie (historia git)','r.silo.d':'Złożone, często zmieniane pliki, w których ≥ 90 % zmian pochodzi od jednej osoby — jej nieobecność zatrzymuje pracę nad nimi. Reguła działa w projektach z co najmniej dwoma autorami.',
     'gitHot':'{c} zmian × złożoność {cx}','silo':'{who}: {s} % z {c} zmian',
+    'r.hiddencoupling':'Ukryte sprzężenie zmian (historia git)','r.hiddencoupling.d':'Pliki kodu zmieniane razem w co najmniej połowie swoich commitów (min. 5 wspólnych), choć żaden nie importuje drugiego — zależność przez globalne nazwy, konfigurację, klucze tekstów albo protokół. Rozważ jawny import lub wspólny moduł. (Bez testów, masowych commitów > 30 plików i plików z < 5 zmianami.)',
+    'coupled':'razem z {b} — wspólne commity: {n}, stopień: {d} %',
   },
   en:{
     'title':'Static analysis',
@@ -76,6 +78,8 @@ CM.Inspect = (function(){
     'r.gitHotspot':'Change hotspots (git history)','r.gitHotspot.d':'Files that are both changed often and complex (changes × complexity, top 10 %) — bugs and the cost of every change pile up here; the best refactoring candidates.',
     'r.silo':'Knowledge in one head (git history)','r.silo.d':'Complex, frequently changed files where ≥ 90 % of changes come from one person — their absence stalls work on them. Checked in projects with at least two authors.',
     'gitHot':'{c} changes × complexity {cx}','silo':'{who}: {s} % of {c} changes',
+    'r.hiddencoupling':'Hidden change coupling (git history)','r.hiddencoupling.d':'Code files changed together in at least half of their commits (min. 5 shared) although neither imports the other — a dependency through globals, configuration, string keys or a protocol. Consider an explicit import or a shared module. (Tests, bulk commits > 30 files and files with < 5 changes excluded.)',
+    'coupled':'with {b} — shared commits: {n}, degree: {d} %',
   }};
   function t(k,sub){ const l=I.getLang(); const d=STR[l]||STR.pl; let s=(d&&k in d)?d[k]:(STR.pl[k]||k); if(sub) for(const p in sub) s=s.replace('{'+p+'}',sub[p]); return s; }
 
@@ -92,7 +96,7 @@ CM.Inspect = (function(){
   // real programming languages only — manifests/docs/styles being "orphans" is normal, not a smell
   const CODE_RE=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte|py|java|go|rb|php|cs|cpp|cxx|cc|c|h|hpp|rs|kt|kts|swift|scala|dart|lua|pl|r|jl|ex|exs|erl|hs|ml|fs|clj|groovy|zig|nim|v|sol)$/i;
   // kolejność reguł w raporcie (= wszystkie identyfikatory reguł; CLI waliduje nimi --fail-on)
-  const ORDER=['archviolation','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+  const ORDER=['archviolation','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
 
   // returns {findings:[{rule,sev,items:[{id,name,path,detail,sev,related?}],count}], score, files, ms}
   // item.sev = ważność tej pozycji (f.sev = pierwszej; liczy się do wyniku), related = id powiązanych węzłów (SARIF)
@@ -186,6 +190,21 @@ CM.Inspect = (function(){
         const who=(gi.authors[g.own]||{}).name||'?';
         add(F,'silo','low',f, t('silo',{who, s:Math.round(g.share*100), c:g.c})); }
     }catch(e){} }
+
+    // ---- ukryte sprzężenie zmian: pary kodu zmieniane razem (CM.GitCore.coupling, jak code-maat), bez importu ----
+    if(graph.gitInfo && CM.GitCore && CM.GitCore.coupling){ try{
+      const byPath=new Map(); for(const f of files) if(f.path) byPath.set(f.path,f);
+      const linked=(a,b)=>(a.importsOut||[]).includes(b.id)||(b.importsOut||[]).includes(a.id);
+      const hidden=[];
+      for(const p of CM.GitCore.coupling(graph.gitInfo)){
+        if(p.degree<0.5 || p.shared<5) continue;
+        const a=byPath.get(p.a), b=byPath.get(p.b);
+        if(!a||!b||a.isTest||b.isTest||!isCode(a)||!isCode(b)||linked(a,b)) continue;   // test ↔ kod zmieniają się razem z natury
+        hidden.push([a,b,p]);
+      }
+      for(const [a,b,p] of hidden.slice(0,LIMIT)) add(F,'hiddencoupling','low',a, t('coupled',{b:b.name, n:p.shared, d:Math.round(p.degree*100)}), [b.id]);
+      if(hidden.length>LIMIT){ const f=F.get('hiddencoupling'); if(f) f.count=hidden.length; }
+    }catch(e){ /* brak osi czasu w starszej mapie — reguła pominięta */ } }
 
     // ---- folder rules ----
     for(const fd of folders){

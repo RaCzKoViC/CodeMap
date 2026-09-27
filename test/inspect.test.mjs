@@ -61,6 +61,30 @@ describe('Inspect: ryzyko, pliki generowane, cykle', () => {
   });
 });
 
+describe('Inspect: ukryte sprzężenie zmian', () => {
+  test('para kodu zmieniana razem bez importu → zgłoszona; z importem, z testem albo rzadka → nie', async () => {
+    const files = [
+      F('src/a.js', 'export const a = 1;\n'), F('src/b.js', 'export const b = window.A;\n'),       // razem, bez importu
+      F('src/c.js', "import { d } from './d.js';\nexport const c = d;\n"), F('src/d.js', 'export const d = 1;\n'),   // razem, z importem
+      F('test/a.test.js', "import { a } from '../src/a.js';\n"),                                    // test ↔ kod
+      F('src/e.js', 'export const e = 1;\n'), F('src/f.js', 'export const f = 1;\n'),                // razem tylko 3×
+    ];
+    const g = new Graph().build(files, { name: 't', source: 'test' });
+    const T0 = Date.UTC(2026, 0, 1), cs = [];
+    const commit = (paths, i) => cs.push({ sha: 'c' + cs.length, parents: [], merge: false, author: { name: 'Ala Kowalska', email: 'a@x.pl' },
+      authorTime: T0 + i * 864e5, time: T0 + i * 864e5, message: 'm', files: paths.map((p) => ({ path: p, status: 'M' })) });
+    for (let i = 0; i < 6; i++) { commit(['src/a.js', 'src/b.js', 'test/a.test.js'], i); commit(['src/c.js', 'src/d.js'], i); }
+    for (let i = 0; i < 3; i++) commit(['src/e.js', 'src/f.js'], 10 + i);
+    for (let i = 0; i < 3; i++) commit(['src/e.js'], 20 + i);
+    CM.GitCore.applyToGraph(g, CM.GitCore.analyze(cs.reverse(), files.map((f) => f.path)), { source: 'test' });
+    const res = host(await CM.Inspect.run(g));
+    const h = rule(res, 'hiddencoupling');
+    assert.equal(h.count, 1);
+    assert.deepEqual([h.items[0].path, ...h.items[0].related].sort(), ['src/a.js', 'src/b.js']);
+    assert.match(h.items[0].detail, /wspólne commity: 6, stopień: 100 %/);
+  });
+});
+
 describe('Inspect: duplikaty', () => {
   const BLOCK = lines(14, (i) => `  const part${i} = normalize(input.slice(${i} * width, (${i} + 1) * width), options.mode, ${i});`);
   test('ciągły wspólny blok w dwóch plikach kodu → para z tokenami; to samo w README i tłumaczeniu → nic', async () => {
