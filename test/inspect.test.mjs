@@ -76,6 +76,8 @@ describe('Inspect: puste catch tylko w kodzie', () => {
     const res = await run([
       F('src/str.js', "const a = 'try { x() } catch (e) {}';\nconst b = `catch {}`;\n// catch (e) {}\n/* catch {} */\nexport default a + b;\n"),
       F('src/real.js', 'try { go(); } catch (e) {}\ntry { go(); } catch {}\nexport const r = 1;\n'),
+      // uzasadnienie w środku (blokowe albo liniowe) = świadome zignorowanie, nie puste catch (regresja z 1.5.0)
+      F('src/why.js', 'try { go(); } catch (e) { /* tryb prywatny: brak localStorage */ }\ntry { go(); } catch {\n  // już przerwane\n}\nexport const w = 1;\n'),
     ]);
     const r = rule(res, 'emptycatch');
     assert.deepEqual(r.items.map((i) => [i.path, i.detail]), [['src/real.js', 'w ok. 2 miejscach']]);

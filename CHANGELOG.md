@@ -5,6 +5,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-09-27
+
+### Poprawione
+- **Reguła „puste catch" (regresja z 1.5.0)**: wycinanie komentarzy razem z napisami sprawiało, że `catch(e){ /* powód */ }`
+  — świadome zignorowanie z uzasadnieniem — znów liczyło się jako puste (na repozytorium CodeMap 55 plików zamiast 0),
+  co zaniżało wynik zdrowia także w CI z GitHub Action. Komentarz zostaje teraz znacznikiem, a jego treść nadal nie jest
+  kodem (`// catch {}` się nie liczy); test regresji z komentarzem blokowym i liniowym wewnątrz `catch`.
+
 ## [1.5.0] — 2026-09-27
 
 Dowód, że mapa mówi prawdę (faza 9): korpus referencyjny 6 repozytoriów zgodny w 100 % z esbuildem, grimp i `go list`,

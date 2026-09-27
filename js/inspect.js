@@ -100,13 +100,14 @@ CM.Inspect = (function(){
   /* ---------------- rules engine ---------------- */
   const SEV_W={high:6, med:3, low:1, info:0};                    // weights for the health score
   // błąd w jednej regule nie przerywa raportu, ale nie znika po cichu (konsola; w CLI — stderr)
-  // JS bez treści napisów i komentarzy (cudzysłowy zostają) — `catch {}` w napisie (fixture, opis reguły) to nie kod
+  // JS bez treści napisów i komentarzy (cudzysłowy zostają, komentarz → znacznik „C") — `catch {}` w napisie albo
+  // komentarzu to nie kod, a `catch(e){ /* powód */ }` to świadome zignorowanie z uzasadnieniem, nie puste catch
   function codeOnly(src){
     let out='', i=0; const n=src.length;
     while(i<n){
       const c=src[i], d=src[i+1];
-      if(c==='/'&&d==='/'){ while(i<n&&src[i]!=='\n') i++; continue; }
-      if(c==='/'&&d==='*'){ const e=src.indexOf('*/',i+2); i=e<0?n:e+2; out+=' '; continue; }
+      if(c==='/'&&d==='/'){ while(i<n&&src[i]!=='\n') i++; out+='C'; continue; }   // komentarz → znacznik: catch z uzasadnieniem nie jest pusty
+      if(c==='/'&&d==='*'){ const e=src.indexOf('*/',i+2); i=e<0?n:e+2; out+='C'; continue; }
       if(c==='"'||c==="'"||c==='`'){ out+=c; i++; while(i<n&&src[i]!==c&&!(c!=='`'&&src[i]==='\n')){ if(src[i]==='\\') i++; i++; } out+=c; i++; continue; }
       out+=c; i++;
     }

@@ -242,7 +242,7 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
 - npm package (not published yet — the name `codemap` is taken, so it goes under a scope): `npm run npm-pack -- --name @scope/codemap`
   builds a 170 KB package (CLI + 17 analysis modules), installs it in a temp dir and runs the installed `codemap analyze`;
   then `npm publish dist/npm/<file>.tgz --access public` and `npx @scope/codemap analyze .`.
-- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.5.0` — a report in the step summary, SARIF, thresholds; an example
+- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.5.1` — a report in the step summary, SARIF, thresholds; an example
   with code scanning is in [docs/github-action.md](docs/github-action.md) (in Polish). The same step runs in this repository's CI.
 
 ### VS Code extension

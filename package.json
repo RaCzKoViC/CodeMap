@@ -1,6 +1,6 @@
 {
   "name": "codemap",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "private": true,
   "description": "CodeMap — Kartografia Kodu: lokalna wizualizacja struktury kodu i zależności w stylu Maltego (czysty JS, bez build-stepu).",
   "license": "MIT",

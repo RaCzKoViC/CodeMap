@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0        # historia git i baza PR
-      - uses: RaCzKoViC/CodeMap@v1.5.0   # komentarz w PR: od wydania v1.2.0
+      - uses: RaCzKoViC/CodeMap@v1.5.1   # komentarz w PR: od wydania v1.2.0
         with:
           pr-comment: true
           max-score-drop: 0     # porażka, gdy PR obniża health score
