@@ -84,6 +84,45 @@ Publikacja:
   tylko dostawcy lokalni; `/codeSearch`.
 - Deep-linki `#repo=owner/name`, `#gist=id`; publiczne linki do map przez backend.
 - Rozszerzenie VS Code / integracja z LSP jako opcja.
+- Wydanie v1.1.0 (Release, notatki z CHANGELOG, nowe zrzuty).
+
+## Faza 5 — przegląd zmian (PR)
+
+Największa wartość przy małym koszcie: łączy graf zależności, historię git, testy i pokrycie.
+- Mapa wpływu PR: zmienione pliki z API GitHub/GitLab (`pulls/:n/files`, `merge_requests/:iid/changes`),
+  zasięg zależności (`impactSet`), ocena ryzyka (częstość zmian × złożoność × pokrycie × właściciel), link
+  `#repo=…&pr=N`.
+- Komentarz w PR z GitHub Action: ryzyko, nowe cykle i naruszenia reguł, pliki bez testów, link do mapy.
+- Sugerowani recenzenci z własności plików (git).
+- CLI `--baseline`: health score przed/po, próg „nie pogarszaj" w CI.
+
+## Faza 6 — tryb na żywo i skala
+
+- Obserwacja folderu (File System Access): okresowy skan dat modyfikacji, analiza tylko zmienionych plików,
+  mapa, RAG i historia git aktualizowane na bieżąco.
+- Renderer WebGL dla 20 tys.+ węzłów (canvas 2D jest wąskim gardłem przy dużych monorepo).
+- Cache analizy w OPFS (szybkie ponowne wczytanie tego samego projektu).
+- Benchmarki w CI (czasy wczytania / analizy / układu na stałych repozytoriach).
+
+## Faza 7 — agent kodu (lokalne AI)
+
+- ChatBot z narzędziami w pętli: model sam woła `codeSearch`, `dependsOn`, `owners`, `tests` przed
+  odpowiedzią (wywołania narzędzi Ollamy); łączy tryb 📚 ze sterowaniem aplikacją.
+- Embeddingi w przeglądarce (WebLLM) — semantyczny RAG bez Ollamy.
+- „Doktor hotspotów": plan refaktoryzacji pliku z czołówki hotspotów na podstawie kodu i testów, z cytatami.
+- Trasy po kodzie (onboarding): uporządkowana ścieżka po plikach z notatkami, generowana przez model
+  i udostępniana linkiem.
+
+## Faza 8 — jakość własna i społeczność
+
+- Własny health score CodeMap (29/100 na kopii z GitHuba: duplikaty, złożone pliki bez testów, bardzo długie
+  pliki): podział `chatbot.js` / `settings.js` / `mindmap.js`, testy renderera i ChatBota, usunięcie
+  duplikatów (`escapeHtml` ×8), próg CLI w naszym CI.
+- Bezpieczeństwo: CSP wymuszane (dziś report-only), SRI dla zasobów z CDN (tree-sitter, WebLLM).
+- Społeczność: README po angielsku jako główne (`README.pl.md`), galeria przykładowych repozytoriów
+  (`#repo=`) w demo, publikacja CLI w npm (`npx codemap analyze`).
+- Dług z faz 1–3: 20 nieosiągalnych układów, migracja `codemap_settings`, `package.json#imports`,
+  wykrywanie zmiany nazwy z edycją (podobieństwo treści).
 
 ## Kolejność
 
@@ -91,3 +130,6 @@ Faza 0 w całości, potem harness testowy z fazy 1 (bez niego przebudowa `app.js
 Największą wartość ma połączenie faz 2 i 3: graf na poziomie funkcji plus hotspoty z historii git,
 analizowane lokalnie i objaśniane lokalnym modelem — żadne z porównywanych narzędzi nie daje tego
 bez serwera i bez wysyłania kodu na zewnątrz.
+
+Po fazie 4 (plan z 2026-09-27): domknięcie fazy 4 i v1.1.0 → faza 5 (PR) → z fazy 8 wcześniej jakość
+własnego kodu z progiem w CI i angielskie README → tryb na żywo → agent z narzędziami → WebGL.
