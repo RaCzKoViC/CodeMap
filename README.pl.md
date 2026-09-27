@@ -149,7 +149,8 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   indeks budowany w Ustawieniach → AI, wektory zapisane w przeglądarce i przeliczane tylko dla zmienionych
   fragmentów. Narzędzie `/codeSearch` pokazuje trafienia bez modelu.
 - **Agent z narzędziami (Ollama, tryb 📚)** — gdy fragmenty nie wystarczą, model sam sprawdza kod przed
-  odpowiedzią: `codeSearch`, `readFile`, `findFiles`, `dependencies`, `dependents`, `fileInfo`, `hotspots`, `owners` (git), `tests` —
+  odpowiedzią: `codeSearch`, `readFile`, `findFiles`, `dependencies`, `dependents`, `fileInfo`, `hotspots`, `owners` (git), `tests` oraz
+  widokowe `showOnMap` (podświetla pliki, o których jest odpowiedź, i ustawia na nich kamerę) —
   wyłącznie odczyt, w przeglądarce, na wczytanym projekcie. Działa z natywnymi wywołaniami narzędzi
   (Llama 3.x, Qwen 3) i z modelami, które zapisują wywołanie jako JSON w treści (Qwen 2.5 Coder); wyniki
   narzędzi są cytowane jako `[n]` jak fragmenty, a kroki widać w zwijanej liście „Kroki agenta". Najwyżej

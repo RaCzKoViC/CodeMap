@@ -6,6 +6,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 ## [Unreleased]
 
 ### Dodane — Faza 7 (agent z narzędziami)
+- Agent: narzędzie widokowe **`showOnMap {paths}`** — podświetla pliki, o których jest odpowiedź, i ustawia na nich
+  kamerę (tylko widok, bez zmian w danych); prompt zachęca, by pokazywać pliki. qwen3:8b na „Które pliki importują
+  format.js? Pokaż je na mapie.": `dependents` → `showOnMap` → poprawna odpowiedź z podświetleniem, 16 s.
 - **Embeddingi w przeglądarce (WebLLM)** — semantyczny RAG bez Ollamy: `CM.LocalAI.embed()` na osobnym silniku
   w workerze (niezależnym od modelu czatu), modele typu embedding z konfiguracji WebLLM (`snowflake-arctic-embed-s/-m`,
   partie `-b4` / `-b32`, tekst ucięty do okna 512 tokenów). RAG: lista modeli z obu źródeł (🌐 = w przeglądarce, z VRAM),

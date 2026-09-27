@@ -403,7 +403,7 @@ else check(glRes && !glRes.error && glRes.err === 0 && glRes.stats && glRes.stat
   && glRes.disp === 'block' && glRes.back === 'canvas' && glRes.hidden && /backend=webgl/.test(glRes.act),
   `renderer WebGL: GPU rysuje demo, kolor piksela, hit-test, eksport PNG, powrót do auto: ${JSON.stringify(glRes)}`);
 check(agentRes && !agentRes.error && agentRes.steps === 'dependents:true,codeSearch:true,readFile:true' && agentRes.sources >= 2 && agentRes.nums
-  && agentRes.roles === 'user,tool,user' && agentRes.tools === 9 && agentRes.same && /reducer/.test(agentRes.answer),
+  && agentRes.roles === 'user,tool,user' && agentRes.tools === 10 && agentRes.same && /reducer/.test(agentRes.answer),
   `agent z narzędziami: tool_calls + JSON w treści, źródła [n], graf nietknięty: ${JSON.stringify(agentRes)}`);
 check(prRes && !prRes.error && prRes.changed === 2 && prRes.outside === 1 && prRes.impacted > 0 && prRes.cur === "pr" && prRes.card && prRes.md && prRes.link && prRes.chat && prRes.persisted && prRes.cleared,
   `mapa wpływu PR: ryzyko, zależne, nakładka, panel, raport, link, ChatBot: ${JSON.stringify(prRes)}`);

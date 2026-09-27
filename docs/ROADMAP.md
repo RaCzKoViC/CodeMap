@@ -117,8 +117,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] ChatBot z narzędziami w pętli (`js/agent.js`): model sam woła `codeSearch`, `readFile`, `findFiles`,
   `dependencies`, `dependents`, `fileInfo`, `hotspots`, `owners`, `tests` przed odpowiedzią — natywne wywołania narzędzi Ollamy
   albo JSON w treści; ponaglenie zamiast wymówki. Sprawdzone na llama3.2:3b, qwen3:8b, qwen2.5-coder:7b
-  (qwen2.5:7b narzędzia ignoruje → zwykły tryb 📚). POZOSTAŁO: sterowanie
-  aplikacją z pętli (akcje zmieniające widok), agent dla WebLLM.
+  (qwen2.5:7b narzędzia ignoruje → zwykły tryb 📚). Widokowe `showOnMap` (podświetlenie + kamera)
+  z pętli agenta. POZOSTAŁO: agent dla WebLLM (tool calling w przeglądarce).
 - [x] Embeddingi w przeglądarce (WebLLM `snowflake-arctic-embed`) — semantyczny RAG bez Ollamy; osobny silnik w workerze.
 - [x] „Doktor hotspotów" (`js/doctor.js`): plan refaktoryzacji pliku z czołówki hotspotów — kartoteka (metryki, git,
   testy, zależne) + fragmenty najdłuższych funkcji, cztery sekcje z cytatami; przycisk w panelu pliku i `hotspotDoctor`.

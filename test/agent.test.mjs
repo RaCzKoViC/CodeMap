@@ -144,3 +144,14 @@ describe('narzędzia owners / tests (bez zmian w widoku)', () => {
     assert.equal(await AG.exec('tests', {}, { graph: build(), sources: [], testMap: CM.TestMap }), 'no test files found in the project');
   });
 });
+
+describe('narzędzie widokowe showOnMap', () => {
+  test('podświetla znalezione pliki przez ctx.view (lista albo tekst), nieznane zgłasza; bez view — sam opis', async () => {
+    const g = build(); let shown = null;
+    const out = await AG.exec('showOnMap', { paths: ['util.js', 'src/app.js', 'nie/ma.js'] }, { graph: g, sources: [], view: (ids) => { shown = ids; } });
+    assert.deepEqual(host(shown), ['src/lib/util.js', 'src/app.js']);
+    assert.match(out, /^highlighted on the map: src\/lib\/util\.js, src\/app\.js\nnot found: nie\/ma\.js$/);
+    assert.match(await AG.exec('showOnMap', { paths: 'reducer.js' }, { graph: g, sources: [] }), /src\/store\/reducer\.js/);
+    await assert.rejects(AG.exec('showOnMap', { paths: ['x.zz'] }, { graph: g, sources: [] }), /no such files/);
+  });
+});

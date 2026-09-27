@@ -1249,9 +1249,10 @@ CM.ChatBot = (function(){
         if(!prep && agentOn() && CM.Agent && CM.Ollama.chatTools){
           try{
             const sysA=sys.replace('using ONLY the numbered code snippets in the user message.',
-              'using the numbered code snippets in the user message and, when they are not enough, the read-only tools (codeSearch, readFile, findFiles, dependencies, dependents, fileInfo, hotspots, owners, tests). If any part of the question is not covered by the snippets, call codeSearch or readFile for it BEFORE answering — never answer that something "would need to be inspected". Tool results are numbered [n] too.');
+              'using the numbered code snippets in the user message and, when they are not enough, the read-only tools (codeSearch, readFile, findFiles, dependencies, dependents, fileInfo, hotspots, owners, tests) and showOnMap to highlight the files your answer is about. If any part of the question is not covered by the snippets, call codeSearch or readFile for it BEFORE answering — never answer that something "would need to be inspected". Tool results are numbered [n] too.');
             const res=await CM.Agent.run({messages:[{role:'system',content:sysA}].concat(messages.slice(1)), sources:ctx.sources.slice(), maxSteps:5, signal:abortCtl.signal,
-              ctx:{graph:CM.App.graph, rag:CM.RAG, gitCore:CM.GitCore, testMap:CM.TestMap, signal:abortCtl.signal},
+              ctx:{graph:CM.App.graph, rag:CM.RAG, gitCore:CM.GitCore, testMap:CM.TestMap, signal:abortCtl.signal,
+                view:(ids)=>{ const R=CM.App.renderer; if(!R) return; R.setHighlight(new Set(ids)); const n=CM.App.graph.nodes.get(ids[0]); if(n&&window.CMApp&&CMApp.focusNode){ CMApp.focusNode(n.id); R.setHighlight(new Set(ids)); } }},
               chat:(msgs, tools)=>CM.Ollama.chatTools(msgs, tools, {signal:abortCtl.signal, think:false, maxTokens:900, temperature:0.2}),
               onStep:(s)=>setStage('🔧 '+s.name+' '+argText(s.args))});
             done=true; if(paintT){ clearTimeout(paintT); paintT=null; }

@@ -1,6 +1,7 @@
 /* ===================== agent.js — ChatBot z narzędziami w pętli (faza 7) ===================== */
 // Model lokalny (Ollama) sam zbiera informacje przed odpowiedzią: szuka w kodzie, czyta fragmenty plików, sprawdza
-// zależności, właścicieli, testy i hotspoty. Tylko narzędzia DO ODCZYTU (nic nie zmienia aplikacji ani plików).
+// zależności, właścicieli, testy i hotspoty. Narzędzia DO ODCZYTU (nic nie zmienia plików ani danych mapy) + jedno
+// widokowe — showOnMap podświetla pliki i ustawia na nich kamerę (ctx.view; bez niego tylko opis).
 // Odporność na różne modele: natywne tool_calls (llama3.x, qwen3), JSON wywołania w treści (qwen2.5-coder)
 // i modele ignorujące narzędzia — pierwsza wiadomość i tak zawiera wyniki wyszukiwania (jak tryb RAG),
 // więc odpowiedź jest ugruntowana. Pętla (run) nie zna DOM ani Ollamy — chat() jest wstrzykiwany (testy w Node).
@@ -28,6 +29,8 @@ CM.Agent = (function(){
       parameters:{type:'object', properties:{path:{type:'string', description:'file or folder; omit for the whole project'}}, required:[]}},
     {name:'tests', description:'Which tests cover a file or folder; without path a project summary with the most complex untested files.',
       parameters:{type:'object', properties:{path:{type:'string', description:'file or folder; omit for the whole project'}}, required:[]}},
+    {name:'showOnMap', description:'Highlight files on the user\'s code map (and move the camera to the first one) — use it to point at the files your answer is about.',
+      parameters:{type:'object', properties:{paths:{type:'array', items:{type:'string'}, description:'project file paths (max 30)'}}, required:['paths']}},
   ];
   const NAMES=new Set(TOOLS.map(t=>t.name));
   function ollamaTools(){ return TOOLS.map(t=>({type:'function', function:{name:t.name, description:t.description, parameters:t.parameters}})); }
@@ -132,6 +135,14 @@ CM.Agent = (function(){
         const fs=ctx.gitCore&&ctx.gitCore.folderStats(g, n); if(!fs) return n.path+'/: no changes in the analysed history';
         const tot=fs.authors.reduce((s,x)=>s+x[1],0)||1;
         return n.path+'/ — '+fs.files+' files, '+fs.c+' changes: '+fs.authors.slice(0,8).map(x=>nm(x[0])+' '+Math.round(x[1]/tot*100)+'%').join(', ')+'\nbus factor: '+fs.busFactor.value;
+      }
+      case 'showOnMap': {
+        let list=args.paths||args.path||args.files||[]; if(typeof list==='string') list=list.split(/[,\s]+/);
+        const found=[], miss=[];
+        for(const p of list.slice(0,30)){ const n=pathMatch(g, p); if(n){ if(!found.includes(n)) found.push(n); } else miss.push(String(p)); }
+        if(!found.length) throw new Error('no such files on the map: '+list.slice(0,5).join(', '));
+        if(ctx.view) ctx.view(found.map(n=>n.id));
+        return 'highlighted on the map: '+found.map(n=>n.path).join(', ')+(miss.length?'\nnot found: '+miss.join(', '):'');
       }
       case 'tests': {
         const TM=ctx.testMap; if(!g.testInfo && TM) TM.mapTests(g);
