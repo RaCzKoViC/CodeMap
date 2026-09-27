@@ -60,6 +60,7 @@ CM.GitRemote = (function(){
       if(o.onProgress) o.onProgress({phase:'list', done:commits.length, total:o.max});
       if(arr.length<100) break; page++;
     }
+    commits.splice(o.max);   // strona ma 100 commitów — nie więcej niż max
     const budget=Math.min(o.maxDetails!=null?o.maxDetails:(o.token?500:50), rate.remaining!=null?Math.max(0,rate.remaining-2):Infinity);
     const d=await details(commits, budget, async (c)=>{
       const x=await get(api+'/commits/'+c.sha);
@@ -88,6 +89,7 @@ CM.GitRemote = (function(){
       if(o.onProgress) o.onProgress({phase:'list', done:commits.length, total:o.max});
       if(arr.length<100) break; page++;
     }
+    commits.splice(o.max);
     const d=await details(commits, o.maxDetails!=null?o.maxDetails:300, async (c)=>{
       const out=[];
       for(let p=1;p<=5;p++){
@@ -121,6 +123,7 @@ CM.GitRemote = (function(){
       if(o.onProgress) o.onProgress({phase:'list', done:commits.length, total:o.max});
       next=j.next||null;
     }
+    commits.splice(o.max);
     const d=await details(commits, o.maxDetails!=null?o.maxDetails:(o.token?300:40), async (c)=>{
       const out=[]; let u=api+'/diffstat/'+c.sha+'?pagelen=100', g=0;
       while(u && g++<5){ const j=await get(u);

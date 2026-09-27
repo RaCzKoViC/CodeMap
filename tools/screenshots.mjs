@@ -1,6 +1,7 @@
 // Zrzuty ekranu do README (docs/screenshot-*.png) w headless Chrome przez CDP — powtarzalnie, z tego
 // samego kodu co aplikacja: wczytuje repozytorium SAMEGO CodeMap jako projekt (prawdziwe pliki z dysku),
-// a potem ustawia trzy widoki: mapa projektu, graf symboli (tree-sitter), ChatBot z menu narzędzi „/".
+// a potem ustawia widoki: mapa projektu, graf symboli (tree-sitter), ChatBot z menu narzędzi „/" oraz
+// historia git czytana z lokalnego katalogu .git (git-local.js) — nakładka częstości zmian + oś czasu.
 //   node tools/screenshots.mjs            (CHROME=ścieżka/do/chrome, gdy autodetekcja zawiedzie)
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -33,6 +34,16 @@ async function collect(dir, out) {
   return out;
 }
 const files = await collect(ROOT, []);
+// katalog .git jako „pliki boczne" (ścieżki względem .git) — przekazywany do strony jako base64
+async function collectGit(dir, rel, out) {
+  for (const name of await readdir(dir)) {
+    const p = join(dir, name), st = await stat(p), r = rel ? rel + '/' + name : name;
+    if (st.isDirectory()) { if (name !== 'logs' && name !== 'hooks') await collectGit(p, r, out); }
+    else if (!/\.lock$/.test(name)) out.push({ path: r, b64: (await readFile(p)).toString('base64') });
+  }
+  return out;
+}
+const gitFiles = existsSync(join(ROOT, '.git')) && (await stat(join(ROOT, '.git'))).isDirectory() ? await collectGit(join(ROOT, '.git'), '', []) : [];
 
 // ---- serwer statyczny + Chrome ----
 const server = createServer(async (req, res) => {
@@ -102,6 +113,25 @@ try {
     const msgs=panel.querySelector('.cb-msgs'); msgs.scrollTop=msgs.scrollHeight; await sleep(200);
     ta.value='/'; ta.dispatchEvent(new Event('input',{bubbles:true})); ta.focus(); await sleep(400); })()`);
   await shot('screenshot-chatbot.png');
+
+  // ---- 4. historia git z lokalnego .git: częstość zmian + oś czasu (Gource-lite) ----
+  if (gitFiles.length) {
+    const g = await js(`(async()=>{ const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+      if(!CM.GitLocal) return 'brak CM.GitLocal';
+      const b64=(s)=>{ const bin=atob(s), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i); return u; };
+      const git=${JSON.stringify(gitFiles)}.map(f=>({path:f.path, file:new File([b64(f.b64)], f.path.split('/').pop())}));
+      const panel=document.getElementById('cb-panel'); if(panel&&CM.ChatBot.isOpen()) CM.ChatBot.close();
+      await CMApp.loadFiles(${JSON.stringify(files)}, {name:'CodeMap', source:'local: CodeMap', kind:'local'}, {git, gitFile:null, coverage:[], gitEntry:null, coverageEntries:[]});
+      for(let i=0;i<200;i++){ if(CMApp.graph.gitInfo) break; await sleep(150); }
+      if(!CMApp.graph.gitInfo) return 'brak gitInfo';
+      CMApp.exec('setLayout',{layout:'force'}); await sleep(5000); CMApp.renderer().fit(); await sleep(400);
+      CMApp.exec('togglePanel',{side:'right',open:true}); CMApp.exec('colorBy',{mode:'churn'}); CM.App.select(null); await sleep(300);
+      const n=CMApp.graph.gitInfo.timeline.commits.length;
+      await CM.Git.openTimeline({play:false, step:Math.round(n*0.72)}); await sleep(700);
+      return JSON.stringify({commits:CMApp.graph.gitInfo.commits, authors:CMApp.graph.gitInfo.authors.length, bus:CMApp.graph.gitInfo.busFactor.value, steps:n}); })()`);
+    console.log('  git:', g);
+    await shot('screenshot-git.png');
+  } else console.log('  (brak katalogu .git — pomijam zrzut historii)');
 } catch (e) {
   console.error('✖', e.message); process.exitCode = 1;
 } finally {
