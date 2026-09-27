@@ -47,6 +47,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 
 ### Wczytywanie (150+ formatów)
 - **Folder / pliki / przeciągnij-upuść / wklej** (`Ctrl+V`) — pełna struktura katalogów.
+- **Folder na żywo** (Wczytaj → Folder na żywo, Chrome / Edge): mapa nadąża za edycją — zmienione pliki są
+  czytane i analizowane w Web Workerze, pozycje, zaznaczenie, kamera i kolorowanie zostają, zmiany świecą na
+  mapie, nowy commit odświeża historię git. Pliki z sekretami (`.env`, klucze prywatne) są na mapie, ale bez treści.
 - **Archiwa** ZIP, TAR, TGZ, GZ — rozpakowywane w przeglądarce (`DecompressionStream`).
 - **PDF** — mapa z zakładek i stron.
 - **Repozytoria** GitHub, GitLab, Bitbucket po adresie URL (publiczne lub z tokenem), wybór gałęzi/tagu,

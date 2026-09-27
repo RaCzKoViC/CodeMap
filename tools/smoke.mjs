@@ -254,6 +254,31 @@ const prRes = await evalJs(`(async()=>{ try{
     persisted:!!(round.prInfo && round.prInfo.number===12), cleared};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// tryb na żywo (faza 6) na prawdziwych uchwytach katalogu: OPFS (bez okna wyboru) → start, zmiana pliku +
+// nowy plik → poll: nowe węzły i krawędzie, pozycje zachowane, node_modules pominięte, znacznik NA ŻYWO; stop
+const liveRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const root=await navigator.storage.getDirectory(); try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){}
+  const d=await root.getDirectoryHandle('smoke-live',{create:true});
+  const write=async(path,text)=>{ let h=d; const parts=path.split('/'); for(const p of parts.slice(0,-1)) h=await h.getDirectoryHandle(p,{create:true});
+    const fh=await h.getFileHandle(parts[parts.length-1],{create:true}); const w=await fh.createWritable(); await w.write(text); await w.close(); };
+  await write('src/a.js',"import { b } from './b.js';\\nexport const a = () => b();\\n");
+  await write('src/b.js',"export const b = () => 1;\\n");
+  await write('node_modules/x/index.js',"module.exports=1;\\n");
+  const ok=await CM.Live.start(d,{interval:600000}); await sleep(300);
+  const g0=CMApp.graph, a0=g0.nodes.get('src/a.js'), x0=a0&&a0.x;
+  const skipped=![...g0.nodes.keys()].some(k=>k.includes('node_modules'));
+  await write('src/b.js',"import { c } from './c.js';\\nexport const b = () => c();\\n");
+  await write('src/c.js',"export const c = () => 2;\\n");
+  const res=await CM.Live.poll(); await sleep(200);
+  const g1=CMApp.graph, kept=!!g1.nodes.get('src/a.js') && g1.nodes.get('src/a.js').x===x0;
+  const edge=g1.edges.some(e=>e.type==='import'&&e.source==='src/b.js'&&e.target==='src/c.js');
+  const badge=!!document.getElementById('st-live');
+  CM.Live.stop(true); const off=!CM.Live.state().on && !document.getElementById('st-live');
+  try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){}
+  return {ok, skipped, added:res&&res.added, changed:res&&res.changed, kept, edge, badge, off};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -274,6 +299,8 @@ check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexH
   `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
 check(prRes && !prRes.error && prRes.changed === 2 && prRes.outside === 1 && prRes.impacted > 0 && prRes.cur === "pr" && prRes.card && prRes.md && prRes.link && prRes.chat && prRes.persisted && prRes.cleared,
   `mapa wpływu PR: ryzyko, zależne, nakładka, panel, raport, link, ChatBot: ${JSON.stringify(prRes)}`);
+check(liveRes && !liveRes.error && liveRes.ok && liveRes.skipped && String(liveRes.added)==="src/c.js" && String(liveRes.changed)==="src/b.js" && liveRes.kept && liveRes.edge && liveRes.badge && liveRes.off,
+  `tryb na żywo (OPFS): zmiany → przebudowa z zachowaniem pozycji: ${JSON.stringify(liveRes)}`);
 check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
   `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
 {

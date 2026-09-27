@@ -5,6 +5,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 6 (tryb na żywo)
+- **Folder na żywo** (`js/live.js`, Wczytaj → „Folder na żywo"): uchwyt katalogu z File System Access, obserwacja
+  przez `FileSystemObserver` (wyzwalacz) + skan dat modyfikacji co 2,5–15 s (siatka bezpieczeństwa, tylko przy
+  widocznej karcie); zmienione i nowe pliki czytane i analizowane w workerze (wyniki niezmienionych z poprzedniego
+  grafu), graf przebudowany z zachowaniem pozycji, zwinięć, zaznaczenia, kamery, nakładki i danych git / testów /
+  PR; zmiany świecą na mapie (3 s), znacznik „NA ŻYWO" z pauzą i zatrzymaniem na pasku stanu; nowy commit
+  (`.git/HEAD`, `logs/HEAD`) przelicza historię git; ChatBot `liveFolder`, `liveStop`. Test w smoke na OPFS.
+
 ### Dodane — Faza 5 (przegląd zmian)
 - **Mapa wpływu PR** (`js/pr-core.js`, `js/pr.js`): Projekt → „Przegląd PR…" (numer albo adres PR / MR
   z GitHub, GitLab, Bitbucket; PR z innego repozytorium wczytuje najpierw to repozytorium) i link

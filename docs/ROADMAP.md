@@ -97,10 +97,11 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] CLI `--base` / `--baseline` / `--pr-md` / `--max-score-drop`: health score przed/po, próg „nie pogarszaj".
 - [ ] Zostało: wybór PR z listy otwartych PR w oknie, porównanie przed/po także w aplikacji (dziś tylko CLI).
 
-## Faza 6 — tryb na żywo i skala
+## Faza 6 — tryb na żywo i skala — W TOKU
 
-- Obserwacja folderu (File System Access): okresowy skan dat modyfikacji, analiza tylko zmienionych plików,
-  mapa, RAG i historia git aktualizowane na bieżąco.
+- [x] Obserwacja folderu (`js/live.js`): FileSystemObserver + skan dat modyfikacji, analiza tylko zmienionych plików,
+  przebudowa z zachowaniem stanu, RAG (wektory po hashu) i historia git (nowy commit) na bieżąco.
+  Zostało: wznowienie obserwacji po przeładowaniu (uchwyt w IndexedDB + zgoda użytkownika).
 - Renderer WebGL dla 20 tys.+ węzłów (canvas 2D jest wąskim gardłem przy dużych monorepo).
 - Cache analizy w OPFS (szybkie ponowne wczytanie tego samego projektu).
 - Benchmarki w CI (czasy wczytania / analizy / układu na stałych repozytoriach).

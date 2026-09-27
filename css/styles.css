@@ -2180,3 +2180,11 @@ body.light .set-ai-prov{background:rgba(20,30,45,.08)}
 /* ---- graf symboli: pigułka postępu analizy tree-sittera, przycisk „Pokaż plik” ---- */
 .toast.sym-pill{border-left:3px solid var(--accent)}
 .det-showfile{margin-top:8px}
+
+/* tryb na żywo (live.js): znacznik na pasku stanu */
+.st-live{display:inline-flex;align-items:center;gap:6px;margin-left:10px;padding:1px 4px 1px 8px;border-radius:9px;background:rgba(52,211,153,.12);color:#34d399;font:700 10.5px var(--mono);letter-spacing:.06em}
+.st-live-dot{width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 0 0 rgba(52,211,153,.6);animation:stLive 1.6s infinite}
+.st-live-dot.paused{background:#94a3b8;animation:none}
+.st-live-btn{background:none;border:0;color:inherit;cursor:pointer;font-size:11px;padding:0 3px;opacity:.8}
+.st-live-btn:hover{opacity:1}
+@keyframes stLive{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 7px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}

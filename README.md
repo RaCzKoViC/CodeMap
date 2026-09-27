@@ -47,6 +47,9 @@ Click **“✨ See demo”** or open `index.html#demo`.
 
 ### Loading (150+ formats)
 - **Folder / files / drag and drop / paste** (`Ctrl+V`) — the full directory structure.
+- **Live folder** (Load → Live folder, Chrome / Edge): the map keeps up with your edits — changed files are
+  re-read and re-analysed in a Web Worker, positions, selection, camera and colouring stay put, changes glow on
+  the map, a new commit refreshes the git history. Secrets (`.env`, private keys) are shown but never read.
 - **Archives** — ZIP, TAR, TGZ, GZ — unpacked right in the browser (`DecompressionStream`).
 - **PDF** — a map built from bookmarks and pages.
 - **Repositories** from GitHub, GitLab and Bitbucket by URL (public, or private with a token), with branch/tag
