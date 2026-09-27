@@ -9,7 +9,7 @@
   window.CMApp={get graph(){return A.graph;}, apply:A.apply, focusNode:A.focusNode, loadDemo:A.loadDemo, toggleImpact:A.toggleImpact,
     copyViewLink:A.copyViewLink, serializeView:A.serializeView,
     impactState:()=>A.impactOn,
-    loadFiles:(files,meta)=>A.ingest(()=>Promise.resolve({files,meta}),'test'),
+    loadFiles:(files,meta,side)=>A.ingest(()=>Promise.resolve({files,meta,side}),'test'),   // side: pliki boczne (.git, lcov) — smoke/zrzuty
     loadFromJSON:A.loadFromJSON,
     hasMap:()=>A.state.counts.nodes>0,
     mapName:()=>(A.graph&&A.graph.meta&&(A.graph.meta.name||A.graph.meta.source))||'mapa',

@@ -80,11 +80,19 @@ CM.UI = (function(){
     return card;
   }
 
+  // sekcje dopisywane przez moduły (historia git, testy/pokrycie…): fn(node|null, graph, H) → Element|null
+  // node === null = widok projektu (nic nie zaznaczono)
+  const DETAIL_SECTIONS=[];
+  function addDetailSection(fn){ if(typeof fn==='function') DETAIL_SECTIONS.push(fn); }
+  function extraSections(body, node, graph, H){
+    for(const fn of DETAIL_SECTIONS){ try{ const s=fn(node, graph, H); if(s) body.appendChild(s); }catch(e){ console.warn('detail section', e); } }
+  }
   function renderDetails(node, graph, H){
     const body=$('#details-body'); body.innerHTML='';
     if(!node){
       body.appendChild(el('div',{class:'details-empty'}, el('p',{class:'muted',text:I.t('cu.clickElement','Kliknij element na mapie, aby zobaczyć zaawansowane parametry.')})));
       const card=repoCard(graph, H); if(card) body.appendChild(card);
+      if(graph && graph.nodes && graph.nodes.size>1) extraSections(body, null, graph, H);
       return;
     }
 
@@ -148,6 +156,7 @@ CM.UI = (function(){
         sec.appendChild(row); body.appendChild(sec);
       }
     }
+    extraSections(body, node, graph, H);
     if(node.type==='external' && node.version){
       const src={npm:'npm',pip:'PyPI',cargo:'crates.io',go:'Go modules'}[node.depSource]||node.depSource||'';
       body.appendChild(el('div',{class:'det-ver',html:CM.icons.svg('package',{size:13})+` <b>${esc(node.name)}</b> <span>v${esc(node.version.replace(/^v/,''))}</span>${src?` <span class="muted">· ${src}</span>`:''}`}));
@@ -592,13 +601,17 @@ CM.UI = (function(){
   }
   function renderHotspots(graph, H){
     const body=$('#hotspots-body'); if(!body) return; body.innerHTML='';
+    // z historią git: częstość zmian × złożoność (CM.GitCore); bez niej: rozmiar × zależności × złożoność
+    const useGit=!!(graph.gitInfo && CM.GitCore);
     const files=[];
-    for(const n of graph.nodes.values()){ if(n.type==='file' && n.metrics) files.push(n); }
-    files.forEach(n=>n._hot=hotspotScore(n));
+    for(const n of graph.nodes.values()){ if(n.type==='file' && n.metrics && (!useGit||n.git)) files.push(n); }
+    files.forEach(n=>n._hot=useGit?CM.GitCore.hotspotScore(n):hotspotScore(n));
     files.sort((a,b)=>b._hot-a._hot);
     const top=files.slice(0,30); const max=top.length?top[0]._hot||1:1;
     if(!top.length){ body.appendChild(el('p',{class:'muted',text:I.t('cu.noFilesWithMetrics','Brak plików z metrykami (wczytaj projekt z zawartością plików, np. folder lub GitHub z opcją pobierania treści).')})); return; }
-    body.appendChild(el('p',{class:'muted small',style:'margin:0 0 12px',text:I.t('cu.hotspotsDesc','Pliki o największym wpływie na projekt — duże, złożone i najczęściej importowane. Kliknij, aby przejść do pliku.')}));
+    body.appendChild(el('p',{class:'muted small',style:'margin:0 0 12px',text:useGit
+      ?I.t('cu.hotspotsDescGit','Pliki często zmieniane i jednocześnie złożone (historia git: częstość zmian × złożoność) — tu kumulują się błędy i koszt każdej zmiany. Kliknij, aby przejść do pliku.')
+      :I.t('cu.hotspotsDesc','Pliki o największym wpływie na projekt — duże, złożone i najczęściej importowane. Kliknij, aby przejść do pliku.')+' '+I.t('cu.hotspotsGitHint','Historia git (Projekt → Historia git) dołoży częstość zmian.')}));
     top.forEach((n,i)=>{
       const row=el('div',{class:'hot-row',onclick:()=>{ if(H&&H.focus) H.focus(n.id); const m=$('#modal-hotspots'); if(m) m.classList.add('hidden'); }});
       row.appendChild(el('div',{class:'hot-rank',text:String(i+1)}));
@@ -607,6 +620,7 @@ CM.UI = (function(){
       main.appendChild(el('div',{class:'hot-path',text:n.path}));
       row.appendChild(main);
       const stats=el('div',{class:'hot-stats'});
+      if(useGit) stats.appendChild(el('span',{html:`<b>${U.fmtNum(n.git.c)}</b> ${I.t('cu.changesAbbr','zmian')}`}));
       stats.appendChild(el('span',{html:`<b>${U.fmtNum(n.metrics.lines)}</b> ${I.t('cu.lnAbbr','ln')}`}));
       stats.appendChild(el('span',{html:`${I.t('cu.complexityAbbr','złoż')} <b>${U.fmtNum(n.metrics.complexity)}</b>`}));
       stats.appendChild(el('span',{html:`<b>${U.fmtNum((n.importsIn||[]).length)}</b>←`}));
@@ -617,5 +631,5 @@ CM.UI = (function(){
     });
   }
 
-  return {renderDetails, renderEdgeDetails, renderFileView, highlight, renderLangFilters, renderSearch, tooltip, filePreview, ctxMenu, hideCtx, renderHistory, renderDiff, nodeIcon, renderHotspots};
+  return {addDetailSection, renderDetails, renderEdgeDetails, renderFileView, highlight, renderLangFilters, renderSearch, tooltip, filePreview, ctxMenu, hideCtx, renderHistory, renderDiff, nodeIcon, renderHotspots};
 })();

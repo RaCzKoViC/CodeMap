@@ -28,7 +28,7 @@ CM.Overlays = (function(){
   function register(o){ if(!o||!o.id) return; reg.set(o.id, o); fillSelect(); }
   function graph(){ return CM.App && CM.App.graph; }
   function isAvailable(o, g){ try{ return !o.available || !!o.available(g||graph()); }catch(e){ return false; } }
-  function list(g){ return [...reg.values()].filter(o=>isAvailable(o,g)).sort((a,b)=>(a.order||50)-(b.order||50)); }
+  function list(g){ return [...reg.values()].filter(o=>isAvailable(o,g)).sort((a,b)=>(a.order??50)-(b.order??50)); }
   function current(){ return mode; }
   function label(o){ try{ return typeof o.label==='function'?o.label():String(o.label||o.id); }catch(e){ return o.id; } }
 

@@ -217,6 +217,7 @@
       lang: I.getLang(),
       impactView: !!A.impactOn,
       coloring: CM.Overlays?CM.Overlays.current():'lang', colorings: CM.Overlays?CM.Overlays.list().map(o=>o.id):[],
+      git: (A.graph&&A.graph.gitInfo)?{commits:A.graph.gitInfo.commits, authors:(A.graph.gitInfo.authors||[]).length, busFactor:A.graph.gitInfo.busFactor&&A.graph.gitInfo.busFactor.value, source:A.graph.gitInfo.source}:null,
       selected: sel?{name:_pn(sel.name), path:_pn(sel.path)||null, type:sel.type}:null,
       availableLayouts: CB_LAYOUTS,
       mindmap: (CM.MindMap&&CM.MindMap.isActive&&CM.MindMap.isActive())?{nodes:(CM.MindMap.nodeCount?CM.MindMap.nodeCount():0), name:_pn(CM.MindMap.mapName?CM.MindMap.mapName():'')}:null,
@@ -320,7 +321,9 @@
         return I.t('cb.stats','Pliki: ')+files+' · '+I.t('cb.statsFolders','foldery: ')+folders+' · '+I.t('cb.statsExt','zewnętrzne: ')+ext+' · '+I.t('cb.statsLines','linie: ')+lines
           +' · '+I.t('cb.statsCycles','cykle: ')+cyc+'\n'+I.t('cb.statsLangs','Języki: ')+top+'\n'+I.t('cb.statsBig','Największe: ')+big.slice(0,5).map(n=>n.name+' ('+((n.metrics&&n.metrics.lines)||0)+')').join(', '); }
       case 'topFiles': { _needProject(); const g=A.graph; const metric=(args.metric||'lines').toLowerCase(); const n=Math.max(1,Math.min(50,+args.n||10));
-        const val=(x)=>metric==='size'?(x.size||0):metric==='deps'?((x.importsIn||[]).length+(x.importsOut||[]).length):((x.metrics&&x.metrics[metric])||0);
+        const val=(x)=>metric==='size'?(x.size||0):metric==='deps'?((x.importsIn||[]).length+(x.importsOut||[]).length)
+          :(metric==='churn'||metric==='changes')?(x.git?x.git.c:0):metric==='hotspot'?(CM.GitCore?Math.round(CM.GitCore.hotspotScore(x)):0)
+          :((x.metrics&&x.metrics[metric])||0);
         const list=[...g.nodes.values()].filter(x=>x.type==='file').sort((a,b)=>val(b)-val(a)).slice(0,n);
         if(A.renderer){ A.renderer.highlight=new Set(list.map(x=>x.id)); A.renderer.kick(); }
         return I.t('cb.topFiles','Top wg ')+metric+': '+list.map(x=>x.name+' ('+val(x)+')').join(', '); }

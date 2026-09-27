@@ -25,7 +25,7 @@ CM.i18n = (function(){
     'project.snapshot':'Zapisz migawkę','project.history':'Historia i porównania',
     'project.save':'Zapisz mapę (.json)','project.exportimg':'Eksport obrazu (PNG / SVG)','project.open':'Otwórz zapisaną mapę',
     'project.exportdot':'Eksportuj DOT (Graphviz)','project.exportmermaid':'Eksportuj Mermaid','project.exportgraphml':'Eksportuj GraphML (yEd)',
-    'project.cycles':'Wykryj cykle zależności','project.hotspots':'Hotspoty (rozmiar × zależności)','project.inspect':'Analiza statyczna (antywzorce)',
+    'project.cycles':'Wykryj cykle zależności','project.hotspots':'Hotspoty (zmiany × złożoność)','project.inspect':'Analiza statyczna (antywzorce)',
     'th.depth':'Głębia','th.graphite':'Grafit','th.forest':'Las','th.plum':'Śliwka','th.paper':'Papier','th.parchment':'Pergamin','th.mist':'Mgła',
     'project.compareadd':'Porównaj: dodaj schemat na mapę','project.compareclear':'Usuń schematy porównawcze',
     'project.clear':'Wyczyść dane','project.newwin':'Nowe okno',
@@ -117,7 +117,7 @@ CM.i18n = (function(){
     'project.btn':'Project','project.btn.title':'Project operations',
     'project.snapshot':'Save snapshot','project.history':'History & comparisons',
     'project.save':'Save map (.json)','project.exportimg':'Export image (PNG / SVG)','project.open':'Open a saved map',
-    'project.cycles':'Detect dependency cycles','project.hotspots':'Hotspots (size × dependencies)','project.inspect':'Static analysis (anti-patterns)',
+    'project.cycles':'Detect dependency cycles','project.hotspots':'Hotspots (changes × complexity)','project.inspect':'Static analysis (anti-patterns)',
     'th.depth':'Depth','th.graphite':'Graphite','th.forest':'Forest','th.plum':'Plum','th.paper':'Paper','th.parchment':'Parchment','th.mist':'Mist',
     'cb.badPreset':'Unknown preset: ','cb.execPreset':'Theme preset: ',
     'cu.truncated':'preview truncated to 64 KB','cu.scrollHint':'Scroll with the wheel to browse the whole file',
@@ -235,6 +235,7 @@ CM.i18n = (function(){
     "cu.comparison":"Comparison:","cu.added":"added","cu.removed":"removed","cu.modified":"modified","cu.unchanged":"unchanged",
     "cu.deltaFiles":"Δ files:","cu.deltaLines":"Δ lines:","cu.deltaSize":"Δ size:","cu.noDiff":"No differences between snapshots.",
     "cu.noFilesWithMetrics":"No files with metrics (load a project that includes file contents, e.g. a folder or GitHub with content fetching enabled).",
+    "cu.hotspotsDescGit":"Files that change often AND are complex (git history: change frequency × complexity) — this is where bugs and the cost of every change pile up. Click to go to the file.","cu.hotspotsGitHint":"Git history (Project → Git history) adds change frequency.","cu.changesAbbr":"changes",
     "cu.hotspotsDesc":"Files with the greatest impact on the project — large, complex and most frequently imported. Click to jump to a file.",
     "cu.complexityAbbr":"cplx",
     "cu.openOn":"Open on ","cu.openRepo":"Open repository","cu.stars":"stars","cu.forks":"forks","cu.issues":"issues",
@@ -455,9 +456,11 @@ CM.i18n = (function(){
   }
   function getLang(){ return lang; }
   function onChange(fn){ listeners.push(fn); }
+  // słowniki modułów ładowanych później (git.js, testy…): I.extend('en', {klucz:'tekst'})
+  function extend(l, obj){ if(DICT[l] && obj) Object.assign(DICT[l], obj); }
 
   // restore persisted language at load time
   try{ const s = localStorage.getItem('codemap_lang'); if(s==='pl'||s==='en') lang = s; }catch(e){}
 
-  return { t, apply, setLang, getLang, onChange, langs:['pl','en'] };
+  return { t, apply, setLang, getLang, onChange, extend, langs:['pl','en'] };
 })();

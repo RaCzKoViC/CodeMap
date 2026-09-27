@@ -27,6 +27,7 @@ CM.Renderer = (function(){
       this.impact = null;             // {focus, up:Set, down:Set, all:Set} dependency-impact view, or null
       this.diffMode = false;
       this.colorFn = null;            // nakładka (CM.Overlays): n -> #hex albo null = kolor języka
+      this.decorators = [];           // rysowanie modułów po węzłach i etykietach (awatary właścicieli, oś czasu git): fn(ctx, renderer)
       this.opts = {
         showGrid:true, showLabels:true, labelZoom:0.5, dim:0.10,
         edgeOpacity:0.45, curvedImports:true, nodeScale:1, showArrows:true,
@@ -241,6 +242,7 @@ CM.Renderer = (function(){
       ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
       this._drawNodes(ctx, vb);
       if(this.opts.showLabels) this._drawLabels(ctx);
+      for(const d of this.decorators){ try{ d(ctx, this); }catch(e){} ctx.globalAlpha=1; ctx.setLineDash([]); }
 
       // fps
       const now=performance.now(); if(this._lt){ this._fps=Math.round(1000/(now-this._lt)); } this._lt=now;

@@ -201,7 +201,7 @@ CM.ChatBot = (function(){
     'colorBy {mode} — color map nodes by data: lang (default), complexity, mtime, and when available owner/churn/age (git history), coverage/tests (see colorings in state)',
     'help — list all available actions',
     'stats — project statistics: files, folders, languages, biggest files, cycles',
-    'topFiles {metric:"lines"|"complexity"|"size"|"deps", n?} — list the top files by a metric and highlight them',
+    'topFiles {metric:"lines"|"complexity"|"size"|"deps"|"churn"|"hotspot", n?} — list the top files by a metric and highlight them (churn/hotspot need git history)',
     'findText {query} — search file CONTENTS for a phrase and highlight matching files on the map',
     'listLang {lang} — list files of one language/technology and highlight them',
     'dependsOn {query} — what depends on this file/folder (reverse dependencies)',

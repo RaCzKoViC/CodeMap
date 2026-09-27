@@ -152,6 +152,34 @@ const chatbotRes = await evalJs(`(async()=>{ try{
   return {bad, good, help, lines, err, acts};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// Historia git (faza 3) bez sieci: syntetyczna historia demo → GitCore.analyze → nakładki, panel,
+// hotspoty, oś czasu i akcje ChatBota (źródła lokalne/API mają własne testy i sondę)
+const gitRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const g=CMApp.graph, A=CM.App;
+  const files=[...g.nodes.values()].filter(n=>n.type==='file').map(n=>n.path);
+  const who=[{name:'Ala Kowalska',email:'ala@x.pl'},{name:'Bob Nowak',email:'bob@x.pl'}];
+  const cs=[]; const T0=Date.UTC(2026,0,1);
+  files.forEach((p,i)=>cs.push({sha:'a'+i, parents:[], merge:false, author:who[i%2], authorTime:T0+i*864e5, time:T0+i*864e5, message:'add '+p, files:[{path:p,status:'A'}]}));
+  for(let k=0;k<12;k++) cs.push({sha:'m'+k, parents:[], merge:false, author:who[0], authorTime:T0+(100+k)*864e5, time:T0+(100+k)*864e5, message:'fix '+k, files:[{path:files[k%3],status:'M'}]});
+  cs.reverse();
+  const res=CM.GitCore.analyze(cs, files); CM.GitCore.applyToGraph(g, res, {source:'test'}); A.apply({relayout:false});
+  const ov=CM.Overlays.list().map(o=>o.id);
+  for(const m of ['owner','churn','hotspot','age']) CMApp.exec('colorBy',{mode:m});
+  const colored=CMApp.renderer().colorFn && CMApp.renderer().colorFn(g.nodes.get(files[0]));
+  CMApp.exec('colorBy',{mode:'lang'});
+  CMApp.focusNode(files[0]); await sleep(200);
+  const panel=(document.getElementById('details-body').textContent||'').includes('${'Historia git'}');
+  const owners=CMApp.exec('owners',{}), churn=CMApp.exec('churn',{n:3}), top=CMApp.exec('topFiles',{metric:'churn',n:3}), bus=CMApp.exec('busFactor',{});
+  await CM.Git.openTimeline({play:false, step:0}); await sleep(100);
+  const first=CMApp.renderer().nodes.length; CM.Git.setStep(res.timeline.commits.length-1); await sleep(100);
+  const last=CMApp.renderer().nodes.length, tl=CM.Git.timeline(); CM.Git.closeTimeline(); await sleep(100);
+  CM.UI.renderHotspots(g, A.handlers); const hot=document.querySelectorAll('#hotspots-body .hot-row').length;
+  const round=CM.Graph.Graph.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  CM.App.select(null);
+  return {ov, colored:!!colored, panel, owners:owners.slice(0,40), churn:churn.includes('('), top:top.includes('('), bus, first, last, total:tl.total,
+    hot, persisted:!!(round.gitInfo && round.nodes.get(files[0]).git), after:CMApp.renderer().nodes.length};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -165,6 +193,9 @@ check(inspectOk === 'ok', `Inspect: reguły architektury (.codemap.rules.json) i
 if (symbolsRes && symbolsRes.skip) console.log(`– graf symboli (tree-sitter): pominięto — ${symbolsRes.why}`);
 else check(symbolsRes && !symbolsRes.error && symbolsRes.count > 0 && symbolsRes.shown > 0 && symbolsRes.details && symbolsRes.exportOk && symbolsRes.hidden,
   `graf symboli (tree-sitter): ${symbolsRes && symbolsRes.error ? symbolsRes.error : JSON.stringify(symbolsRes)}`);
+check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitRes.ov.includes(m)) && gitRes.colored && gitRes.panel && gitRes.churn && gitRes.top
+  && gitRes.first < gitRes.last && gitRes.total > 1 && gitRes.hot > 0 && gitRes.persisted,
+  `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
   `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
