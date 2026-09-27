@@ -140,7 +140,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Dług z faz 1–3: [x] 20 nieosiągalnych układów (usunięte, test UI = apply), [x] migracja `codemap_settings` (`js/prefs.js`), [x] `package.json#imports`,
   [x] wykrywanie zmiany nazwy z edycją (podobieństwo linii, zgodne z `git log -M`).
 
-## Faza 9 — dowód, że mapa mówi prawdę — W TOKU 2026-09-27
+## Faza 9 — dowód, że mapa mówi prawdę — WYKONANA 2026-09-27 (v1.5.0)
 
 - ✅ Korpus referencyjny (`tools/corpus.mjs`): repozytoria z galerii przypięte do tagów, krawędzie importów CodeMap
   porównane z wyrocznią ekosystemu — esbuild (metafile: rozwiązane importy JS/TS), grimp (Python), `go list` (Go,
@@ -157,7 +157,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   ciągłe bloki ≥ 50 tokenów (78 → 24 par); ✅ testy 35 nieprzetestowanych modułów (755 testów, serwer 43; pliki kodu z
   testami 38 % → 63 %, dwa błędy znalezione i naprawione).
 
-## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27
+## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27 (v1.5.0)
 
 - ✅ Sprzężenie zmian (change coupling): `GitCore.coupling` z osi czasu historii (stopień jak w code-maat, bez masowych
   commitów), sekcja „Zmieniany razem z" w panelu z oznaczeniem „bez importu", reguła Inspect „ukryte sprzężenie zmian",
@@ -176,7 +176,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   także przechodnie; querybatch + szczegóły, ważność GHSA / CVSS 3, wersja z poprawką), okno z podglądem wysyłki
   `js/vulns-ui.js`, nakładka, reguła `vulndep` (na pliku blokady / manifestu), CLI `--osv`.
 
-## Faza 11 — AI dalej lokalnie — WYKONANA 2026-09-27
+## Faza 11 — AI dalej lokalnie — WYKONANA 2026-09-27 (v1.5.0)
 
 - ✅ Agent z narzędziami dla WebLLM (wymuszony JSON wywołania): `CM.Agent.jsonChat` — każdy krok to obiekt JSON
   ze schematem (narzędzia jako enum + „answer") przez gramatykę WebLLM (`responseFormat`), 3 kroki, wyniki przycięte

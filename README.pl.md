@@ -242,7 +242,7 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
 - Paczka npm (jeszcze nieopublikowana — nazwa `codemap` jest zajęta, więc idzie pod zakresem): `npm run npm-pack -- --name @zakres/codemap`
   buduje paczkę 170 KB (CLI + 17 modułów analizy), instaluje ją w katalogu tymczasowym i uruchamia zainstalowane
   `codemap analyze`; potem `npm publish dist/npm/<plik>.tgz --access public` i `npx @zakres/codemap analyze .`.
-- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.2.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
+- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.5.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
   z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
 
 ### Rozszerzenie VS Code

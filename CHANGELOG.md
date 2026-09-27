@@ -5,6 +5,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-09-27
+
+Dowód, że mapa mówi prawdę (faza 9): korpus referencyjny 6 repozytoriów zgodny w 100 % z esbuildem, grimp i `go list`,
+precyzyjniejsze reguły Inspect, dług i 35 modułów z testami (780 testów); analiza, której nie ma konkurencja w
+przeglądarce (faza 10): sprzężenie zmian, trend zdrowia, macierz zależności, CODEOWNERS a git, podatne zależności z
+OSV.dev; AI dalej lokalnie (faza 11): pytania o mapę bez modelu, szkielety testów, agent dla WebLLM, asystent przeglądu
+PR i widok przed / po — [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ### Dodane — Faza 9 (dowód, że mapa mówi prawdę)
 - **Korpus referencyjny** (`tools/corpus.mjs`, `npm run corpus`): sześć repozytoriów z galerii przypiętych do wydań
   (Express 5.2.1, Preact 10.29.8, ky 2.1.0, petite-vue 0.4.1, Flask 3.1.3, Gin 1.12.0) — krawędzie importów z CLI
@@ -20,39 +28,61 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   wczytania, 1–5 ms klatki); w CI punktem odniesienia jest artefakt `bench` ostatniego zielonego przebiegu main,
   porównanie trafia do podsumowania.
 
-### Dodane — Faza 11 (AI dalej lokalnie)
-- **Asystent przeglądu PR i porównanie przed / po** (`js/pr-review.js`): `fetchPR` zachowuje łatki (GitHub `patch`, GitLab
-  `diff`; 12 KB na plik, 200 KB na PR) — trzymane tylko w pamięci, poza `graph.prInfo`, zapisem mapy i linkami
-  udostępniania. „🔍 Asystent przeglądu" w karcie PR (i akcja `prAssist`) otwiera rozmowę z modelem LOKALNYM (diff to
-  kod — jak Doktor): nagłówek z ryzykiem, pliki od najbardziej ryzykownych z powodami (częste zmiany, złożoność, wielu
-  zależnych, słabe testy, duża zmiana, autor nie zna pliku), pliki spoza mapy, recenzenci i ponumerowane fragmenty [n]
-  z hunków w budżecie modelu (bez łatek — fragmenty bieżącej treści); odpowiedź w czterech sekcjach z cytatami [n].
-  „⇄ Przed / po" przy zmienionym pliku: widok obok siebie z numerami linii, usunięcia i dodania sparowane.
-- **Agent z narzędziami także dla WebLLM** (model w przeglądarce): `CM.Agent.jsonChat` — każdy krok to jeden obiekt JSON
-  wymuszony gramatyką WebLLM (`response_format` ze schematem: nazwa narzędzia z `enum` albo `"answer"`), więc mały model
-  nie wymyśli narzędzia ani nie przejdzie w prozę w połowie wywołania; wywołanie idzie przez ten sam `toolCalls`, co
-  JSON w treści u Ollamy, `{"tool":"answer"}` staje się zwykłą odpowiedzią, a ostatni krok (limit) generuje się bez
-  schematu. Pod małe okno kontekstu: 3 kroki i wyniki narzędzi przycięte do 1400 znaków (`maxResult`). ChatBot w trybie
-  📚 z WebLLM korzysta teraz z tych samych narzędzi (wyszukiwanie w kodzie, odczyt pliku, zależności, właściciele,
-  testy, hotspoty, pokazanie na mapie) co z Ollamą.
-- **Szkielety testów** (`js/testgen.js`, przycisk „🧪 Szkielet testów" w sekcji Doktora hotspotów pliku bez testów, akcja
-  ChatBota `testSkeleton {query?}` — domyślnie najbardziej ryzykowny plik bez testów): bez modelu. Framework z projektu
-  (package.json najbliższy plikowi: vitest / jest / mocha / `node --test`, potem importy istniejących testów; pytest z
-  conftest / wymagań, inaczej unittest; Go `testing` z tabelą przypadków; Rust `#[cfg(test)] mod tests`; JUnit 5 w
-  src/test/java). Położenie i przyrostek wybrane głosowaniem z istniejących par test ↔ kod (obok pliku, `__tests__/`,
-  płaski `test/`, lustrzane drzewo; `.test.mjs` dla `.js` zostaje, `.test.jsx` dopasowuje się do `.jsx`), import
-  wyeksportowanych funkcji i klas (moduł bez eksportów — uwaga), przypadki od najbardziej złożonych funkcji z
-  podpowiedzią „złożoność N — co najmniej N przypadków", przypadek błędu, gdy plik rzuca wyjątki. Okno z podświetleniem
-  składni, kopiowaniem i pobraniem pliku.
-- **Pytania o mapę językiem naturalnym, bez modelu** (`js/mapquery.js`): „pliki bez testów o złożoności powyżej 50 w src",
-  „top 5 najczęściej zmienianych plików", „pliki autora Ala zmienione w ostatnim miesiącu", „files with more than 300
-  lines in lib", „pliki nieruszane od 3 miesięcy", „hotspoty w cyklach", „podatne zależności" — warunki liczbowe (linie,
-  złożoność, funkcje, zmiany, autorzy, rozmiar, fan-in/out; słowne operatory i znaki), flagi (bez testów / z testami /
-  testy, hotspoty, podatne, bez właściciela, cykle, osierocone, zduplikowane, TODO), autor, okres, język, folder (tylko
-  istniejący), sortowanie i limit; po polsku i angielsku, z diakrytykami i bez. ChatBot odpowiada od razu z grafu, gdy
-  parser jest pewny (bez klucza API i modelu), i podświetla pliki; inne pytania idą do modelu, który ma akcję `mapQuery`.
+### Dodane — testy (faza 9)
+- **Testy dla 35 wcześniej nieprzetestowanych modułów** (755 testów w repozytorium, 43 na serwerze): wczytywanie archiwów
+  ZIP / TAR / GZ i PDF zbudowanych w teście, hosty repozytoriów, deep-linki, porównanie schematów, nakładki, magazyn,
+  synchronizacja offline (409 / 507), logowanie, i18n, języki, fizyka, symbole na atrapie drzewa składni, runner, mapa
+  myśli, ChatBot (escapowanie HTML), dostawcy AI / Ollama / WebLLM na podstawionym fetch, tryb na żywo, nawigacja; CLI
+  (odmiana liczebników, SARIF, raport, fsload, gitdir, przegląd PR na tymczasowym repozytorium); serwer (konto, blokada
+  logowania, reset, sync, Sejf, bloby). Wspólny `test/minidom.mjs` dla testów UI. Pliki kodu z testami: 38 % → 63 %.
 
-### Dodane — Faza 10 (sprzężenie zmian)
+### Zmienione — precyzja reguł Inspect (fałszywe alarmy z analizy samego CodeMap)
+- **Duplikaty = ciągłe bloki**: para plików tylko z ciągłym wspólnym blokiem ≥ 50 tokenów (odciski winnowing z
+  pozycjami, wyrównanie po przekątnej — jak jscpd), a nie suma rozsianych wspólnych idiomów; opis „tokeny: N,
+  bloki: K". Tylko kod: dokumenty (README i jego tłumaczenie), konfiguracje, dane i pliki generowane odpadają.
+  Na repozytorium CodeMap: 78 par → 28, każda z prawdziwym blokiem.
+- **Pliki generowane** (`Metrics.isGenerated`): lockfile albo znacznik w nagłówku (`@generated`, `DO NOT EDIT`,
+  `auto-generated`, `GENEROWANE`) — poza regułą „ogromny plik" i duplikatami.
+- **„God" = hub**: duży stopień i jednocześnie fan-in ≥ 3 oraz fan-out ≥ 3 (hub-like modularization); plik
+  wejściowy z samym fan-out (index.html) to „fan-out", a pomocnik testów z samym fan-in nie jest zgłaszany.
+- **Ryzyko**: `innerHTML = ''` (czyszczenie elementu) i porównania nie liczą się jako wstawianie HTML.
+- **Cykle bez dokumentacji**: linki README.md ↔ README.pl.md to nawigacja, nie cykl zależności (także `noCycles`).
+- Wynik zdrowia CodeMap: 45 → 53 bez zmian w kodzie aplikacji (same poprawki reguł; `test/inspect.test.mjs`).
+
+### Zmienione — dług z własnej analizy (faza 9)
+- **Puste `catch`: 229 miejsc → 0** — ok. 40 dostało prawdziwą obsługę (`console.warn('[CodeMap] …')` albo istniejący
+  komunikat: odzyskiwanie transakcji i usuwanie plików w Sejfie, synchronizacja, czyszczenie danych, autozapis sesji,
+  samouczek, menu VS Code, utrata kontekstu WebGL, błąd pojedynczej reguły Inspect), ok. 60 — wspólne pomocniki
+  (`CM.util.lsSet` / `lsDel` / `lsJSON` zamiast ~35 kopii try/catch wokół localStorage, `quiet()`, `soft()`, `errBody()`…),
+  reszta — krótkie uzasadnienie, dlaczego zignorowanie jest poprawne. Reguła „puste catch" liczy już tylko kod (bez
+  treści napisów i komentarzy — `catch {}` w fixture czy opisie reguły to nie kod).
+- **Zduplikowane bloki → wspólne funkcje**: geometria łączników mapy myśli (`CM.MindMapLayout.anchorDirs/anchorPoint/
+  eachConnector/connectorSvg/cardBounds` — eksport SVG bajt w bajt taki sam na 8976 przypadkach), szkielet paneli
+  Ustawień i Sejfu (`CM.Settings.kit`), kolory i widoczność krawędzi renderera (canvas i WebGL), `CM.Renderer.fitPoints`,
+  `CM.util.matchPath` / `matchNode` (agent, doktor, git, testy, ai-bridge), `CM.UIKit.barRow`, pomocniki wczytywania
+  (`A.isMapFile`, `A.loadError`, `A.needProject`), `sendRowBlob` / `deleteRowBlob` na serwerze; smoke webview VS Code
+  używa `tools/cdp.mjs` zamiast własnej kopii klienta CDP (`serveDir` rozpoznaje teraz checkout w `.claude/worktrees`).
+
+### Poprawione — rozbieżności znalezione korpusem
+- **TypeScript ESM (NodeNext)**: `import './x.js'` w źródle .ts wskazuje `x.ts` / `x.tsx` (`.mjs` → `.mts`,
+  `.cjs` → `.cts`) — w ky CodeMap nie widział żadnej z 50 krawędzi.
+- **Python — biblioteka standardowa**: `import typing` / `import json` wewnątrz pakietu to stdlib, a nie
+  `flask/typing.py` czy `flask/json/` (Python 3 nie ma importów względnych bez kropki); lokalny moduł o nazwie z
+  stdlib wchodzi w grę tylko w korzeniu źródeł (katalogu bez `__init__.py`). Flask: precyzja 57 % → 100 %.
+- **Python — `from . import x`**: krawędź do podmodułu `x.py`; do `__init__.py` pakietu tylko wtedy, gdy któraś
+  nazwa jest symbolem, a nie podmodułem (jak grimp / import-linter).
+- **Go z `go.mod`**: import z prefiksem ścieżki modułu → dokładny katalog pakietu (korzeń modułu też); każda inna
+  ścieżka to stdlib albo zależność — dawniej `encoding/json` trafiał do dowolnego katalogu `…/json` w projekcie.
+- **Go — nazwy zależności zewnętrznych** = ścieżka modułu jak w `go.mod` (`github.com/gin-gonic/gin`,
+  `golang.org/x/net`, `…/validator/v10`) zamiast jednego zbiorczego „github"; wersje z `go.mod` wreszcie się łączą.
+
+### Poprawione — błędy znalezione testami
+- **Pliki bez rozszerzenia** (`LICENSE`, `README`, `CHANGELOG`, `AUTHORS`…) były rozpoznawane jako dokumenty Word i ich
+  treść nie była czytana — teraz to zwykły tekst; `go.mod` to konfiguracja (nie Modula), `go.sum` — plik blokady.
+- **Serwer**: domyślny limit Fastify 100 znaków na parametr URL odrzucał (414) pliki Sejfu o nazwach dłuższych niż 100
+  znaków, zanim trasa sprawdziła własny limit 255 — synchronizacja albumu z takim plikiem się nie udawała; limit 300.
+
+### Dodane — Faza 10 (analiza, której nie ma konkurencja w przeglądarce)
 - **Sprzężenie zmian** (`GitCore.coupling` / `couplingFor`, jak code-maat): pary plików zmieniane w tych samych commitach
   osi czasu historii git; stopień = wspólne / średnia zmian obu plików, commity > 30 plików pomijane, progi minRevs 5,
   minShared 3, minDegree 0,3 (opcje). Liczone z `gitInfo.timeline`, więc działa też dla zapisanych map.
@@ -94,59 +124,37 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Reguła Inspect „ukryte sprzężenie zmian"**: pliki kodu zmieniane razem w ≥ 50 % commitów (min. 5 wspólnych) bez
   importu w żadną stronę; bez testów (test ↔ kod zmieniają się razem z natury). Trafia też do CLI, SARIF i komentarza PR.
 
-### Zmienione — precyzja reguł Inspect (fałszywe alarmy z analizy samego CodeMap)
-- **Duplikaty = ciągłe bloki**: para plików tylko z ciągłym wspólnym blokiem ≥ 50 tokenów (odciski winnowing z
-  pozycjami, wyrównanie po przekątnej — jak jscpd), a nie suma rozsianych wspólnych idiomów; opis „tokeny: N,
-  bloki: K". Tylko kod: dokumenty (README i jego tłumaczenie), konfiguracje, dane i pliki generowane odpadają.
-  Na repozytorium CodeMap: 78 par → 28, każda z prawdziwym blokiem.
-- **Pliki generowane** (`Metrics.isGenerated`): lockfile albo znacznik w nagłówku (`@generated`, `DO NOT EDIT`,
-  `auto-generated`, `GENEROWANE`) — poza regułą „ogromny plik" i duplikatami.
-- **„God" = hub**: duży stopień i jednocześnie fan-in ≥ 3 oraz fan-out ≥ 3 (hub-like modularization); plik
-  wejściowy z samym fan-out (index.html) to „fan-out", a pomocnik testów z samym fan-in nie jest zgłaszany.
-- **Ryzyko**: `innerHTML = ''` (czyszczenie elementu) i porównania nie liczą się jako wstawianie HTML.
-- **Cykle bez dokumentacji**: linki README.md ↔ README.pl.md to nawigacja, nie cykl zależności (także `noCycles`).
-- Wynik zdrowia CodeMap: 45 → 53 bez zmian w kodzie aplikacji (same poprawki reguł; `test/inspect.test.mjs`).
-
-### Dodane — testy (faza 9)
-- **Testy dla 35 wcześniej nieprzetestowanych modułów** (755 testów w repozytorium, 43 na serwerze): wczytywanie archiwów
-  ZIP / TAR / GZ i PDF zbudowanych w teście, hosty repozytoriów, deep-linki, porównanie schematów, nakładki, magazyn,
-  synchronizacja offline (409 / 507), logowanie, i18n, języki, fizyka, symbole na atrapie drzewa składni, runner, mapa
-  myśli, ChatBot (escapowanie HTML), dostawcy AI / Ollama / WebLLM na podstawionym fetch, tryb na żywo, nawigacja; CLI
-  (odmiana liczebników, SARIF, raport, fsload, gitdir, przegląd PR na tymczasowym repozytorium); serwer (konto, blokada
-  logowania, reset, sync, Sejf, bloby). Wspólny `test/minidom.mjs` dla testów UI. Pliki kodu z testami: 38 % → 63 %.
-
-### Poprawione — błędy znalezione testami
-- **Pliki bez rozszerzenia** (`LICENSE`, `README`, `CHANGELOG`, `AUTHORS`…) były rozpoznawane jako dokumenty Word i ich
-  treść nie była czytana — teraz to zwykły tekst; `go.mod` to konfiguracja (nie Modula), `go.sum` — plik blokady.
-- **Serwer**: domyślny limit Fastify 100 znaków na parametr URL odrzucał (414) pliki Sejfu o nazwach dłuższych niż 100
-  znaków, zanim trasa sprawdziła własny limit 255 — synchronizacja albumu z takim plikiem się nie udawała; limit 300.
-
-### Zmienione — dług z własnej analizy (faza 9)
-- **Puste `catch`: 229 miejsc → 0** — ok. 40 dostało prawdziwą obsługę (`console.warn('[CodeMap] …')` albo istniejący
-  komunikat: odzyskiwanie transakcji i usuwanie plików w Sejfie, synchronizacja, czyszczenie danych, autozapis sesji,
-  samouczek, menu VS Code, utrata kontekstu WebGL, błąd pojedynczej reguły Inspect), ok. 60 — wspólne pomocniki
-  (`CM.util.lsSet` / `lsDel` / `lsJSON` zamiast ~35 kopii try/catch wokół localStorage, `quiet()`, `soft()`, `errBody()`…),
-  reszta — krótkie uzasadnienie, dlaczego zignorowanie jest poprawne. Reguła „puste catch" liczy już tylko kod (bez
-  treści napisów i komentarzy — `catch {}` w fixture czy opisie reguły to nie kod).
-- **Zduplikowane bloki → wspólne funkcje**: geometria łączników mapy myśli (`CM.MindMapLayout.anchorDirs/anchorPoint/
-  eachConnector/connectorSvg/cardBounds` — eksport SVG bajt w bajt taki sam na 8976 przypadkach), szkielet paneli
-  Ustawień i Sejfu (`CM.Settings.kit`), kolory i widoczność krawędzi renderera (canvas i WebGL), `CM.Renderer.fitPoints`,
-  `CM.util.matchPath` / `matchNode` (agent, doktor, git, testy, ai-bridge), `CM.UIKit.barRow`, pomocniki wczytywania
-  (`A.isMapFile`, `A.loadError`, `A.needProject`), `sendRowBlob` / `deleteRowBlob` na serwerze; smoke webview VS Code
-  używa `tools/cdp.mjs` zamiast własnej kopii klienta CDP (`serveDir` rozpoznaje teraz checkout w `.claude/worktrees`).
-
-### Poprawione — rozbieżności znalezione korpusem
-- **TypeScript ESM (NodeNext)**: `import './x.js'` w źródle .ts wskazuje `x.ts` / `x.tsx` (`.mjs` → `.mts`,
-  `.cjs` → `.cts`) — w ky CodeMap nie widział żadnej z 50 krawędzi.
-- **Python — biblioteka standardowa**: `import typing` / `import json` wewnątrz pakietu to stdlib, a nie
-  `flask/typing.py` czy `flask/json/` (Python 3 nie ma importów względnych bez kropki); lokalny moduł o nazwie z
-  stdlib wchodzi w grę tylko w korzeniu źródeł (katalogu bez `__init__.py`). Flask: precyzja 57 % → 100 %.
-- **Python — `from . import x`**: krawędź do podmodułu `x.py`; do `__init__.py` pakietu tylko wtedy, gdy któraś
-  nazwa jest symbolem, a nie podmodułem (jak grimp / import-linter).
-- **Go z `go.mod`**: import z prefiksem ścieżki modułu → dokładny katalog pakietu (korzeń modułu też); każda inna
-  ścieżka to stdlib albo zależność — dawniej `encoding/json` trafiał do dowolnego katalogu `…/json` w projekcie.
-- **Go — nazwy zależności zewnętrznych** = ścieżka modułu jak w `go.mod` (`github.com/gin-gonic/gin`,
-  `golang.org/x/net`, `…/validator/v10`) zamiast jednego zbiorczego „github"; wersje z `go.mod` wreszcie się łączą.
+### Dodane — Faza 11 (AI dalej lokalnie)
+- **Asystent przeglądu PR i porównanie przed / po** (`js/pr-review.js`): `fetchPR` zachowuje łatki (GitHub `patch`, GitLab
+  `diff`; 12 KB na plik, 200 KB na PR) — trzymane tylko w pamięci, poza `graph.prInfo`, zapisem mapy i linkami
+  udostępniania. „🔍 Asystent przeglądu" w karcie PR (i akcja `prAssist`) otwiera rozmowę z modelem LOKALNYM (diff to
+  kod — jak Doktor): nagłówek z ryzykiem, pliki od najbardziej ryzykownych z powodami (częste zmiany, złożoność, wielu
+  zależnych, słabe testy, duża zmiana, autor nie zna pliku), pliki spoza mapy, recenzenci i ponumerowane fragmenty [n]
+  z hunków w budżecie modelu (bez łatek — fragmenty bieżącej treści); odpowiedź w czterech sekcjach z cytatami [n].
+  „⇄ Przed / po" przy zmienionym pliku: widok obok siebie z numerami linii, usunięcia i dodania sparowane.
+- **Agent z narzędziami także dla WebLLM** (model w przeglądarce): `CM.Agent.jsonChat` — każdy krok to jeden obiekt JSON
+  wymuszony gramatyką WebLLM (`response_format` ze schematem: nazwa narzędzia z `enum` albo `"answer"`), więc mały model
+  nie wymyśli narzędzia ani nie przejdzie w prozę w połowie wywołania; wywołanie idzie przez ten sam `toolCalls`, co
+  JSON w treści u Ollamy, `{"tool":"answer"}` staje się zwykłą odpowiedzią, a ostatni krok (limit) generuje się bez
+  schematu. Pod małe okno kontekstu: 3 kroki i wyniki narzędzi przycięte do 1400 znaków (`maxResult`). ChatBot w trybie
+  📚 z WebLLM korzysta teraz z tych samych narzędzi (wyszukiwanie w kodzie, odczyt pliku, zależności, właściciele,
+  testy, hotspoty, pokazanie na mapie) co z Ollamą.
+- **Szkielety testów** (`js/testgen.js`, przycisk „🧪 Szkielet testów" w sekcji Doktora hotspotów pliku bez testów, akcja
+  ChatBota `testSkeleton {query?}` — domyślnie najbardziej ryzykowny plik bez testów): bez modelu. Framework z projektu
+  (package.json najbliższy plikowi: vitest / jest / mocha / `node --test`, potem importy istniejących testów; pytest z
+  conftest / wymagań, inaczej unittest; Go `testing` z tabelą przypadków; Rust `#[cfg(test)] mod tests`; JUnit 5 w
+  src/test/java). Położenie i przyrostek wybrane głosowaniem z istniejących par test ↔ kod (obok pliku, `__tests__/`,
+  płaski `test/`, lustrzane drzewo; `.test.mjs` dla `.js` zostaje, `.test.jsx` dopasowuje się do `.jsx`), import
+  wyeksportowanych funkcji i klas (moduł bez eksportów — uwaga), przypadki od najbardziej złożonych funkcji z
+  podpowiedzią „złożoność N — co najmniej N przypadków", przypadek błędu, gdy plik rzuca wyjątki. Okno z podświetleniem
+  składni, kopiowaniem i pobraniem pliku.
+- **Pytania o mapę językiem naturalnym, bez modelu** (`js/mapquery.js`): „pliki bez testów o złożoności powyżej 50 w src",
+  „top 5 najczęściej zmienianych plików", „pliki autora Ala zmienione w ostatnim miesiącu", „files with more than 300
+  lines in lib", „pliki nieruszane od 3 miesięcy", „hotspoty w cyklach", „podatne zależności" — warunki liczbowe (linie,
+  złożoność, funkcje, zmiany, autorzy, rozmiar, fan-in/out; słowne operatory i znaki), flagi (bez testów / z testami /
+  testy, hotspoty, podatne, bez właściciela, cykle, osierocone, zduplikowane, TODO), autor, okres, język, folder (tylko
+  istniejący), sortowanie i limit; po polsku i angielsku, z diakrytykami i bez. ChatBot odpowiada od razu z grafu, gdy
+  parser jest pewny (bez klucza API i modelu), i podświetla pliki; inne pytania idą do modelu, który ma akcję `mapQuery`.
 
 ## [1.4.0] — 2026-09-27
 
