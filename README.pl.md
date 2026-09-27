@@ -295,7 +295,12 @@ js/settings-docs.js        # wbudowana specyfikacja i instrukcja obsługi
 js/inspect.js              # analiza statyczna (16 reguł + reguły architektury, health score)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
 js/chatbot-strings.js  js/chatbot-core.js  js/chatbot-render.js   # ChatBot: teksty PL/EN, czysta logika (narzędzia, prompty, walidacja akcji), renderowanie
-js/mindmap.js  js/mmdraw.js  # tryb MindMap + warstwa rysowania
+js/mindmap.js  js/mmdraw.js  # tryb MindMap: edytor, renderowanie, interakcja + warstwa rysowania
+js/mindmap-strings.js      # MindMap: słowniki tekstów (klucze i18n + polskie teksty zapasowe)
+js/mindmap-templates.js    # MindMap: 16 ramek kart, 34 typy diagramów, miniatury, karta kodu
+js/mindmap-layout.js       # MindMap: algorytmy układu + okno „Schemat układu”
+js/mindmap-io.js           # MindMap: import/eksport Markdown, .mindmap.json, SVG/PNG, zapis lokalny, migawki
+js/mindmap-ui.js           # MindMap: widżety (okno tekstu, popover, menu, przyciski pierścienia)
 js/drive.js                # Dysk (File System Access) i Sejf (OPFS + AES-GCM)
 js/auth.js  js/sync.js     # konto i synchronizacja (tylko z backendem)
 js/app-core.js             # CM.App — wspólny kontekst (graph, renderer, state, filters, handlers) + rdzeń:
