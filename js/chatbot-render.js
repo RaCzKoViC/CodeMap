@@ -82,7 +82,7 @@ CM.ChatBotRender = (function(){
   /* ---------------- wiadomości i lista rozmów ---------------- */
   function welcomeRow(){ const r=el('div',{class:'cb-row cb-row-assistant'});
     r.appendChild(el('span',{class:'cb-bavatar',html:botIcon(true)}));
-    const b=el('div',{class:'cb-bubble cb-bubble-assistant'}); b.innerHTML=fmt(t('welcome')); r.appendChild(b); return r; }
+    const b=el('div',{class:'cb-bubble cb-bubble-assistant'}); U.setHTML(b, fmt(t('welcome'))); r.appendChild(b); return r; }
   // wiersz wiadomości; o = {quick, onEdit(row, m), onThumb(m, ±1), onRegen(id), onChange()} — onChange: zapis + ponowne renderowanie
   function messageRow(m, o){
     const row=el('div',{class:'cb-row cb-row-'+m.role,'data-mid':m.id});
@@ -97,7 +97,7 @@ CM.ChatBotRender = (function(){
       bodyTxt=C.stripActions(th.rest);
       if(!String(bodyTxt).trim() && m.actions && m.actions.some(a=>!a.pending&&a.ok)) bodyTxt=t('didActions');
     }
-    b.innerHTML=thHtml+fmt(bodyTxt);
+    U.setHTML(b, thHtml+fmt(bodyTxt));   // fmt: markdown z escapowaniem treści, thinkHTML — tak samo
     if(m.sources&&m.sources.length) linkCites(b, m.sources);
     if(m.role==='user' && m.attachments && m.attachments.length){
       const ab=el('div',{class:'cb-att-msg'});

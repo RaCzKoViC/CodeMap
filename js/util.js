@@ -13,7 +13,7 @@ CM.util = (function(){
     const n = document.createElement(tag);
     for(const k in attrs){
       if(k === 'class') n.className = attrs[k];
-      else if(k === 'html') n.innerHTML = attrs[k];
+      else if(k === 'html') setHTML(n, attrs[k]);           // zaufany HTML (patrz setHTML)
       else if(k === 'text') n.textContent = attrs[k];
       else if(k.startsWith('on') && typeof attrs[k] === 'function') n.addEventListener(k.slice(2), attrs[k]);
       else if(attrs[k] !== false && attrs[k] != null) n.setAttribute(k, attrs[k]);
@@ -203,6 +203,19 @@ CM.util = (function(){
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>HTML_ESC[c]); }
   function escapeText(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>HTML_ESC[c]); }
 
+  // HTML do DOM — JEDNO miejsce (jak polityka Trusted Types): setHTML(el, html) przyjmuje wyłącznie HTML wytworzony
+  // przez nasz kod (ikony SVG z CM.icons, wynik kolorowania składni i markdownu czatu — oba escapują treść, napisy
+  // interfejsu z CM.i18n) albo wynik szablonu html``. Dane (nazwy plików, odpowiedzi modeli, treść repozytoriów) idą
+  // przez html`` — wartości ${…} są escapowane, chyba że opakowane w raw(…) (zaufany HTML z naszego kodu).
+  const RAW=Symbol('raw');
+  function raw(s){ return {[RAW]:String(s==null?'':s)}; }
+  function html(strs, ...vals){
+    let out=strs[0];
+    vals.forEach((v,i)=>{ out+=(v&&v[RAW]!=null ? v[RAW] : Array.isArray(v) ? v.map(x=>x&&x[RAW]!=null?x[RAW]:escapeHtml(x)).join('') : escapeHtml(v))+strs[i+1]; });
+    return raw(out);
+  }
+  function setHTML(node, h){ if(node) node.innerHTML = h&&h[RAW]!=null ? h[RAW] : String(h==null?'':h); return node; }
+
   // plik wskazany zapytaniem (agent, Doktor hotspotów): pełna ścieżka 100 > końcówka „/q” 90 > nazwa 80 > fragment 50;
   // nodes = węzły z polem path (kolejność rozstrzyga remisy), wynik = najlepszy węzeł albo null
   function matchPath(nodes, q){
@@ -233,7 +246,7 @@ CM.util = (function(){
   function lsDel(k){ try{ localStorage.removeItem(k); return true; }catch(e){ return false; } }
   function lsJSON(k, def){ try{ const v=localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
 
-  return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,escapeHtml,escapeText,
+  return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,escapeHtml,escapeText,html,raw,setHTML,
           clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera,mistralKeySlots,
           matchPath,matchNode,lsSet,lsDel,lsJSON};
 })();

@@ -29,7 +29,7 @@
       'dsm.saved':'Rules approved: Inspect enforces them in this session, .codemap.rules.json downloaded — add it to the repository.',
       'dsm.pAct':'Proposed rules ({l} layers, {f} forbidden, {e} exceptions): '},
   };
-  const t=(k,sub)=>{ const l=(I&&I.getLang&&I.getLang())==='en'?'en':'pl'; let s=(STR[l]&&STR[l][k])||STR.pl[k]||k; if(sub) for(const p in sub) s=s.split('{'+p+'}').join(sub[p]); return s; };
+  const t=CM.UIKit.strings(STR);
   const MAX_UNITS=80;
   let opts={mode:null, depth:1};
 
@@ -135,15 +135,7 @@
     return dlg;
   }
 
-  function wire(){
-    const after=document.getElementById('btn-cycles');
-    if(after && !document.getElementById('btn-dsm')){
-      const b=el('button',{class:'menu-item', id:'btn-dsm', type:'button', 'data-ic':'layers', text:t('dsm.menu'),
-        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ open(); }catch(e){ U.toast(e.message,'error'); } }});
-      after.parentNode.insertBefore(b, after.nextSibling); if(CM.icons&&CM.icons.hydrate) CM.icons.hydrate(b.parentNode);
-    }
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wire); else setTimeout(wire, 0);
+  CM.UIKit.menuItem({id:'btn-dsm', after:'btn-cycles', icon:'layers', text:()=>t('dsm.menu'), open:()=>open()});
 
   if(A.registerAction) A.registerAction({name:'dependencyMatrix', sig:'{mode?:"packages"|"folders", depth?}',
     desc:'open the dependency structure matrix (DSM) of packages (monorepo) or folders: units ordered providers → consumers, dependencies above the diagonal are cycles; returns the order, cycles and upstream dependencies',

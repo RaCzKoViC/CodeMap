@@ -446,7 +446,7 @@ CM.i18n = (function(){
   function apply(root){
     root = root || document;
     root.querySelectorAll('[data-i18n]').forEach(e=>{ setText(e, t(e.getAttribute('data-i18n'))); });
-    root.querySelectorAll('[data-i18n-html]').forEach(e=>{ e.innerHTML = t(e.getAttribute('data-i18n-html')); });
+    root.querySelectorAll('[data-i18n-html]').forEach(e=>{ CM.util.setHTML(e, t(e.getAttribute('data-i18n-html'))); });   // napisy z tego pliku
     root.querySelectorAll('[data-i18n-title]').forEach(e=>{ e.title = t(e.getAttribute('data-i18n-title')); });
     root.querySelectorAll('[data-i18n-aria]').forEach(e=>{ e.setAttribute('aria-label', t(e.getAttribute('data-i18n-aria'))); });
     root.querySelectorAll('[data-i18n-ph]').forEach(e=>{ e.placeholder = t(e.getAttribute('data-i18n-ph')); });

@@ -71,7 +71,7 @@ describe('karta „kod" (codeView)', () => {
   });
   test('pusta karta: podpowiedź zamiast kodu, bez etykiety i bez kopiowania', () => {
     const { card } = view('  ');
-    assert.match(card.querySelector('.mm-code-pre').innerHTML, /^<span class="mm-code-ph">\/\/ dwuklik/);
+    assert.match(card.querySelector('.mm-code-ph').textContent, /^\/\/ dwuklik/);   // element z tekstem, nie HTML z napisu
     assert.equal(card.querySelector('.mm-code-gut').textContent, '1');
     assert.equal(card.querySelector('.mm-code-lang').textContent, '');
     assert.equal(card.querySelector('.mm-code-copy'), null);

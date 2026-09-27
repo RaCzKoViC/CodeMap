@@ -284,7 +284,8 @@ CM.UI = (function(){
         const all=pv.split('\n');
         const slice=all.slice(0,140).join('\n');
         const pre=el('pre',{class:'code-preview hl'});
-        pre.innerHTML=highlight(slice, node.lang||node.ext)+(all.length>140?`\n<span class="hl-more">… +${all.length-140} ${I.t('cu.moreLinesFs','wierszy — „pełny ekran"')}</span>`:'');
+        // kolorowanie escapuje treść (zaufany HTML), dopisek o kolejnych wierszach — przez html``
+        U.setHTML(pre, U.html`${U.raw(highlight(slice, node.lang||node.ext))}${all.length>140?U.html`\n<span class="hl-more">… +${all.length-140} ${I.t('cu.moreLinesFs','wierszy — „pełny ekran"')}</span>`:''}`);
         sec.appendChild(pre); body.appendChild(sec);
       }
     }
@@ -366,10 +367,10 @@ CM.UI = (function(){
       const gutter=el('div',{class:'fv-gutter'}); const n=pv.split('\n').length;
       const unc=node.coverage&&node.coverage.uncovered;   // pokrycie z raportu (testmap.js): niepokryte linie na czerwono
       if(unc&&unc.length){ const bad=new Set(); for(const [a,b] of unc) for(let l=a;l<=b&&l<=n;l++) bad.add(l);
-        gutter.innerHTML=Array.from({length:n},(_,i)=>bad.has(i+1)?'<span class="fv-unc">'+(i+1)+'</span>':String(i+1)).join('\n');
+        U.setHTML(gutter, Array.from({length:n},(_,i)=>bad.has(i+1)?'<span class="fv-unc">'+(i+1)+'</span>':String(i+1)).join('\n'));   // same numery linii
         gutter.title=I.t('cu.uncoveredLines','Czerwone numery = linie niepokryte testami (wczytany raport pokrycia)'); }
       else gutter.textContent=Array.from({length:n},(_,i)=>i+1).join('\n');
-      const pre=el('pre',{class:'fv-code hl'}); pre.innerHTML=highlight(pv, node.lang||node.ext);
+      const pre=el('pre',{class:'fv-code hl'}); U.setHTML(pre, highlight(pv, node.lang||node.ext));   // kolorowanie escapuje treść
       wrap.appendChild(gutter); wrap.appendChild(pre); body.appendChild(wrap);
     } else {
       body.appendChild(el('p',{class:'muted',style:'padding:14px',text:I.t('cu.contentUnavailable','Zawartość niedostępna (plik binarny, zbyt duży, albo wczytany bez treści).')}));
@@ -470,11 +471,11 @@ CM.UI = (function(){
     if(!node){ tEl.classList.add('hidden'); return; }
     let rows='';
     if(node.type==='file'){ const m=node.metrics||{};
-      rows=`<div class="tt-row">${node.langInfo?node.langInfo.name:''} · <b>${U.fmtNum(m.lines||0)}</b> ${I.t('cu.linesGen','linii')} · <b>${U.fmtBytes(node.size)}</b></div>`;
+      rows=`<div class="tt-row">${esc(node.langInfo?node.langInfo.name:'')} · <b>${U.fmtNum(m.lines||0)}</b> ${I.t('cu.linesGen','linii')} · <b>${U.fmtBytes(node.size)}</b></div>`;
       if((node.importsOut||[]).length||(node.importsIn||[]).length) rows+=`<div class="tt-row">→ ${ (node.importsOut||[]).length } · ← ${ (node.importsIn||[]).length }</div>`;
     } else if(node.type==='folder'){ rows=`<div class="tt-row"><b>${U.fmtNum(node.descFiles||0)}</b> ${I.t('cu.filesGen','plików')} · <b>${U.fmtNum(node.totalLines||0)}</b> ${I.t('cu.linesGen','linii')} · ${U.fmtBytes(node.totalSize)}</div>`; }
     else { rows=`<div class="tt-row">${I.t('cu.usedTimes','zależność · używana')} ${node.count}×</div>`; }
-    tEl.innerHTML=`<div class="tt-name">${esc(node.name)}</div>${rows}<div class="tt-row muted">${esc(node.path||'')}</div>`;
+    U.setHTML(tEl, U.html`<div class="tt-name">${node.name}</div>${U.raw(rows)}<div class="tt-row muted">${node.path||''}</div>`);
     tEl.classList.remove('hidden');
     const r=tEl.getBoundingClientRect();
     let px=x+14, py=y+14;
@@ -511,12 +512,8 @@ CM.UI = (function(){
     const truncated = node.preview.length>=65536;
     const more = truncated ? `\n<span class="hl-more">… ${I.t('cu.truncated','podgląd ucięty do 64 KB')}</span>` : '';
     const todos = (m.todos||0) ? `<span class="fp-tag">${m.todos} ${I.t('cu.markersTag','znaczników')}</span>` : '';
-    fpEl.innerHTML =
-      `<div class="fp-head"><span class="fp-dot" style="background:${col}"></span>`+
-      `<span class="fp-name">${esc(node.name)}</span>`+
-      `<span class="fp-meta">${esc(langName)} · ${U.fmtNum(m.lines||0)} ${I.t('cu.lnAbbr','ln')} · ${U.fmtBytes(node.size)}</span>${todos}`+
-      `<span class="fp-scroll" title="${esc(I.t('cu.scrollHint','Przewijaj kółkiem, aby przeglądać cały plik'))}">⇅</span></div>`+
-      `<pre class="fp-code hl">${highlight(node.preview, node.lang||node.ext)}${more}</pre>`;
+    // dane (nazwa, język, kolor) escapowane przez html``; kolorowanie składni i znaczniki z naszego kodu — raw
+    U.setHTML(fpEl, U.html`<div class="fp-head"><span class="fp-dot" style="background:${col}"></span><span class="fp-name">${node.name}</span><span class="fp-meta">${langName} · ${U.fmtNum(m.lines||0)} ${I.t('cu.lnAbbr','ln')} · ${U.fmtBytes(node.size)}</span>${U.raw(todos)}<span class="fp-scroll" title="${I.t('cu.scrollHint','Przewijaj kółkiem, aby przeglądać cały plik')}">⇅</span></div><pre class="fp-code hl">${U.raw(highlight(node.preview, node.lang||node.ext))}${U.raw(more)}</pre>`);
     fpEl.classList.remove('hidden');
     const r=fpEl.getBoundingClientRect();
     let px=x+18, py=y+18;

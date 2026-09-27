@@ -349,9 +349,8 @@
     });
 
     // localized HUD hint (rebuilt on language change)
-    function refreshHud(){ const h=$('#fly-hint'); if(h) h.innerHTML=
-      '<b>WASD</b> '+I.t('ca.flyMove','ruch')+' · <b>'+I.t('ca.flyMouse','mysz')+'</b> '+I.t('ca.flyTurn','obrót/pochylenie')+
-      ' · <b>'+I.t('ca.flySpace','Spacja')+'/Shift</b> '+I.t('ca.flyZoom','zoom')+' · <b>Esc/G</b> '+I.t('ca.flyExit','wyjście'); }
+    function refreshHud(){ const h=$('#fly-hint'); if(h) U.setHTML(h, U.html`<b>WASD</b> ${I.t('ca.flyMove','ruch')} · <b>${I.t('ca.flyMouse','mysz')}</b> ${I.t('ca.flyTurn','obrót/pochylenie')}` +
+      ` · <b>${I.t('ca.flySpace','Spacja')}/Shift</b> ${I.t('ca.flyZoom','zoom')} · <b>Esc/G</b> ${I.t('ca.flyExit','wyjście')}`); }
     I.onChange(refreshHud); refreshHud();
   }
 

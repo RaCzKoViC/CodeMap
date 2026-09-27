@@ -89,3 +89,15 @@ describe('escapowanie HTML (jedno źródło)', () => {
     assert.equal(CM.util.escapeText('if (a < b && s === "x") {}'), 'if (a &lt; b &amp;&amp; s === "x") {}');
   });
 });
+
+describe('html`` / raw / setHTML — jedno miejsce wstawiania HTML-a', () => {
+  test('wartości escapowane, raw() wstawiane dosłownie, zagnieżdżone html`` i tablice', () => {
+    const U = CM.util, s = (h) => { const box = { innerHTML: '' }; U.setHTML(box, h); return box.innerHTML; };
+    assert.equal(s(U.html`<b>${'<img onerror=x>'}</b>`), '<b>&lt;img onerror=x&gt;</b>');
+    assert.equal(s(U.html`${U.raw('<svg/>')}<i>${'a"b'}</i>`), '<svg/><i>a&quot;b</i>');
+    assert.equal(s(U.html`<ul>${['<x>', U.raw('<li>ok</li>')]}</ul>`), '<ul>&lt;x&gt;<li>ok</li></ul>');
+    assert.equal(s(U.html`<p>${U.html`<b>${'&'}</b>`}</p>`), '<p><b>&amp;</b></p>');
+    assert.equal(s(U.html`${null}${undefined}${0}`), '0');
+    assert.equal(s('<b>zaufany</b>'), '<b>zaufany</b>');
+  });
+});

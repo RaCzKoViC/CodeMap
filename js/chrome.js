@@ -95,7 +95,7 @@
   function startClock(){
     const elc=$('#st-clock'); if(!elc) return;
     const p=(n)=>String(n).padStart(2,'0');
-    const tick=()=>{ const d=new Date(); elc.innerHTML=`${p(d.getHours())}:${p(d.getMinutes())}<span class="st-sec">:${p(d.getSeconds())}</span>`; };
+    const tick=()=>{ const d=new Date(); U.setHTML(elc, U.html`${p(d.getHours())}:${p(d.getMinutes())}<span class="st-sec">:${p(d.getSeconds())}</span>`); };
     tick(); setInterval(tick, 1000);
   }
 

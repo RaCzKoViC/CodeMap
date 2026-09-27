@@ -50,6 +50,9 @@ export function makeElement(doc, tag) {
     appendChild(c) { if (c.parentNode) c.parentNode.removeChild(c); c.parentNode = e; e.children.push(c); if (c.tagName === 'OPTION') e.options.push(c); return c; },
     insertBefore(c, ref) { if (c.parentNode) c.parentNode.removeChild(c); const i = ref ? e.children.indexOf(ref) : -1; c.parentNode = e; if (i < 0) e.children.push(c); else e.children.splice(i, 0, c); return c; },
     removeChild(c) { const i = e.children.indexOf(c); if (i >= 0) e.children.splice(i, 1); c.parentNode = null; return c; },
+    // jak w DOM: napisy → węzły tekstowe; replaceChildren czyści zawartość (także ustawioną przez innerHTML / textContent)
+    append(...xs) { for (const x of xs) e.appendChild(typeof x === 'string' ? doc.createTextNode(x) : x); },
+    replaceChildren(...xs) { for (const c of e.children) c.parentNode = null; e.children.length = 0; html = ''; text = ''; e.append(...xs); },
     replaceChild(n, o) { const i = e.children.indexOf(o); if (i >= 0) { e.children[i] = n; n.parentNode = e; o.parentNode = null; } return o; },
     remove() { if (e.parentNode) e.parentNode.removeChild(e); },
     get nextSibling() { const p = e.parentNode; return p ? p.children[p.children.indexOf(e) + 1] || null : null; },

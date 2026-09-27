@@ -164,7 +164,8 @@ CM.MindMapLayout = (function(){
       d = horiz ? `M${from.x} ${from.y} C ${from.x+dx} ${from.y}, ${to.x-dx} ${to.y}, ${to.x} ${to.y}`
                 : `M${from.x} ${from.y} C ${from.x} ${(from.y+to.y)/2}, ${to.x} ${(from.y+to.y)/2}, ${to.x} ${to.y}`; }
     else { const mx=(from.x+to.x)/2; d=`M${from.x} ${from.y} H ${mx} V ${to.y} H ${to.x}`; }
-    return `<path d="${d}" stroke="${col}" stroke-width="${wide?2.6:2}" fill="none" opacity="0.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // kolor pochodzi z mapy (także importowanej z pliku) — escapowany, bo `"` w kolorze wstrzyknąłby atrybut
+    return `<path d="${d}" stroke="${CM.util.escapeHtml(col)}" stroke-width="${wide?2.6:2}" fill="none" opacity="0.8" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
   // prostokąt obejmujący karty: heightOf(n) = wysokość karty, skip(n) = pomiń (np. zwinięte)
   function cardBounds(nodes, heightOf, skip){

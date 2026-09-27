@@ -17,7 +17,7 @@
       'ht.progress':'Health trend: {i} / {n} — {sha} ({s})','ht.sum':'{n} of {c} commits · change: {a} → {b} ({d})','ht.rules':'Largest changes per rule: ','ht.none':'No commits in the history.',
       'ht.date':'date','ht.commit':'commit','ht.score':'score','ht.files':'files','ht.high':'high','ht.med':'med','ht.low':'low','ht.msg':'message','ht.cancelled':'Health trend cancelled.','ht.act':'Health trend: '},
   };
-  const t=(k,sub)=>{ const l=(I&&I.getLang&&I.getLang())==='en'?'en':'pl'; let s=(STR[l]&&STR[l][k])||STR.pl[k]||k; if(sub) for(const p in sub) s=s.split('{'+p+'}').join(sub[p]); return s; };
+  const t=CM.UIKit.strings(STR);
   const PILL=CM.UIKit.pill(I.t('ca.cancelLoad','Anuluj'), ()=>{ if(job) job.cancel(); });
   let job=null, last=null, n=10;
   const TREND_URL=(()=>{ const sc=document.querySelector('script[src*="js/health-trend-ui.js"]'); const v=(sc&&sc.src.match(/[?&]v=([\w.-]+)/)||[])[1]||''; return 'js/trend-worker.js'+(v?'?v='+v:''); })();
@@ -118,15 +118,7 @@
     render(dlg); dlg.open(); return dlg;
   }
 
-  function wire(){
-    const after=document.getElementById('btn-timeline');
-    if(after && !document.getElementById('btn-trend')){
-      const b=el('button',{class:'menu-item', id:'btn-trend', type:'button', 'data-ic':'flow', text:t('ht.menu'),
-        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ open(); }catch(e){ U.toast(e.message,'error'); } }});
-      after.parentNode.insertBefore(b, after.nextSibling); if(CM.icons&&CM.icons.hydrate) CM.icons.hydrate(b.parentNode);
-    }
-  }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', wire); else setTimeout(wire, 0);
+  CM.UIKit.menuItem({id:'btn-trend', after:'btn-timeline', icon:'flow', text:()=>t('ht.menu'), open:()=>open()});
 
   if(A.registerAction) A.registerAction({name:'healthTrend', sig:'{n?}',
     desc:'compute the health-score trend over git history (local .git only): N commits spread over the first-parent history, analyzed like the folder; opens a chart and returns the first → last change',

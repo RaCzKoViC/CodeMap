@@ -33,7 +33,7 @@ CM.Inspect = (function(){
     'r.dupcode':'Zduplikowany kod (wspólne bloki)','r.dupcode.d':'Pary plików z ciągłym identycznym blokiem kodu ≥ 50 tokenów (winnowing z wyrównaniem pozycji, jak jscpd; białe znaki nieistotne; bez dokumentów, konfiguracji i plików generowanych) — kandydaci do wyciągnięcia wspólnej funkcji.',
     'dupShare':'{a} i {b} — wspólny kod, tokeny: {n}, bloki: {k}',
     'r.emptycatch':'Puste bloki catch (połykanie wyjątków)','r.emptycatch.d':'`catch { }` bez obsługi ukrywa błędy. (Heurystyka na pierwszych 4000 znakach pliku.)',
-    'r.risky':'Ryzykowne API (bezpieczeństwo)','r.risky.d':'Użycia eval / innerHTML= / document.write — potencjalne wektory XSS. (Heurystyka na pierwszych 4000 znakach.)',
+    'r.risky':'Ryzykowne API (bezpieczeństwo)','r.risky.d':'Użycia eval / innerHTML= / document.write — potencjalne wektory XSS. (Heurystyka na pierwszych 4000 znakach; pliki testów pominięte.)',
     'r.debug':'Pozostałości debugowania','r.debug.d':'Liczne console.log / debugger w kodzie produkcyjnym. (Heurystyka na pierwszych 4000 znakach.)',
     'r.minified':'Pliki zminifikowane / vendored','r.minified.d':'Wyglądają na zbudowane/obce artefakty — zwykle warto je wykluczyć z analizy.',
     'r.archviolation':'Naruszenia reguł architektury','r.archviolation.d':'Importy zakazane przez `.codemap.rules.json` w repozytorium (warstwy, `forbid`, `noCycles`).',
@@ -77,7 +77,7 @@ CM.Inspect = (function(){
     'r.dupcode':'Duplicated code (shared blocks)','r.dupcode.d':'Pairs of files with a contiguous identical code block of ≥ 50 tokens (winnowing with position alignment, like jscpd; whitespace-insensitive; docs, config and generated files excluded) — candidates for extracting a shared function.',
     'dupShare':'{a} and {b} — shared code, tokens: {n}, blocks: {k}',
     'r.emptycatch':'Empty catch blocks (exception swallowing)','r.emptycatch.d':'`catch { }` with no handling hides errors. (Heuristic over the first 4000 chars.)',
-    'r.risky':'Risky APIs (security)','r.risky.d':'Uses of eval / innerHTML= / document.write — potential XSS vectors. (Heuristic over the first 4000 chars.)',
+    'r.risky':'Risky APIs (security)','r.risky.d':'Uses of eval / innerHTML= / document.write — potential XSS vectors. (Heuristic over the first 4000 chars; test files skipped.)',
     'r.debug':'Debug leftovers','r.debug.d':'Multiple console.log / debugger in production code. (Heuristic over the first 4000 chars.)',
     'r.minified':'Minified / vendored files','r.minified.d':'Look like built/third-party artifacts — usually worth excluding from analysis.',
     'r.archviolation':'Architecture rule violations','r.archviolation.d':'Imports forbidden by `.codemap.rules.json` in the repository (layers, `forbid`, `noCycles`).',
@@ -110,7 +110,15 @@ CM.Inspect = (function(){
       const c=src[i], d=src[i+1];
       if(c==='/'&&d==='/'){ while(i<n&&src[i]!=='\n') i++; out+='C'; continue; }   // komentarz → znacznik: catch z uzasadnieniem nie jest pusty
       if(c==='/'&&d==='*'){ const e=src.indexOf('*/',i+2); i=e<0?n:e+2; out+='C'; continue; }
-      if(c==='"'||c==="'"||c==='`'){ out+=c; i++; while(i<n&&src[i]!==c&&!(c!=='`'&&src[i]==='\n')){ if(src[i]==='\\') i++; i++; } out+=c; i++; continue; }
+      // literał regex (`/` po operatorze, nawiasie albo na początku linii — nie dzielenie) → pusty `/ /`: wzorzec z
+      // `innerHTML` czy `eval` to tekst, nie wywołanie
+      if(c==='/' && /(^|[=(,:;!&|?{}[\n]|\breturn)\s*$/.test(out.slice(-12))){
+        let j=i+1, cls=false;
+        while(j<n && src[j]!=='\n' && (cls || src[j]!=='/')){ if(src[j]==='\\') j++; else if(src[j]==='[') cls=true; else if(src[j]===']') cls=false; j++; }
+        if(j<n && src[j]==='/'){ out+='/ /'; i=j+1; continue; }
+      }
+      // napis → pusty literał; szablon z ${…} → `$` (dane wstawiane do HTML-a — reguła ryzyka ma go widzieć)
+      if(c==='"'||c==="'"||c==='`'){ const s0=i; out+=c; i++; while(i<n&&src[i]!==c&&!(c!=='`'&&src[i]==='\n')){ if(src[i]==='\\') i++; i++; } if(c==='`'&&src.slice(s0,i).includes('${')) out+='$'; out+=c; i++; continue; }
       out+=c; i++;
     }
     return out;
@@ -190,9 +198,10 @@ CM.Inspect = (function(){
         if(pv && !minified && CODE_JS.test(f.lang||'')){
           const ec=(codeOnly(pv).match(/catch\s*(\([^)]*\))?\s*\{\s*\}/g)||[]).length;   // bez napisów i komentarzy
           if(ec) add(F,'emptycatch','low',f, t('ln',{n:ec}));
-          // innerHTML = '' (czyszczenie elementu) nie wstawia treści — nie liczy się jako ryzyko
-          const risky=(pv.match(/\beval\s*\(|\.innerHTML\s*=(?!=|\s*(''|""|``)\s*[;,)}\n])|document\.write\s*\(|dangerouslySetInnerHTML/g)||[]).length;
-          if(risky) add(F,'risky','med',f, t('ln',{n:risky}));
+          // tylko kod (napisy puste, komentarze pominięte): innerHTML = '' / stały HTML bez danych nie jest ryzykiem, a
+          // `innerHTML=` wewnątrz napisu (kod ramki, skrypt strony w teście) nie jest przypisaniem w tym pliku
+          const risky=(codeOnly(pv).match(/\beval\s*\(|\.innerHTML\s*=(?!=|\s*(''|""|``)\s*[;,)}\n])|document\.write\s*\(|dangerouslySetInnerHTML/g)||[]).length;
+          if(risky && !f.isTest) add(F,'risky','med',f, t('ln',{n:risky}));   // testy celowo wstawiają HTML (sanityzacja) — to nie wektor XSS
           const dbg=(pv.match(/console\.log\s*\(|(^|\n)\s*debugger\b/g)||[]).length;
           if(dbg>=5) add(F,'debug','low',f, t('ln',{n:dbg}));
         }

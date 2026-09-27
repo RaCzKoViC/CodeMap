@@ -93,7 +93,7 @@ CM.ChatBot = (function(){
     if(panel && builtLang===lang) return;
     builtLang=lang;
     if(!launcher){ launcher=el('button',{id:'cb-launcher',onclick:open}); document.body.appendChild(launcher); }
-    launcher.innerHTML=botIcon(true)+'<span>'+t('name')+'</span>'; launcher.title=t('open');
+    U.setHTML(launcher, U.html`${U.raw(botIcon(true))}<span>${t('name')}</span>`); launcher.title=t('open');
 
     if(!panel){ panel=el('div',{id:'cb-panel',class:'hidden'+(sbOpen?' cb-sb-open':'')}); document.body.appendChild(panel); }
     panel.classList.toggle('cb-sb-open', sbOpen);
@@ -429,16 +429,16 @@ CM.ChatBot = (function(){
       if(host && chipsEl.parentNode!==host) host.appendChild(chipsEl);
       return chipsEl; };
     const runInto=(entry, chip)=>{   // execute an action and reflect the result on its chip + entry
-      chip.onclick=null; chip.classList.remove('cb-chip-confirm','cb-chip-run'); chip.classList.add('cb-chip-run'); chip.innerHTML='⏳ '+esc(entry.action);
+      chip.onclick=null; chip.classList.remove('cb-chip-confirm','cb-chip-run'); chip.classList.add('cb-chip-run'); chip.textContent='⏳ '+entry.action;
       try{ const r=(window.CMApp&&CMApp.exec)?CMApp.exec(entry.action, entry.args):'';
         if(r && typeof r.then==='function'){ entry.ok=true; delete entry.pending; entry.result='…';
-          r.then(v=>{ entry.result=String(v||t('done')); chip.classList.remove('cb-chip-run'); chip.innerHTML='⚡ '+esc(INFO_TOOLS.has(entry.action)?('/'+entry.action):entry.result); saveConvs(); },
-                 e=>{ entry.ok=false; entry.result=(e&&e.message)||t('failed'); chip.classList.remove('cb-chip-run'); chip.classList.add('cb-chip-err'); chip.innerHTML='⚠ '+esc(entry.result); saveConvs(); });
+          r.then(v=>{ entry.result=String(v||t('done')); chip.classList.remove('cb-chip-run'); chip.textContent='⚡ '+(INFO_TOOLS.has(entry.action)?('/'+entry.action):entry.result); saveConvs(); },
+                 e=>{ entry.ok=false; entry.result=(e&&e.message)||t('failed'); chip.classList.remove('cb-chip-run'); chip.classList.add('cb-chip-err'); chip.textContent='⚠ '+entry.result; saveConvs(); });
           return; }
         entry.result=r||t('done'); entry.ok=true; delete entry.pending;
-        chip.classList.remove('cb-chip-run'); chip.innerHTML='⚡ '+esc(entry.result); }
+        chip.classList.remove('cb-chip-run'); chip.textContent='⚡ '+entry.result; }
       catch(e){ entry.result=(e&&e.message)||t('failed'); entry.ok=false; delete entry.pending;
-        chip.classList.remove('cb-chip-run'); chip.classList.add('cb-chip-err'); chip.innerHTML='⚠ '+esc(entry.result); }
+        chip.classList.remove('cb-chip-run'); chip.classList.add('cb-chip-err'); chip.textContent='⚠ '+entry.result; }
     };
     const execLive=(a, fromStream, trusted)=>{
       if(!trusted && !validAction(a)) return;   // nieznana nazwa / brak wymaganych argumentów → pomiń (bez czerwonego chipa)
@@ -488,10 +488,10 @@ CM.ChatBot = (function(){
       const paint=()=>{ _paintT=null; if(_runDone) return; _lastPaint=performance.now(); if(!acc) return; ensureLive();
         const near=(msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight)<70;
         const th=splitThink(acc);                                   // live thought preview (reasoning models)
-        if(structured){ liveInner.innerHTML=(quick?'':thinkHTML(th,false))+fmt(jsonReplyPrefix(th.rest))+'<span class="cb-caret"></span>'; }
+        if(structured){ U.setHTML(liveInner, (quick?'':thinkHTML(th,false))+fmt(jsonReplyPrefix(th.rest))+'<span class="cb-caret"></span>'); }   // fmt: markdown z escapowaniem
         else {
           for(const a of extractActions(th.rest)) execLive(a, true, false);  // model output → untrusted
-          liveInner.innerHTML=thinkHTML(th,false)+fmt(stripActions(th.rest))+'<span class="cb-caret"></span>';
+          U.setHTML(liveInner, thinkHTML(th,false)+fmt(stripActions(th.rest))+'<span class="cb-caret"></span>');
         }
         if(near) scrollBottom(); };
       const streamOpts={ temperature:think?0.6:0.5, signal:abortCtl.signal,
@@ -586,7 +586,7 @@ CM.ChatBot = (function(){
     const paint=()=>{ paintT=null; if(done||!acc) return; last=performance.now();
       if(!liveInner){ if(typing.parentNode) typing.remove(); const lv=V.liveRow(); liveInner=lv.inner; msgsEl.appendChild(lv.row); }
       const near=(msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight)<70; const th=splitThink(acc);
-      liveInner.innerHTML=(quick?'':thinkHTML(th,false))+fmt(th.rest)+'<span class="cb-caret"></span>'; if(near) scrollBottom(); };
+      U.setHTML(liveInner, (quick?'':thinkHTML(th,false))+fmt(th.rest)+'<span class="cb-caret"></span>'); if(near) scrollBottom(); };
     const finish=(content, extra)=>{ if(typing.parentNode) typing.remove();
       conv.messages.push(Object.assign({id:uid(), role:'assistant', content, ts:Date.now(), genMs:Math.max(1,Math.round(performance.now()-tStart))}, extra||{}));
       conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv); };
@@ -686,7 +686,7 @@ CM.ChatBot = (function(){
   function setSending(on){ if(!sendBtn) return;
     if(modelSel) modelSel.disabled=on;   // model switch mid-generation would kill the engine worker
     sendBtn.classList.toggle('cb-stopping', on); sendBtn.title=on?t('stop'):t('send');
-    sendBtn.innerHTML=on?ic.svg('x',{size:16}):ic.svg('flow',{size:17}); }
+    ic.set(sendBtn, on?'x':'flow', {size:on?16:17}); }
 
   /* ---------------- auto title from content ---------------- */
   async function maybeTitle(conv){

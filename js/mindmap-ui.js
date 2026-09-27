@@ -10,11 +10,11 @@ CM.MindMapUI = (function(){
   // przycisk z etykietą (górny / dolny pasek pierścienia)
   function sBtn(ic,label,fn,cls){ const b=U.el('button',{class:'mm-sb '+(cls||''),title:label});
     b.onmousedown=(e)=>e.stopPropagation(); b.onclick=(e)=>{ e.stopPropagation(); fn(); };
-    b.innerHTML=CM.icons.svg(ic,{size:18}); b.appendChild(U.el('span',{class:'mm-sb-lbl',text:label})); return b; }
+    CM.icons.set(b, ic, {size:18}); b.appendChild(U.el('span',{class:'mm-sb-lbl',text:label})); return b; }
   // sama ikona (wąskie kolumny lewa / prawa — etykieta w podpowiedzi)
   function sIcon(ic,label,fn,cls){ const b=U.el('button',{class:'mm-si '+(cls||''),title:label});
     b.onmousedown=(e)=>e.stopPropagation(); b.onclick=(e)=>{ e.stopPropagation(); fn(); };
-    b.innerHTML=CM.icons.svg(ic,{size:19}); return b; }
+    CM.icons.set(b, ic, {size:19}); return b; }
   function sBar(side, btns){ const bar=U.el('div',{class:'mm-sbar mm-sbar-'+side}); btns.forEach(b=>bar.appendChild(b)); return bar; }
 
   function create(ctx){
@@ -74,7 +74,7 @@ CM.MindMapUI = (function(){
         if(it.sep){ el.appendChild(U.el('div',{class:'mm-menu-sep'})); continue; }
         if(it.head){ el.appendChild(U.el('div',{class:'mm-menu-head',text:it.head})); continue; }
         const b=U.el('button',{class:'mm-menu-item'+(it.danger?' danger':'')+(it.primary?' primary':'')});
-        b.innerHTML=CM.icons.svg(it.ic||'box',{size:it.primary?20:19}); b.appendChild(U.el('span',{text:it.t}));
+        CM.icons.set(b, it.ic||'box', {size:it.primary?20:19}); b.appendChild(U.el('span',{text:it.t}));
         b.onmousedown=(e)=>e.stopPropagation(); b.onclick=(e)=>{ e.stopPropagation(); closePop(); it.fn(); };
         el.appendChild(b);
       }

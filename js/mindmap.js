@@ -52,7 +52,7 @@ CM.MindMap = (function(){
   function fillTools(tools){
     tools.innerHTML='';
     const toolBtn=(ic,short,title,fn,cls,id)=>{ const b=U.el('button',{class:'mm-tool '+(cls||''),title:title,onclick:fn});
-      b.innerHTML=CM.icons.svg(ic,{size:20}); b.appendChild(U.el('span',{class:'mm-tool-lbl',text:short})); if(id) b.id=id; return b; };
+      CM.icons.set(b, ic, {size:20}); b.appendChild(U.el('span',{class:'mm-tool-lbl',text:short})); if(id) b.id=id; return b; };
     tools.appendChild(U.el('div',{class:'mm-tools-title',text:I.t('cm.toolsTitle','NARZĘDZIA')}));
     const undoBtn=toolBtn('rotateL',I.t('cm.toolUndo','Cofnij'),I.t('cm.toolUndoTitle','Cofnij (Ctrl+Z)'),()=>mmUndo(),'mm-disabled'); undoBtn.id='mm-undo'; tools.appendChild(undoBtn);
     const redoBtn=toolBtn('rotateR',I.t('cm.toolRedo','Ponów'),I.t('cm.toolRedoTitle','Ponów (Ctrl+Y)'),()=>mmRedo(),'mm-disabled'); redoBtn.id='mm-redo'; tools.appendChild(redoBtn);
@@ -108,8 +108,8 @@ CM.MindMap = (function(){
     inspector=U.el('aside',{id:'mm-inspector'});
     // collapse/expand rail for the right inspector panel
     const inspRail=U.el('button',{id:'mm-insp-rail',title:I.t('cm.inspRailTitle','Zwiń / rozwiń panel właściwości')});
-    inspRail.innerHTML=CM.icons.svg('expand',{size:16});
-    inspRail.onclick=()=>{ const col=root.classList.toggle('mm-insp-collapsed'); inspRail.innerHTML=CM.icons.svg(col?'collapse':'expand',{size:16}); setTimeout(()=>{ drawEdges(); positionSurround(); },260); };
+    CM.icons.set(inspRail, 'expand', {size:16});
+    inspRail.onclick=()=>{ const col=root.classList.toggle('mm-insp-collapsed'); CM.icons.set(inspRail, col?'collapse':'expand', {size:16}); setTimeout(()=>{ drawEdges(); positionSurround(); },260); };
     root.appendChild(tools); root.appendChild(canvas); root.appendChild(inspector); root.appendChild(inspRail);
     buildSurround(); layoutDlg=L.createDialog(ctx);
     io.buildTimeline(); io.loadSnaps(); io.buildSlModal();
@@ -244,7 +244,7 @@ CM.MindMap = (function(){
     let s='';
     L.eachConnector(state, ()=>60, hiddenByCollapse, (from,to,col,wide)=>{
       s+=L.connectorSvg(worldToScreen(from.x,from.y), worldToScreen(to.x,to.y), curved, col, wide); });
-    svg.innerHTML=s;
+    U.setHTML(svg, s);   // krawędzie mapy myśli: ścieżki SVG z liczb (drawEdges)
   }
 
   // ---------- card interactions ----------

@@ -1,39 +1,19 @@
 // Publiczne linki do map: tworzenie, publiczny odczyt, wygaśnięcie, unieważnienie, własność, quota, nagłówki.
 // app.inject (bez portu) na tymczasowej bazie SQLite — DATA_DIR ustawiony PRZED importem modułów serwera.
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import { testApp, PASS } from './helpers.mjs';
 
-const DIR = mkdtempSync(join(tmpdir(), 'codemap-shares-'));
-Object.assign(process.env, {
-  DATA_DIR: DIR, NODE_ENV: 'test', EMAIL_MODE: 'console', APP_ORIGIN: 'http://localhost:8787',
-  MAX_SHARE_BYTES: String(64 * 1024), MAX_SHARES_PER_USER: '6', DEFAULT_QUOTA_BYTES: String(10 * 1024 * 1024),
-});
-const { buildApp, logPath } = await import('../app.js');
-const { db, BLOB_DIR } = await import('../db.js');
+const { app, appMod: { logPath }, db, BLOB_DIR, user } = await testApp('shares',
+  { MAX_SHARE_BYTES: String(64 * 1024), MAX_SHARES_PER_USER: '6', DEFAULT_QUOTA_BYTES: String(10 * 1024 * 1024) }, { subnet: 3 });
 const { gcShares, SHARE_ID_RE } = await import('../shares.js');
-const argon2 = (await import('argon2')).default;
-
-const app = await buildApp({ logger: false, serveStatic: false });
-after(async () => { await app.close(); db.close(); rmSync(DIR, { recursive: true, force: true }); });
-
-const PASS = 'test-password-123';
 const MAP = { format: 'codemap', version: 2, meta: { name: 'demo-app', html: 'https://github.com/o/r' },
   nodes: [{ id: '__root__', type: 'folder', name: 'demo-app' }, { id: 'src/a.js', type: 'file', parent: '__root__', name: 'a.js', preview: null }],
   edges: [{ source: 'src/a.js', target: 'src/b.js', type: 'import' }] };
 
-async function user(email, quota) {
-  const hash = await argon2.hash(PASS, { type: argon2.argon2id, memoryCost: 4096, timeCost: 1, parallelism: 1 });
-  db.prepare('INSERT INTO users (email, pass_hash, lang, verified_at, quota_bytes, created_at) VALUES (?,?,?,?,?,?)')
-    .run(email, hash, 'pl', Date.now(), quota ?? 10 * 1024 * 1024, Date.now());
-  const r = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { email, password: PASS } });
-  assert.equal(r.statusCode, 200, r.body);
-  const c = r.cookies.find((x) => x.name === 'cm_sess');
-  return { cookie: `cm_sess=${c.value}`, id: db.prepare('SELECT id FROM users WHERE email = ?').get(email).id };
-}
 const used = (uid) => db.prepare('SELECT used_bytes FROM users WHERE id = ?').get(uid).used_bytes;
 const create = (u, body = MAP, qs = '', headers = {}) => app.inject({
   method: 'POST', url: '/api/shares' + qs,

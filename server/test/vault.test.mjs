@@ -1,32 +1,12 @@
 // Sejf / Ulubione w chmurze (server/vault.js) przez app.inject: tylko albumy zaszyfrowane (enc:true), walidacja
 // albumu i nazwy pliku, szyfrogramy jako strumień z quotą, nadpisanie i usunięcie, manifest synchronizacji, izolacja kont.
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { testApp } from './helpers.mjs';
 
-const DIR = mkdtempSync(join(tmpdir(), 'codemap-vault-'));
-Object.assign(process.env, { DATA_DIR: DIR, NODE_ENV: 'test', EMAIL_MODE: 'console', APP_ORIGIN: 'http://localhost:8787' });
-const { buildApp } = await import('../app.js');
-const { db, BLOB_DIR } = await import('../db.js');
-const argon2 = (await import('argon2')).default;
-
-const app = await buildApp({ logger: false, serveStatic: false });
-after(async () => { await app.close(); db.close(); rmSync(DIR, { recursive: true, force: true }); });
-
-const PASS = 'test-password-123';
-let ip = 0;
-const call = (u, method, url, payload, headers = {}) => app.inject({ method, url, payload,
-  headers: { 'x-forwarded-for': '10.2.0.' + (++ip % 250 + 1), ...(u ? { cookie: u.cookie } : {}), ...headers } });
-const put = (u, url, bytes) => call(u, 'PUT', url, Buffer.from(bytes), { 'content-type': 'application/octet-stream' });
-async function user(email) {
-  const hash = await argon2.hash(PASS, { type: argon2.argon2id, memoryCost: 4096, timeCost: 1, parallelism: 1 });
-  db.prepare('INSERT INTO users (email, pass_hash, lang, verified_at, quota_bytes, created_at) VALUES (?,?,?,?,?,?)').run(email, hash, 'pl', Date.now(), 1 << 20, Date.now());
-  const r = await call(null, 'POST', '/api/auth/login', { email, password: PASS });
-  return { cookie: 'cm_sess=' + r.cookies.find((x) => x.name === 'cm_sess').value, id: db.prepare('SELECT id FROM users WHERE email = ?').get(email).id };
-}
-const used = (u) => db.prepare('SELECT used_bytes FROM users WHERE id = ?').get(u.id).used_bytes;
+const { BLOB_DIR, call, bin: put, user, used } = await testApp('vault', {}, { subnet: 2 });
 const ala = await user('ala@example.com'), bob = await user('bob@example.com');
 const META = JSON.stringify({ enc: true, salt: 'c29s', verifier: 'dmVy', kdf: { name: 'pbkdf2', iter: 600000 } });
 

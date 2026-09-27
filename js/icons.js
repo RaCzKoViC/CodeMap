@@ -78,8 +78,8 @@ CM.icons = (function(){
   function node(name, opts){
     const span=document.createElement('span');
     span.className='ic-wrap';
-    span.innerHTML=svg(name, opts);
-    return span.firstChild;
+    CM.util.setHTML(span, svg(name, opts));   // SVG ze stałej tablicy P
+    return span.firstChild || span;   // bez parsera HTML (atrapa DOM w testach) — sam kontener
   }
   // inject icon markup into elements carrying data-ic="name"
   function hydrate(root){
@@ -89,5 +89,7 @@ CM.icons = (function(){
       elm.insertAdjacentHTML('afterbegin', svg(name, {size: +elm.getAttribute('data-ic-size')||16}));
     });
   }
-  return {svg, node, hydrate, has:(n)=>!!P[n]};
+  // ikona (+ tekst) jako zawartość elementu — bez innerHTML w modułach
+  function set(elm, name, opts, text){ if(!elm) return elm; elm.replaceChildren(node(name, opts)); if(text!=null) elm.append(text); return elm; }
+  return {svg, node, set, hydrate, has:(n)=>!!P[n]};
 })();

@@ -344,7 +344,7 @@ CM.MindMapIO = (function(){
     function buildTimeline(){
       timelineEl=U.el('div',{id:'mm-timeline'});
       const btn=U.el('button',{id:'mm-tl-toggle',title:S.SNAP.toggleTitle});
-      btn.innerHTML=CM.icons.svg('clock',{size:15})+'<span>&nbsp;'+S.SNAP.toggle+'</span>';
+      CM.icons.set(btn, 'clock', {size:15}); btn.appendChild(U.el('span',{text:' '+S.SNAP.toggle}));
       btn.onclick=()=>{ btn.classList.toggle('open'); updateTimeline(); };
       const track=U.el('div',{id:'mm-tl-track'});
       timelineEl.appendChild(btn); timelineEl.appendChild(track); ctx.canvas.appendChild(timelineEl);
@@ -356,19 +356,20 @@ CM.MindMapIO = (function(){
       if(!track||!btn) return;
       if(!btn.classList.contains('open')){ track.style.display='none'; return; }
       track.style.display='flex'; track.innerHTML='';
-      if(!snaps.length){ track.innerHTML='<span class="mm-tl-empty">'+S.SNAP.empty+'</span>'; return; }
+      if(!snaps.length){ track.replaceChildren(U.el('span',{class:'mm-tl-empty', text:S.SNAP.empty})); return; }
       // najnowsze pierwsze
       for(let i=snaps.length-1;i>=0;i--){
         const s=snaps[i];
         const b=U.el('button',{class:'mm-tl-snap'+(i===snaps.length-1?' current':'')});
         const ago=U.relTime?U.relTime(s.ts):new Date(s.ts).toLocaleTimeString();
-        b.innerHTML='<span class="mm-tl-dot"></span><span class="mm-tl-age">'+ago+'</span><span class="mm-tl-info">'+s.nodes.length+S.SNAP.nodes+'</span>'+(s.reason&&s.reason!=='auto'?'<span class="mm-tl-reason">'+s.reason+'</span>':'');
+        // s.reason — opis migawki (bywa od użytkownika): escapowany (wcześniej wstawiany surowo)
+        U.setHTML(b, U.html`<span class="mm-tl-dot"></span><span class="mm-tl-age">${ago}</span><span class="mm-tl-info">${s.nodes.length+S.SNAP.nodes}</span>${s.reason&&s.reason!=='auto'?U.html`<span class="mm-tl-reason">${s.reason}</span>`:''}`);
         b.onclick=(()=>{ const idx=i; return ()=>restoreSnap(idx); })();
         track.appendChild(b);
       }
       // przycisk „migawka teraz”
       const nb=U.el('button',{class:'mm-tl-snap',style:'border-color:var(--accent);background:rgba(34,211,238,.1)'});
-      nb.innerHTML='<span style="color:var(--accent)">'+CM.icons.svg('plus',{size:13})+'</span><span class="mm-tl-age">'+S.SNAP.now+'</span><span class="mm-tl-info">'+S.SNAP.snapshot+'</span>';
+      U.setHTML(nb, U.html`<span style="color:var(--accent)">${U.raw(CM.icons.svg('plus',{size:13}))}</span><span class="mm-tl-age">${S.SNAP.now}</span><span class="mm-tl-info">${S.SNAP.snapshot}</span>`);
       nb.onclick=()=>{ takeSnap(S.SNAP.manual); U.toast&&U.toast(S.SNAP.saved,'success',1500); };
       track.appendChild(nb);
     }

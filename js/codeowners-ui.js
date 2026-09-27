@@ -14,7 +14,7 @@
       'co.unavail':'No CODEOWNERS file (.github/, root, docs/ or .gitlab/).','co.sum':'CODEOWNERS ({f}): rules {r}, code files without an owner {u}, drifts from git {d}. Most files: {top}',
       'co.file':'{p}: {o} (rule {pat}, line {l})','co.fileNone':'{p}: no owner in CODEOWNERS','co.others':'others'},
   };
-  const t=(k,sub)=>{ const l=(I&&I.getLang&&I.getLang())==='en'?'en':'pl'; let s=(STR[l]&&STR[l][k])||STR.pl[k]||k; if(sub) for(const p in sub) s=s.split('{'+p+'}').join(sub[p]); return s; };
+  const t=CM.UIKit.strings(STR);
   // analiza raz na graf i jego stan historii (gitInfo podmieniany po „Historia git")
   let memo={g:null, gi:null, res:null};
   function analysis(g){ if(memo.g!==g || memo.gi!==g.gitInfo){ memo={g, gi:g.gitInfo, res:CO.analyze(g)}; } return memo.res; }

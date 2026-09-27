@@ -41,7 +41,7 @@
       r.framework?el('span',{class:'tag',text:t('doc.tgFw')+': '+r.framework}):null, el('span',{class:'muted small',text:' · '+(r.convention&&r.convention.fromProject?t('doc.tgConv'):t('doc.tgDef'))})));
     if(inline) dlg.body.appendChild(el('div',{class:'muted small',text:t('doc.tgInline')}));
     const pre=el('pre',{class:'tg-code hl'});
-    try{ pre.innerHTML=(CM.UI&&CM.UI.highlight)?CM.UI.highlight(r.code, node.lang||node.ext):U.escapeHtml(r.code); }catch(e){ pre.textContent=r.code; }
+    try{ U.setHTML(pre, (CM.UI&&CM.UI.highlight)?CM.UI.highlight(r.code, node.lang||node.ext):U.escapeHtml(r.code)); }catch(e){ pre.textContent=r.code; }   // kolorowanie escapuje treść
     dlg.body.appendChild(pre);
     const copy=el('button',{class:'tb-btn',type:'button',text:t('doc.tgCopy'),onclick:async()=>{ try{ await navigator.clipboard.writeText(r.code); copy.textContent=t('doc.tgCopied'); }catch(e){ if(U.toast) U.toast(e.message,'error'); } }});
     const save=el('button',{class:'tb-btn primary',type:'button',text:t('doc.tgSave'),onclick:()=>{

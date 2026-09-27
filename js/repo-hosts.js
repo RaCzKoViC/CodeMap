@@ -82,7 +82,8 @@
     const name=(u&&u.name)||login, bio=u&&u.bio;
     const blog=u&&u.blog?(/^https?:/.test(u.blog)?u.blog:'https://'+u.blog):'';
     const hasStats = u && (u.public_repos!=null||u.followers!=null||u.following!=null);
-    card.innerHTML=`
+    // dane profilu escapowane (escapeHtml, safeUrl), ikony i napisy interfejsu z naszego kodu
+    U.setHTML(card, `
       <button class="ac-close" title="${I.t('ca.acClose','Zamknij')}">${CM.icons.svg('x',{size:18})}</button>
       <div class="ac-hero">
         <img class="ac-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(login)}">
@@ -102,7 +103,7 @@
         ${u&&u.public_gists!=null?row('file', u.public_gists+I.t('ca.acGists',' gistów'),''):''}
       </div>
       ${u&&u.__err?`<p class="ac-err">${escapeHtml(u.__err)}</p>`:''}
-      <a class="ac-open tb-btn primary" href="${escapeHtml(prof)}" target="_blank" rel="noopener">${CM.icons.svg('globe',{size:14})} ${I.t('ca.acOpenProfile','Otwórz pełny profil')}${hostLabel?(I.t('ca.acOnHost',' na ')+hostLabel):''}</a>`;
+      <a class="ac-open tb-btn primary" href="${escapeHtml(prof)}" target="_blank" rel="noopener">${CM.icons.svg('globe',{size:14})} ${I.t('ca.acOpenProfile','Otwórz pełny profil')}${hostLabel?(I.t('ca.acOnHost',' na ')+hostLabel):''}</a>`);
     card.querySelector('.ac-close').onclick=closeAuthorCard;
   }
   function escapeHtml(s){ return U.escapeHtml(s); }
@@ -268,8 +269,7 @@
     if(!rl){ box.textContent=''; return; }
     const low=rl.remaining<=5;
     box.classList.toggle('low', low);
-    box.innerHTML=CM.i18n.t('gh.rateLabel','Limit API GitHub: ')+'<b>'+rl.remaining+' / '+rl.limit+'</b>'+
-      (rl.limit<=60 ? (' · '+CM.i18n.t('gh.rateHint','dodaj token, by zwiększyć do 5000')) : '');
+    U.setHTML(box, U.html`${CM.i18n.t('gh.rateLabel','Limit API GitHub: ')}<b>${rl.remaining} / ${rl.limit}</b>${rl.limit<=60 ? ' · '+CM.i18n.t('gh.rateHint','dodaj token, by zwiększyć do 5000') : ''}`);
   }
 
   // ---------------- compare two branches/tags as a diff (green=added, red=removed, yellow=changed) ----------------

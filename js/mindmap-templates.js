@@ -271,17 +271,17 @@ CM.MindMapTemplates = (function(){
     if(has){
       const lines=codeText.split('\n');
       gut.textContent=lines.map((_,i)=>String(i+1)).join('\n');
-      try{ pre.innerHTML=(CM.UI&&CM.UI.highlight)?CM.UI.highlight(codeText, lang):escCode(codeText); }
+      try{ U.setHTML(pre, (CM.UI&&CM.UI.highlight)?CM.UI.highlight(codeText, lang):escCode(codeText)); }   // kolorowanie escapuje treść
       catch(e){ pre.textContent=codeText; }
     } else {
       gut.textContent='1';
-      pre.innerHTML='<span class="mm-code-ph">'+escCode(I.t('cm.codePlaceholder','// dwuklik, aby wpisać kod'))+'</span>';
+      pre.replaceChildren(U.el('span',{class:'mm-code-ph', text:I.t('cm.codePlaceholder','// dwuklik, aby wpisać kod')}));
     }
     view.appendChild(gut); view.appendChild(pre); card.appendChild(view);
     card.appendChild(U.el('span',{class:'mm-code-lang',text: has?lang:''}));
     if(has){
       const cp=U.el('button',{class:'mm-code-copy',title:I.t('cm.copyCodeTitle','Kopiuj kod')});
-      cp.innerHTML=CM.icons.svg('copy',{size:11})+'<span>copy</span>';
+      CM.icons.set(cp, 'copy', {size:11}); cp.appendChild(U.el('span',{text:'copy'}));
       const stop=(e)=>e.stopPropagation(); cp.addEventListener('pointerdown',stop); cp.addEventListener('mousedown',stop); cp.addEventListener('dblclick',stop);
       cp.onclick=(e)=>{ e.stopPropagation();
         if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(codeText).then(()=>{ cp.classList.add('done'); setTimeout(()=>cp.classList.remove('done'),1300); U.toast&&U.toast(I.t('cm.codeCopied','📋 Skopiowano kod.'),'success',1400); },()=>{}); } };

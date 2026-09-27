@@ -37,9 +37,12 @@ describe('Inspect: ryzyko, pliki generowane, cykle', () => {
     const res = await run([
       F('src/clear.js', "box.innerHTML = '';\nlist.innerHTML=\"\";\nif (el.innerHTML == '') go();\n"),
       F('src/set.js', "box.innerHTML = '';\nbox.innerHTML = html;\n"),
+      F('test/set.test.js', "import './../src/set.js';\nbox.innerHTML = '<b>x</b>';\neval('1');\n"),   // test — celowo, nie ryzyko
+      F('src/static.js', "box.innerHTML = '<b>stały HTML</b>';\nconst frame = 'o.innerHTML = h; eval(x)';   // kod w napisie\n"),
+      F('src/tpl.js', 'box.innerHTML = `<b>${name}</b>`;\n'),   // szablon z danymi — ryzyko
     ]);
     const r = rule(res, 'risky');
-    assert.deepEqual(paths(res, 'risky'), ['src/set.js']);
+    assert.deepEqual(paths(res, 'risky').sort(), ['src/set.js', 'src/tpl.js']);
     assert.match(r.items[0].detail, /1/);
   });
   test('plik blokady i plik z nagłówkiem „DO NOT EDIT" nie są „ogromne"; zwykły kod tak', async () => {

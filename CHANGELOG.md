@@ -5,6 +5,23 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Bezpieczeństwo — Faza 16
+- **Jedno miejsce wstawiania HTML-a** (`CM.util.setHTML`, jak polityka Trusted Types) i szablon **`CM.util.html`**
+  z escapowaniem wartości `${…}` (`raw(…)` tylko dla HTML-a z naszego kodu: ikon, kolorowania składni, markdownu czatu):
+  `innerHTML =` zniknęło z modułów aplikacji (19 plików); tekst idzie przez `textContent`, ikony przez nowe
+  `CM.icons.set(el, nazwa, opcje, tekst)`. Przy okazji naprawione wstawienia bez escapowania: opis migawki mapy myśli
+  (`s.reason`), kolor łącznika mapy myśli w atrybucie SVG (mapy importowane z pliku — `"` wstrzykiwał atrybut) i nazwa
+  języka nieznanego rozszerzenia (z nazwy pliku) w podpowiedzi mapy.
+- **Reguła „ryzykowne API" precyzyjniej**: analizuje tylko kod (bez napisów, komentarzy i literałów regex — `innerHTML`
+  w kodzie ramki albo we wzorcu to nie wywołanie), stały HTML bez danych nie jest ryzykiem, szablon z `${…}` jest;
+  pliki testów pominięte. CodeMap: 22 → 1 plik (samo `setHTML`).
+
+### Zmienione — Faza 16
+- Wspólny kod okien w `CM.UIKit`: `strings(STR)` (tłumacz okna) i `menuItem({id, after, icon, text, open})`
+  zamiast kopii w oknach DSM, trendu zdrowia, podatności i CODEOWNERS; testy serwera na wspólnym `server/test/helpers.mjs`
+  (`testApp`: katalog danych, aplikacja, konto, zapytania). Duplikaty 43 → 35, zdrowie CodeMap 59 → 63 (bez historii git
+  64 → 69).
+
 ### Poprawione — Faza 16
 - **Węzły w dokładnie tym samym miejscu rozsuwają się** (`js/physics.js`): dwa błędy — kierunek „rozsunięcia" liczony
   z tej samej sumy współrzędnych był identyczny dla obu węzłów (szły razem), a Barnes-Hut przybliżał komórkę, której

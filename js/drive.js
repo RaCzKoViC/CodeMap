@@ -531,7 +531,7 @@ CM.Drive = (function(){
     const heart=el('button',{class:'drv-thumb-heart'+(favd?' on':''),title:t(favd?'photo.unfav':'photo.fav'),html:heartIcon(favd,16)});
     heart.onclick=async(e)=>{ e.stopPropagation(); const r=await toggleFav(album, f.name); if(r===null) return;
       U.toast(r?t('fav.added'):t('fav.removed'), r?'success':'');
-      if(album==='fav') reload(); else { heart.classList.toggle('on',r); heart.innerHTML=heartIcon(r,16); heart.title=t(r?'photo.unfav':'photo.fav'); } };
+      if(album==='fav') reload(); else { heart.classList.toggle('on',r); U.setHTML(heart, heartIcon(r,16)); heart.title=t(r?'photo.unfav':'photo.fav'); } };
     cell.appendChild(heart);
     cell.appendChild(el('span',{class:'drv-thumb-name',text:f.name}));
     return cell;
@@ -700,7 +700,7 @@ CM.Drive = (function(){
       let txt=''; try{ txt=TD.decode(bytes); }catch(e){ txt=''; }
       const lang=(name.split('.').pop()||'').toLowerCase();
       const pre=el('pre',{class:'drv-pv-code hl'});
-      try{ pre.innerHTML=(CM.UI&&CM.UI.highlight)?CM.UI.highlight(txt.slice(0,60000), lang):escTxt(txt.slice(0,60000)); }
+      try{ U.setHTML(pre, (CM.UI&&CM.UI.highlight)?CM.UI.highlight(txt.slice(0,60000), lang):escTxt(txt.slice(0,60000))); }   // kolorowanie escapuje treść
       catch(e){ pre.textContent=txt.slice(0,60000); }
       body.appendChild(pre);
     } else {
@@ -762,7 +762,7 @@ CM.Drive = (function(){
       heart.onclick=async()=>{ const r=await toggleFav(album, f.name); if(r===null) return;
         U.toast(r?t('fav.added'):t('fav.removed'), r?'success':'');
         if(album==='fav' && r===false){ photos.splice(i,1); if(reloadGrid) reloadGrid(); show(); }
-        else { heart.classList.toggle('on',r); heart.innerHTML=heartIcon(r,20); heart.title=t(r?'photo.unfav':'photo.fav'); } };
+        else { heart.classList.toggle('on',r); U.setHTML(heart, heartIcon(r,20)); heart.title=t(r?'photo.unfav':'photo.fav'); } };
       top.appendChild(heart);
       top.appendChild(el('button',{class:'drv-photo-btn',title:t('photo.download'),html:ic.svg('download',{size:18}),
         onclick:async()=>{ try{ const bytes=await albRead(album,f.name); U.download(f.name,bytes,'application/octet-stream'); }catch(e){ U.toast(t('common.openFail'),'error'); } }}));

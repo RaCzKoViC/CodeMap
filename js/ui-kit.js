@@ -59,5 +59,26 @@ CM.UIKit = (function(){
       el('span',{class:'bv',text:value}));
   }
 
-  return {pill, modal, repoToken, fileIndex, barRow};
+  // tłumacz okna: STR = {pl:{…}, en:{…}} → t(klucz, {zmienna}) w języku interfejsu (CM.i18n); brak → pl → sam klucz
+  function strings(STR){
+    return (k, sub)=>{
+      const I=CM.i18n, l=(I&&I.getLang&&I.getLang())==='en'?'en':'pl';
+      let s=(STR[l]&&STR[l][k])||STR.pl[k]||k;
+      if(sub) for(const p in sub) s=s.split('{'+p+'}').join(sub[p]);
+      return s;
+    };
+  }
+  // pozycja menu za przyciskiem `after` (po załadowaniu DOM, bez dubla): zamyka otwarte menu, woła open(), błąd → toast.
+  // o = {id, after, icon, text: napis albo funkcja (język w chwili dodania), open}
+  function menuItem(o){
+    const add=()=>{
+      const a=document.getElementById(o.after); if(!a || document.getElementById(o.id)) return;
+      const b=el('button',{class:'menu-item', id:o.id, type:'button', 'data-ic':o.icon, text:typeof o.text==='function'?o.text():o.text,
+        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ o.open(); }catch(e){ U.toast(e.message,'error'); } }});
+      a.parentNode.insertBefore(b, a.nextSibling); if(CM.icons&&CM.icons.hydrate) CM.icons.hydrate(b.parentNode);
+    };
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', add); else setTimeout(add, 0);
+  }
+
+  return {pill, modal, repoToken, fileIndex, barRow, strings, menuItem};
 })();

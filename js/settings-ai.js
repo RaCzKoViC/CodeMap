@@ -63,12 +63,12 @@
     eSel.onchange=()=>{ CM.RAG.setModelPref(eSel.value); showStat(); };
     bBuild.onclick=async()=>{
       if(CM.RAG.isBuilding()){ CM.RAG.cancelBuild(); return; }
-      bBuild.innerHTML=t('ai.ragCancel'); rbar.style.display='block'; rstat.className='set-localai-stat';
+      bBuild.textContent=t('ai.ragCancel'); rbar.style.display='block'; rstat.className='set-localai-stat';
       try{ const s=await CM.RAG.buildVectors({model:eSel.value, onProgress:(d,n)=>{ rstat.textContent=d+' / '+n; rbar.firstChild.style.width=Math.round(d/Math.max(1,n)*100)+'%'; },
           onLoad:(p)=>{ rstat.textContent=(p.text||'')+(p.pct?' '+p.pct+'%':''); rbar.firstChild.style.width=(p.pct||0)+'%'; }});
         if(s){ rstat.textContent=t('ai.ragDone')+s.chunks+' · '+s.model; rstat.className='set-localai-stat ok'; } }
       catch(e){ rstat.textContent=(e&&e.name==='AbortError')?'—':((e&&e.message)||String(e)); rstat.className='set-localai-stat err'; }
-      finally{ bBuild.innerHTML=ic.svg('refresh',{size:14})+' '+t('ai.ragBuild'); rbar.style.display='none'; }
+      finally{ ic.set(bBuild, 'refresh', {size:14}, ' '+t('ai.ragBuild')); rbar.style.display='none'; }
     };
     bClear.onclick=async()=>{ await CM.RAG.clearVectors(); showStat(); };
   }
@@ -106,11 +106,11 @@
         pullBox.appendChild(sug);
         pbtn.onclick=async()=>{ const name=pinp.value.trim(); if(!name) return;
           if(pullCtl){ pullCtl.abort(); return; }
-          pullCtl=new AbortController(); pbtn.innerHTML=t('ai.ollamaPullCancel'); pinp.disabled=true; pbar.style.display='block'; pstat.className='set-localai-stat';
+          pullCtl=new AbortController(); pbtn.textContent=t('ai.ollamaPullCancel'); pinp.disabled=true; pbar.style.display='block'; pstat.className='set-localai-stat';
           try{ await CM.Ollama.pull(name, (p)=>{ pstat.textContent=(p.status||'')+(p.pct!=null?(' '+p.pct+'%'):''); pbar.firstChild.style.width=(p.pct||0)+'%'; }, pullCtl.signal);
             pstat.textContent=t('ai.ollamaPullDone')+name; pstat.className='set-localai-stat ok'; CM.Ollama.setModel(name); await fill(); }
           catch(e){ pstat.textContent=(e&&e.name==='AbortError')?'—':((e&&e.message)||String(e)); pstat.className='set-localai-stat err'; }
-          finally{ pullCtl=null; pbtn.innerHTML=ic.svg('download',{size:14})+' '+t('ai.ollamaPullBtn'); pinp.disabled=false; pbar.style.display='none'; } };
+          finally{ pullCtl=null; ic.set(pbtn, 'download', {size:14}, ' '+t('ai.ollamaPullBtn')); pinp.disabled=false; pbar.style.display='none'; } };
       };
       const fill=async()=>{
         stat.className='set-localai-stat'; stat.textContent='…';
@@ -167,9 +167,9 @@
       const curDl=(dlmap.find(m=>m.id===LA.modelId())||{}).downloaded;
       const isReady=LA.status()==='ready';
       // main button: downloaded → "Uruchom" (loads from cache, NO re-download); loaded → disabled ✓
-      if(isReady){ dl.innerHTML='✓ '+t('ai.localLoaded'); dl.disabled=true; stat.textContent=t('ai.localReady'); stat.className='set-localai-stat ok'; }
-      else if(curDl){ dl.innerHTML=ic.svg('flow',{size:14})+' '+t('ai.localRun'); }
-      else { dl.innerHTML=ic.svg('download',{size:14})+' '+t('ai.localDl'); }
+      if(isReady){ dl.textContent='✓ '+t('ai.localLoaded'); dl.disabled=true; stat.textContent=t('ai.localReady'); stat.className='set-localai-stat ok'; }
+      else if(curDl){ ic.set(dl, 'flow', {size:14}, ' '+t('ai.localRun')); }
+      else { ic.set(dl, 'download', {size:14}, ' '+t('ai.localDl')); }
       dl.onclick=async()=>{
         dl.disabled=true; mSel.disabled=true; unl.textContent=t('ai.localCancel');
         const off=LA.onProgress(showProg); showProg(LA.progress());   // LIVE % also for click-started loads

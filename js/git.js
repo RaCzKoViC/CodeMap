@@ -229,7 +229,7 @@
     ($('#stage')||document.body).appendChild(b);
     return b;
   }
-  function playIcon(){ const p=$('#git-timeline .tl-play'); if(p) p.innerHTML=TL.playing?'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="2" width="3.6" height="12" rx="1" fill="currentColor"/><rect x="9.4" y="2" width="3.6" height="12" rx="1" fill="currentColor"/></svg>':CM.icons.svg('play',{size:16}); }
+  function playIcon(){ const p=$('#git-timeline .tl-play'); if(p) U.setHTML(p, TL.playing?'<svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="2" width="3.6" height="12" rx="1" fill="currentColor"/><rect x="9.4" y="2" width="3.6" height="12" rx="1" fill="currentColor"/></svg>':CM.icons.svg('play',{size:16})); }
   async function openTimeline(opts){
     opts=opts||{};
     if(!A.graph || !state.counts.nodes){ U.toast(T('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return false; }
