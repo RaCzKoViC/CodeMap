@@ -148,6 +148,9 @@ thresholds, a **health score** and a Markdown report. An optional **`.codemap.ru
 Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `exportGraph`.
 
 ### AI — optional and privacy-preserving
+- **Questions about the map without any model** — ChatBot answers questions like “untested files with complexity over 50
+  in src”, “top 5 most changed files”, “files of author Ala changed in the last month” or “files in cycles” straight
+  from the graph (metrics, git, tests, CODEOWNERS, OSV; Polish and English) and highlights them; the `mapQuery` action.
 - **WebLLM** — models that run in the browser (WebGPU), with weights cached and nothing sent anywhere.
 - **Ollama** — a local model server on your own computer.
 - **API keys (cloud)** — as many keys as you like: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
@@ -307,6 +310,7 @@ js/cochange.js                  # change coupling (GitCore.coupling): "changes t
 js/dsm.js  js/dsm-ui.js         # packages and dependency matrix: units, providers → consumers order, cycles (pure) + the DSM window
 js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: patterns, owners → git authors, unowned / drift (pure) + panel, coloring, action
 js/vulns.js  js/vulns-ui.js     # vulnerable dependencies: lockfile/manifest versions, OSV.dev querybatch, CVSS 3 (pure) + window, coloring
+js/mapquery.js                  # map questions in natural language (PL/EN) → spec → files, no model; mapQuery action
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

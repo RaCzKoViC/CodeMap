@@ -365,6 +365,15 @@ CM.ChatBot = (function(){
       conv.messages.push({id:uid(), role:'assistant', content:helpText(), ts:Date.now(), genMs:1});
       conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv); return;
     }
+    //  • pytanie o mapę („pliki bez testów o złożoności > 50", „top 5 najczęściej zmienianych") → odpowiedź z grafu (CM.MapQuery)
+    const mq=lastUser && !rag && CM.MapQuery && window.CMApp && CMApp.graph && CM.MapQuery.parse(lastUser.content, CMApp.graph);
+    if(mq && mq.confident){
+      const t0=performance.now(); let result='', ok=true;
+      try{ result=CMApp.exec('mapQuery', {q:lastUser.content})||t('done'); }catch(e){ ok=false; result=(e&&e.message)||t('failed'); }
+      conv.messages.push({id:uid(), role:'assistant', content:'', ts:Date.now(), genMs:Math.max(1,Math.round(performance.now()-t0)),
+        actions:[{action:'mapQuery', args:{q:lastUser.content}, ok, result}]});
+      conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv); return;
+    }
     const quickCmd=lastUser && (lastUser.content||'').trim().length<=64 && intentFallback(lastUser.content);
     if(quickCmd){
       const t0=performance.now(); let result='', ok=true;

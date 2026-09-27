@@ -20,6 +20,15 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   wczytania, 1–5 ms klatki); w CI punktem odniesienia jest artefakt `bench` ostatniego zielonego przebiegu main,
   porównanie trafia do podsumowania.
 
+### Dodane — Faza 11 (AI dalej lokalnie)
+- **Pytania o mapę językiem naturalnym, bez modelu** (`js/mapquery.js`): „pliki bez testów o złożoności powyżej 50 w src",
+  „top 5 najczęściej zmienianych plików", „pliki autora Ala zmienione w ostatnim miesiącu", „files with more than 300
+  lines in lib", „pliki nieruszane od 3 miesięcy", „hotspoty w cyklach", „podatne zależności" — warunki liczbowe (linie,
+  złożoność, funkcje, zmiany, autorzy, rozmiar, fan-in/out; słowne operatory i znaki), flagi (bez testów / z testami /
+  testy, hotspoty, podatne, bez właściciela, cykle, osierocone, zduplikowane, TODO), autor, okres, język, folder (tylko
+  istniejący), sortowanie i limit; po polsku i angielsku, z diakrytykami i bez. ChatBot odpowiada od razu z grafu, gdy
+  parser jest pewny (bez klucza API i modelu), i podświetla pliki; inne pytania idą do modelu, który ma akcję `mapQuery`.
+
 ### Dodane — Faza 10 (sprzężenie zmian)
 - **Sprzężenie zmian** (`GitCore.coupling` / `couplingFor`, jak code-maat): pary plików zmieniane w tych samych commitach
   osi czasu historii git; stopień = wspólne / średnia zmian obu plików, commity > 30 plików pomijane, progi minRevs 5,

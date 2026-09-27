@@ -175,12 +175,14 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   także przechodnie; querybatch + szczegóły, ważność GHSA / CVSS 3, wersja z poprawką), okno z podglądem wysyłki
   `js/vulns-ui.js`, nakładka, reguła `vulndep` (na pliku blokady / manifestu), CLI `--osv`.
 
-## Faza 11 — AI dalej lokalnie
+## Faza 11 — AI dalej lokalnie — W TOKU 2026-09-27
 
 - Agent z narzędziami dla WebLLM (wymuszony JSON wywołania).
 - Szkielety testów dla hotspotów bez testów (rozszerzenie Doktora).
 - Asystent przeglądu PR (mapa wpływu + fragmenty zmian) i porównanie przed/po w aplikacji.
-- Pytania o mapę językiem naturalnym → filtr / nakładka.
+- ✅ Pytania o mapę językiem naturalnym → podświetlenie: `js/mapquery.js` (parser PL/EN bez modelu: warunki liczbowe,
+  flagi — bez testów, hotspoty, podatne, bez właściciela, cykle, osierocone, zduplikowane — autor, okres, język, folder,
+  sortowanie, limit), ChatBot odpowiada od razu, gdy parser jest pewny; akcja `mapQuery` dla modeli.
 
 ## Faza 12 — dystrybucja (wymaga kont właściciela)
 

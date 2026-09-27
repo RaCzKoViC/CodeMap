@@ -566,6 +566,24 @@ const vuRes = await evalJs(`(async()=>{ try{
 check(vuRes && !vuRes.error && vuRes.before === 0 && vuRes.send && vuRes.calls === 2 && vuRes.rows === 1 && vuRes.link === 'https://osv.dev/vulnerability/GHSA-35jh-r3h4-6jhm'
   && vuRes.ov === 'vulns' && vuRes.rule === 1 && vuRes.sev === 'high' && vuRes.det,
   `podatne zależności: zgoda przed wysyłką, tabela, nakładka, panel, reguła vulndep (podstawiony fetch): ${JSON.stringify(vuRes)}`);
+// pytania o mapę (faza 11): w ChatBocie bez modelu „pokaż 3 największe pliki js" → odpowiedź z grafu (CM.MapQuery),
+// chip akcji mapQuery, 3 pliki podświetlone; pytanie spoza zakresu („które pliki są najważniejsze?") nie jest przechwytywane
+const mqRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  CMApp.loadDemo(); for(let i=0;i<60 && !(CMApp.graph&&CMApp.graph.nodes.size>20);i++) await sleep(100); await sleep(300);
+  const direct=CMApp.exec('mapQuery',{q:'top 3 najwi\u0119ksze pliki js'});
+  const hi1=CM.App.renderer.highlight?CM.App.renderer.highlight.size:null;
+  CM.ChatBot.open(); await sleep(300); CM.ChatBot._newChat(); await sleep(200);
+  const ta=document.querySelector('#cb-panel .cb-input'); ta.value='poka\u017c 3 najwi\u0119ksze pliki js'; ta.dispatchEvent(new Event('input',{bubbles:true}));
+  document.querySelector('#cb-panel .cb-send').click(); await sleep(400);
+  const conv=CM.ChatBot._convs()[0], last=[...conv.messages].reverse().find(m=>m.role==='assistant');
+  const act=last&&last.actions&&last.actions[0];
+  const P=CM.MapQuery.parse('kt\u00f3re pliki s\u0105 najwa\u017cniejsze?', CMApp.graph);
+  CM.ChatBot.close(); CM.App.renderer.setHighlight(null);
+  return {direct:String(direct), hi1, act:act?act.action:null, ok:act?act.ok:null, res:act?String(act.result).slice(0,120):'', notConfident:!P.confident};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(mqRes && !mqRes.error && /^Pliki: \d+ \(pokazano 3\)/.test(mqRes.direct) && mqRes.hi1 === 3 && mqRes.act === 'mapQuery' && mqRes.ok && /^Pliki:/.test(mqRes.res) && mqRes.notConfident,
+  `pytania o mapę: akcja mapQuery, ChatBot bez modelu, podświetlenie, pytanie spoza zakresu idzie dalej: ${JSON.stringify(mqRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
