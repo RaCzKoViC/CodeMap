@@ -110,5 +110,44 @@ CM.DSM = (function(){
     return m.cycles.map(c => c.map(id => name.get(id)));
   }
 
-  return {units, matrix, packageCycles, OUTSIDE};
+  // Propozycja `.codemap.rules.json` z warstw macierzy (faza 14): warstwa = jednostka (katalog pakietu albo folderu,
+  // `dir/**`; zagnieżdżone przed rodzicem, bo liczy się pierwsze dopasowanie; pliki w korzeniu — `*`), zakazy: dostawca
+  // (wyżej w macierzy) nie zależy od konsumentów (niżej) — tylko pary, między którymi DZIŚ nie ma zależności pod prąd,
+  // więc reguły od razu przechodzą i pilnują, żeby nowe się nie pojawiły; istniejące zależności pod prąd = wyjątki
+  // do naprawy. noCycles tylko, gdy projekt nie ma dziś cykli importów między plikami.
+  // → {mode, rules:{layers, forbid, noCycles?}, exceptions:[{from, to, count}], text}
+  function proposeRules(graph, opts){
+    opts = opts || {};
+    const en = opts.lang === 'en';
+    const m = matrix(graph, opts);
+    const keep = m.units.map((u, i) => ({u, i})).filter(({u}) => u.id !== OUTSIDE || m.mode === 'folders');
+    // nazwa warstwy: nazwa jednostki, przy powtórce (dwa pakiety „app") z katalogiem
+    const dup = new Set(), seenN = new Set();
+    for(const {u} of keep){ if(seenN.has(u.name)) dup.add(u.name); seenN.add(u.name); }
+    const nameOf = (u) => u.id === OUTSIDE ? '(root)' : dup.has(u.name) ? u.name + ' (' + (u.dir || '.') + ')' : u.name;
+    // jednostka korzenia (tryb folderów) = pliki płytsze niż poziom: `*`, `*/*`… do głębokości
+    const depth = Math.max(1, opts.depth || 1);
+    const globOf = (u) => u.id === OUTSIDE ? (depth === 1 ? '*' : Array.from({length: depth}, (_, k) => Array(k + 1).fill('*').join('/'))) : (u.dir ? u.dir + '/**' : '**');
+    // kolejność warstw do dopasowania: najpierw najgłębsze katalogi, `**` (pakiet w korzeniu) i korzeń na końcu
+    const catchAll = (l) => (l.match === '**' || Array.isArray(l.match) || l.match === '*') ? 1 : 0;
+    const layers = keep.map(({u}) => ({name: nameOf(u), match: globOf(u)}))
+      .sort((a, b) => catchAll(a) - catchAll(b) || String(b.match).split('/').length - String(a.match).split('/').length || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const forbid = [], exceptions = [];
+    for(const {u, i} of keep){
+      const to = [];
+      for(const {u: v, i: j} of keep){
+        if(j <= i) continue;                               // j niżej = konsument u
+        if(m.cells[i][j]) exceptions.push({from: nameOf(u), to: nameOf(v), count: m.cells[i][j]});
+        else to.push(nameOf(v));
+      }
+      if(to.length) forbid.push({from: nameOf(u), to: to.length === 1 ? to[0] : to,
+        why: en ? 'layers from the dependency matrix: a provider does not depend on its consumers' : 'warstwy z macierzy zależności: dostawca nie zależy od konsumentów'});
+    }
+    const rules = {layers, forbid};
+    const cyc = typeof graph.importCycles === 'function' ? graph.importCycles() : null;
+    if(cyc && !(cyc.components || []).length) rules.noCycles = true;
+    return {mode: m.mode, rules, exceptions, text: JSON.stringify(rules, null, 2) + '\n'};
+  }
+
+  return {units, matrix, packageCycles, proposeRules, OUTSIDE};
 })();

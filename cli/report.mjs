@@ -182,3 +182,12 @@ export function toSummary(CM, report, { color = false } = {}) {
   out.push('', ...tail.map(row));
   return out.join('\n');
 }
+
+/** Podatne zależności (graph.vulnInfo z OSV.dev) tekstem — narzędzie MCP vulnerable_dependencies (po angielsku). */
+export function vulnSummary(vi) {
+  if (!vi) return 'OSV.dev check did not run (network error?)';
+  if (!vi.items.length) return `none of ${vi.checked} packages has known vulnerabilities`;
+  const line = (it) => `- ${it.name} ${it.version} (${it.ecosystem}${it.direct === false ? ', transitive' : ''}): ${it.level || '?'} — `
+    + it.vulns.slice(0, 4).map((v) => v.id).join(', ') + (it.fixed ? ' · fixed in ' + it.fixed : '');
+  return `${vi.items.length} of ${vi.checked} packages vulnerable:\n` + vi.items.map(line).join('\n');
+}

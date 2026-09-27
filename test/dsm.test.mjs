@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { loadCM, host, CORE } from './harness.mjs';
 import { FILES as MONO } from './fixtures/monorepo.mjs';
 
-const CM = loadCM([...CORE, 'dsm']);
+const CM = loadCM([...CORE, 'rules', 'metrics', 'testmap', 'inspect', 'dsm']);
 const { Graph } = CM.Graph;
 const F = (path, content) => ({ path, content, size: content.length, mtime: 1 });
 const build = (files) => new Graph().build(files.map((f) => ({ ...f })), { name: 't', source: 'test' });
@@ -68,5 +68,48 @@ describe('DSM: cykle i tryb folderów', () => {
     const g = build([F('svc/pyproject.toml', '[build-system]\nrequires = []\n[project]\nname = "svc-core"\n'),
       F('tools/pyproject.toml', '[tool.poetry]\nname = \'svc-tools\'\n'), F('svc/core.py', 'X = 1\n'), F('tools/run.py', 'import os\n')]);
     assert.deepEqual(host(g.packages), [{ name: 'svc-core', eco: 'pip', dir: 'svc' }, { name: 'svc-tools', eco: 'pip', dir: 'tools' }]);
+  });
+});
+
+describe('DSM: propozycja reguł architektury (proposeRules)', () => {
+  const R = (p) => CM.Rules.parse(p.text);
+  test('pakiety: warstwy z katalogów (korzeń `**` na końcu), dostawca → konsumenci jako listy, noCycles; reguły dziś przechodzą', () => {
+    const g = build(MONO), p = CM.DSM.proposeRules(g, { lang: 'en' });
+    assert.equal(p.mode, 'packages');
+    assert.deepEqual(host(p.rules.layers.map((l) => l.name + '=' + l.match)),
+      ['@mono/b=packages/b/**', '@mono/c=packages/c/**', '@mono/shared=packages/shared/**', 'util-pkg=packages/util/**', 'mono=**']);
+    assert.deepEqual(host(p.rules.forbid[0].to), ['@mono/c', '@mono/shared', 'util-pkg', 'mono']);
+    assert.equal(R(p).forbid.length, 10);
+    assert.equal(p.rules.noCycles, true);
+    assert.deepEqual(host(p.exceptions), []);
+    assert.deepEqual(host(CM.Rules.evaluate(g, R(p))), []);
+    assert.match(p.rules.forbid[0].why, /provider does not depend on its consumers/);
+  });
+  test('nowa zależność pod prąd łamie zatwierdzone reguły; istniejący cykl pakietów = wyjątek poza regułami', () => {
+    const p = CM.DSM.proposeRules(build(MONO));
+    const up = build([...MONO, F('packages/b/src/up.ts', "import { u } from '../../shared/src/util';\nexport const up = u;\n")]);
+    const v = host(CM.Rules.evaluate(up, R(p)));
+    assert.deepEqual(v.map((x) => x.from + ' ' + x.rule), ['packages/b/src/up.ts forbid:@mono/b→@mono/shared']);
+    const cyc = build([...MONO, F('packages/b/src/up.ts', "import { u } from '../../shared/src/util';\nexport const up = u;\n"),
+      F('packages/shared/src/down.ts', "import { up } from '../../b/src/up';\nexport const down = up;\n")]);
+    const pc = CM.DSM.proposeRules(cyc);
+    assert.equal(pc.exceptions.length, 1);
+    assert.equal(pc.rules.noCycles, true);   // cykl pakietów b ↔ shared, nie plików
+    assert.deepEqual(host(CM.Rules.evaluate(cyc, R(pc))), []);
+  });
+  test('foldery poziomu 2: korzeń = pliki płytsze (`*`, `*/*`), nazwy jednostek = ścieżki', () => {
+    const p = CM.DSM.proposeRules(build(MONO), { mode: 'folders', depth: 2 });
+    const root = p.rules.layers.find((l) => l.name === '(root)');
+    assert.deepEqual(host(root.match), ['*', '*/*']);
+    assert.equal(p.rules.layers[p.rules.layers.length - 1].name, '(root)');
+    assert.equal(CM.Rules.layerOf('tools/gen.ts', R(p)), '(root)');
+    assert.equal(CM.Rules.layerOf('packages/b/lib/feat/one.ts', R(p)), 'packages/b');
+  });
+  test('zatwierdzone w sesji (graph.rulesDraft) — Inspect egzekwuje je bez pliku w projekcie', async () => {
+    const g = build([...MONO, F('packages/b/src/up.ts', "import { u } from '../../shared/src/util';\nexport const up = u;\n")]);
+    g.rulesDraft = CM.DSM.proposeRules(build(MONO)).text;
+    assert.equal(CM.Rules.findRulesNode(g).draft, true);
+    const rep = await CM.Inspect.run(g), f = rep.findings.find((x) => x.rule === 'archviolation');
+    assert.ok(f && f.items[0].path === 'packages/b/src/up.ts', JSON.stringify(host(rep.findings.map((x) => x.rule))));
   });
 });

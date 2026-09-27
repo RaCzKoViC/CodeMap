@@ -7,7 +7,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { runAnalysis } from '../cli/analyze.mjs';
 import { architectureMarkdown } from '../cli/architecture.mjs';
-import { writeTree, LAYER_RULES } from './harness.mjs';
+import { writeTree, LAYER_RULES, ROOT } from './harness.mjs';
+import { spawnSync } from 'node:child_process';
+import { createServer } from '../cli/mcp.mjs';
+
+const CLI = path.join(ROOT, 'cli', 'codemap.mjs');
 
 let dir;
 const write = (rel, text) => writeTree(dir, rel, text);
@@ -41,6 +45,21 @@ describe('ARCHITECTURE.md', () => {
     assert.match(m, /languages: JavaScript 5, JSON 2, Text 1/);
     assert.match(m, /No import cycles between files\./);
     assert.equal(await md('en'), m, 'deterministyczne');
+  });
+  test('codemap rules: propozycja z warstw folderów na stdout, podsumowanie na stderr, --out; MCP propose_rules', async () => {
+    const r = spawnSync(process.execPath, [CLI, 'rules', dir, '--folders', '--lang', 'en'], { encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    const j = JSON.parse(r.stdout);
+    assert.ok(j.layers.some((l) => l.name === 'lib' && l.match === 'lib/**') && j.layers.some((l) => l.name === 'app'));
+    const lib = j.forbid.find((f) => f.from === 'lib');
+    assert.ok(lib && [].concat(lib.to).includes('app'), JSON.stringify(j.forbid));
+    assert.match(r.stderr, /Proposed rules \(folders\): layers \d+, forbidden \d+, exceptions to fix \(upstream dependencies\) 0/);
+    const out = path.join(dir, 'proposal.json');
+    assert.equal(spawnSync(process.execPath, [CLI, 'rules', dir, '--folders', '--out', out, '-q', '--lang', 'en'], { encoding: 'utf8' }).status, 0);
+    assert.deepEqual(JSON.parse(fs.readFileSync(out, 'utf8')), j); fs.rmSync(out);
+    const srv = createServer({ dir, lang: 'en', git: false, log: () => {} });
+    const res = (await srv.handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'propose_rules', arguments: { mode: 'folders' } } })).result;
+    assert.match(res.content[0].text, /^folders: \d+ layers, 0 upstream dependencies to fix[\s\S]*"from": "lib"/);
   });
   test('zależność „pod prąd" (lib → app) = ⚠ cykl i naruszenie reguły; po polsku', async () => {
     write('lib/hook.js', "import { View } from '../app/view.js';\nexport const hook = () => new View(1);\n");

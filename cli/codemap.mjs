@@ -18,6 +18,7 @@ import { loadCodeMap } from './runtime.mjs';
 import { changedFiles, prReport, baseline, diffFindings, prMarkdown } from './pr.mjs';
 import { healthHistory, historyTable, historyMarkdown } from './history.mjs';
 import { architectureMarkdown } from './architecture.mjs';
+import { proposeRules, exceptionLines } from './propose-rules.mjs';
 
 const SEV_ALIAS = { high: 'high', error: 'high', critical: 'high', med: 'med', medium: 'med', warning: 'med',
   low: 'low', note: 'low', info: 'info' };
@@ -83,6 +84,9 @@ export function parseArgs(argv, RULES) {
       case '--max-content': o.maxContent = Math.floor(num(a, need())); break;
       case '--osv': o.osv = true; break;
       case '--architecture': o.architecture = need(); break;
+      case '--packages': o.unitMode = 'packages'; break;   // codemap rules: jednostki = pakiety
+      case '--folders': o.unitMode = 'folders'; break;
+      case '--depth': o.depth = Math.max(1, Math.min(3, Math.floor(num(a, need())))); break;
       case '--staged': break;   // codemap check: jedyny tryb (indeks vs HEAD), flaga dla czytelności hooków
       case '--install-hook': o.installHook = true; break;
       case '--uninstall-hook': o.uninstallHook = true; break;
@@ -97,7 +101,7 @@ export function parseArgs(argv, RULES) {
         else throw new CliError(tr('eArgs', { a }));
     }
   }
-  if (o.out && !o.export) throw new CliError(tr('eOutNoExport'));
+  if (o.out && !o.export && o.cmd !== 'rules') throw new CliError(tr('eOutNoExport'));
   if ((o.baseline || o.prMd || o.maxScoreDrop != null) && !o.base) throw new CliError(tr('eBaselineNoBase'));
   const toStdout = [o.json, o.md, o.sarif, o.map, o.prMd, o.architecture].filter((x) => x === '-').length + (o.export && (!o.out || o.out === '-') ? 1 : 0);
   if (toStdout > 1) throw new CliError(tr('eStdout'));
@@ -153,6 +157,18 @@ export async function main(argv = process.argv.slice(2)) {
     if (o.cmd === 'check') {   // zmiany w indeksie vs HEAD przed commitem (cli/check.mjs)
       const { checkCommand } = await import('./check.mjs');
       return await checkCommand(o, { cliPath: fileURLToPath(import.meta.url), writeOut });
+    }
+    if (o.cmd === 'rules') {   // propozycja .codemap.rules.json z warstw macierzy zależności (CM.DSM.proposeRules)
+      const res = await runAnalysis(o.dir || '.', { lang, git: false, coverage: false, exclude: o.exclude, maxContent: o.maxContent });
+      const p = proposeRules(res.CM, res.graph, { mode: o.unitMode, depth: o.depth, lang });
+      writeOut(o.out || '-', p.text);
+      if (!o.quiet) {
+        const lines = [tr('rulesSum', { m: p.mode, l: p.rules.layers.length, f: p.forbidden, e: p.exceptions.length }),
+          ...exceptionLines(p).slice(0, 20).map((x) => '  ↑ ' + x)];
+        if (o.out && o.out !== '-') lines.push('  ' + tr('written', { what: '.codemap.rules.json', file: o.out }));
+        process.stderr.write(lines.join('\n') + '\n');
+      }
+      return 0;
     }
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 

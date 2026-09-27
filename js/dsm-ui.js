@@ -9,11 +9,25 @@
     pl:{'dsm.menu':'Macierz zależności (DSM)','dsm.title':'Macierz zależności','dsm.units':'Jednostki','dsm.pk':'pakiety ({n})','dsm.f1':'foldery — poziom 1','dsm.f2':'foldery — poziom 2',
       'dsm.sum':'jednostki: {u} · zależności: {d} · cykle: {c} · nad przekątną: {a}','dsm.hint':'Wiersz zależy od kolumny (liczba importów). Kolejność: dostawcy u góry, konsumenci niżej — zdrowe zależności leżą pod przekątną; czerwone komórki nad nią to zależności „pod prąd", czyli cykle. Klik w komórkę: pliki na mapie i pary importów.',
       'dsm.none':'Brak zależności między jednostkami.','dsm.many':'Za dużo jednostek ({n}) — wybierz płytszy poziom.','dsm.pairs':'{a} → {b}: importy ({n})','dsm.files':'pliki','dsm.outside':'(poza pakietami)','dsm.root':'(korzeń)',
-      'dsm.cycle':'cykl','dsm.act':'Macierz zależności: ','dsm.noProject':'Najpierw wczytaj projekt (CodeMap).'},
+      'dsm.cycle':'cykl','dsm.act':'Macierz zależności: ','dsm.noProject':'Najpierw wczytaj projekt (CodeMap).',
+      'dsm.propose':'Zaproponuj reguły','dsm.pTitle':'Propozycja .codemap.rules.json z tych warstw','dsm.pSum':'warstwy: {l} · zakazy: {f} · wyjątki do naprawy: {e}',
+      'dsm.pHint':'Dostawca (wyżej) nie może zależeć od konsumentów (niżej). Zakazane są tylko pary, między którymi dziś nie ma zależności pod prąd — reguły od razu przechodzą i pilnują, żeby nowe się nie pojawiły. Inspect egzekwuje je jako „naruszenia architektury".',
+      'dsm.pExc':'Istniejące zależności pod prąd (poza regułami — do naprawy):','dsm.pExists':'Projekt ma już plik .codemap.rules.json — zatwierdzenie go nie zmieni; zapisany plik zastąp ręcznie.',
+      'dsm.approve':'Zatwierdź reguły','dsm.copy':'Kopiuj JSON','dsm.copied':'Skopiowano reguły.',
+      'dsm.savedLive':'Reguły zatwierdzone: zapisane w folderze projektu (.codemap.rules.json) — Inspect już ich pilnuje.',
+      'dsm.saved':'Reguły zatwierdzone: Inspect pilnuje ich w tej sesji, plik .codemap.rules.json pobrany — dodaj go do repozytorium.',
+      'dsm.pAct':'Propozycja reguł ({l} warstw, {f} zakazów, {e} wyjątków): '},
     en:{'dsm.menu':'Dependency matrix (DSM)','dsm.title':'Dependency matrix','dsm.units':'Units','dsm.pk':'packages ({n})','dsm.f1':'folders — level 1','dsm.f2':'folders — level 2',
       'dsm.sum':'units: {u} · dependencies: {d} · cycles: {c} · above the diagonal: {a}','dsm.hint':'A row depends on a column (number of imports). Order: providers at the top, consumers below — healthy dependencies sit below the diagonal; red cells above it are upstream dependencies, i.e. cycles. Click a cell: files on the map and the import pairs.',
       'dsm.none':'No dependencies between units.','dsm.many':'Too many units ({n}) — pick a shallower level.','dsm.pairs':'{a} → {b}: imports ({n})','dsm.files':'files','dsm.outside':'(outside packages)','dsm.root':'(root)',
-      'dsm.cycle':'cycle','dsm.act':'Dependency matrix: ','dsm.noProject':'Load a project first (CodeMap).'},
+      'dsm.cycle':'cycle','dsm.act':'Dependency matrix: ','dsm.noProject':'Load a project first (CodeMap).',
+      'dsm.propose':'Propose rules','dsm.pTitle':'Proposed .codemap.rules.json from these layers','dsm.pSum':'layers: {l} · forbidden: {f} · exceptions to fix: {e}',
+      'dsm.pHint':'A provider (higher) must not depend on its consumers (lower). Only pairs with no upstream dependency today are forbidden — the rules pass right away and keep new ones from appearing. Inspect enforces them as “Architecture rule violations”.',
+      'dsm.pExc':'Existing upstream dependencies (left out of the rules — to fix):','dsm.pExists':'The project already has .codemap.rules.json — approving will not change it; replace the saved file by hand.',
+      'dsm.approve':'Approve rules','dsm.copy':'Copy JSON','dsm.copied':'Rules copied.',
+      'dsm.savedLive':'Rules approved: saved in the project folder (.codemap.rules.json) — Inspect enforces them now.',
+      'dsm.saved':'Rules approved: Inspect enforces them in this session, .codemap.rules.json downloaded — add it to the repository.',
+      'dsm.pAct':'Proposed rules ({l} layers, {f} forbidden, {e} exceptions): '},
   };
   const t=(k,sub)=>{ const l=(I&&I.getLang&&I.getLang())==='en'?'en':'pl'; let s=(STR[l]&&STR[l][k])||STR.pl[k]||k; if(sub) for(const p in sub) s=s.split('{'+p+'}').join(sub[p]); return s; };
   const MAX_UNITS=80;
@@ -37,8 +51,11 @@
     sel.appendChild(el('option',{value:'f1',text:t('dsm.f1')})); sel.appendChild(el('option',{value:'f2',text:t('dsm.f2')}));
     sel.value=m.mode==='packages'?'packages':'f'+opts.depth;
     const deps=m.cells.reduce((s,r)=>s+r.reduce((a,x)=>a+(x?1:0),0),0);
+    const propBox=el('div',{class:'dsm-propose'});
     dlg.body.appendChild(el('div',{class:'dsm-top'}, el('label',{class:'muted small',text:t('dsm.units')+': '}), sel,
+      el('button',{class:'tb-btn', type:'button', id:'dsm-propose', text:t('dsm.propose'), onclick:()=>showProposal(propBox, m.mode)}),
       el('span',{class:'muted small dsm-sum', text:t('dsm.sum',{u:m.units.length, d:deps, c:m.cycles.length, a:m.above})})));
+    dlg.body.appendChild(propBox);
     dlg.body.appendChild(el('div',{class:'muted small dsm-hint', text:t('dsm.hint')}));
     if(m.units.length>MAX_UNITS){ dlg.body.appendChild(el('div',{class:'dsm-empty', text:t('dsm.many',{n:m.units.length})})); return; }
     if(!deps){ dlg.body.appendChild(el('div',{class:'dsm-empty', text:t('dsm.none')})); }
@@ -81,6 +98,35 @@
     dlg.body.appendChild(pairsBox);
   }
 
+  // propozycja reguł z warstw macierzy (CM.DSM.proposeRules) → jedno kliknięcie: reguły w sesji (graph.rulesDraft,
+  // Inspect) + plik — w folderze obserwowanym na żywo zapis wprost, inaczej pobranie
+  const lang=()=>(I&&I.getLang&&I.getLang())==='en'?'en':'pl';
+  const proposal=(mode)=>D.proposeRules(A.graph, {mode:mode||opts.mode||undefined, depth:opts.depth, lang:lang()});
+  const countForbid=(p)=>p.rules.forbid.reduce((s,f)=>s+(Array.isArray(f.to)?f.to.length:1),0);
+  async function approve(p){
+    A.graph.rulesDraft=p.text;
+    let live=false;
+    if(CM.Live && CM.Live.writeFile && CM.Live.state().on){ try{ await CM.Live.writeFile(CM.Rules.FILE, p.text); live=true; }catch(e){ /* brak uprawnień do zapisu — pobranie */ } }
+    if(!live) U.download(CM.Rules.FILE, p.text);
+    U.toast(t(live?'dsm.savedLive':'dsm.saved'));
+    return live;
+  }
+  function showProposal(box, mode){
+    const p=proposal(mode); box.innerHTML='';
+    box.appendChild(el('div',{class:'field-label', text:t('dsm.pTitle')}));
+    box.appendChild(el('div',{class:'muted small', text:t('dsm.pSum',{l:p.rules.layers.length, f:countForbid(p), e:p.exceptions.length})+' — '+t('dsm.pHint')}));
+    if(CM.Rules.findRulesNode(A.graph) && !CM.Rules.findRulesNode(A.graph).draft) box.appendChild(el('div',{class:'small dsm-warn', text:t('dsm.pExists')}));
+    if(p.exceptions.length){
+      box.appendChild(el('div',{class:'small', text:t('dsm.pExc')}));
+      for(const x of p.exceptions.slice(0,20)) box.appendChild(el('div',{class:'dsm-pair', text:x.from+' → '+x.to+' ('+x.count+')'}));
+    }
+    box.appendChild(el('pre',{class:'dsm-json', text:p.text}));
+    box.appendChild(el('div',{class:'dsm-top'},
+      el('button',{class:'tb-btn primary', type:'button', id:'dsm-approve', text:t('dsm.approve'), onclick:()=>approve(p)}),
+      el('button',{class:'tb-btn', type:'button', text:t('dsm.copy'), onclick:()=>{ navigator.clipboard.writeText(p.text).then(()=>U.toast(t('dsm.copied')), ()=>{ /* schowek zablokowany — JSON widać wyżej */ }); }})));
+    return p;
+  }
+
   function open(o){
     if(!A.graph||!A.state||!A.state.counts||!A.state.counts.nodes) throw new Error(t('dsm.noProject'));
     if(o) opts=Object.assign({mode:null, depth:1}, o);
@@ -111,5 +157,12 @@
         +(m.cycles.length?' · '+t('dsm.cycle')+': '+m.cycles.map(c=>c.map(id=>uname(m.units.find(u=>u.id===id))).join(' ↔ ')).join('; '):'')
         +(up.length?' · ↑ '+up.slice(0,10).join(', '):'');
     }});
-  CM.DSMUI={open};
+  if(A.registerAction) A.registerAction({name:'proposeRules', sig:'{mode?: "packages"|"folders", depth?: 1|2}', desc:'propose .codemap.rules.json from the dependency-matrix layers (shown for approval in the DSM window)',
+      descPl:'zaproponuj .codemap.rules.json z warstw macierzy zależności (do zatwierdzenia w oknie DSM)', auto:true, info:true,
+      run:(a)=>{
+        const o={mode:a&&(a.mode==='packages'||a.mode==='folders')?a.mode:null, depth:Math.max(1,Math.min(3,+(a&&a.depth)||1))};
+        const dlg=open(o), box=dlg.body.querySelector('.dsm-propose'), p=showProposal(box, o.mode);
+        return t('dsm.pAct',{l:p.rules.layers.length, f:countForbid(p), e:p.exceptions.length})+p.rules.layers.map(l=>l.name).join(', ');
+      }});
+  CM.DSMUI={open, proposal, approve};
 })();

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createServer, TOOLS } from '../cli/mcp.mjs';
+import { vulnSummary } from '../cli/report.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'cli', 'codemap.mjs');
 let dir, srv;
@@ -80,5 +81,15 @@ describe('MCP: sesja stdio', () => {
     assert.deepEqual(msgs.map((m) => m.id).sort(), [1, 2]);
     assert.equal(msgs.find((m) => m.id === 2).result.content[0].text, 'src/b.js');
     assert.equal(msgs.find((m) => m.id === 1).result.serverInfo.name, 'codemap');
+  });
+});
+
+describe('vulnerable_dependencies — tekst (vulnSummary)', () => {
+  test('brak sprawdzenia, brak podatności, lista z przechodnią zależnością i poprawką', () => {
+    assert.match(vulnSummary(null), /did not run/);
+    assert.equal(vulnSummary({ checked: 4, items: [] }), 'none of 4 packages has known vulnerabilities');
+    const t = vulnSummary({ checked: 9, items: [{ name: 'lodash', version: '4.17.20', ecosystem: 'npm', direct: false, level: 'HIGH', fixed: '4.17.21',
+      vulns: ['A', 'B', 'C', 'D', 'E'].map((id) => ({ id })) }] });
+    assert.equal(t, '1 of 9 packages vulnerable:\n- lodash 4.17.20 (npm, transitive): HIGH — A, B, C, D · fixed in 4.17.21');
   });
 });

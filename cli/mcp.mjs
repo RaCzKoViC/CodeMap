@@ -9,6 +9,8 @@ import { runAnalysis } from './analyze.mjs';
 import { MCP_MODULES } from './runtime.mjs';
 import { architectureMarkdown } from './architecture.mjs';
 import { stagedCheckText } from './check.mjs';
+import { proposeRules, proposalText } from './propose-rules.mjs';
+import { vulnSummary } from './report.mjs';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const S = (props = {}, required = []) => ({ type: 'object', properties: props, required });
@@ -32,6 +34,7 @@ export const TOOLS = [
   { name: 'ask_map', description: 'Natural-language question about the map answered from the graph, e.g. "untested files with complexity over 50 in src", "top 5 most changed files", "files in cycles".', inputSchema: S({ question: str('the question') }, ['question']) },
   { name: 'test_skeleton', description: 'Test file skeleton for a code file following the project conventions (framework, location, imports, cases ordered by complexity).', inputSchema: S({ path: str('file path') }, ['path']) },
   { name: 'architecture', description: 'ARCHITECTURE.md of the project generated from the map: layers in dependency order (with upstream dependencies = cycles), packages, entry points, core modules, hotspots, ownership, test conventions, rules and cycles.', inputSchema: S() },
+  { name: 'propose_rules', description: 'Proposed .codemap.rules.json from the dependency-matrix layers: a provider must not depend on its consumers; only pairs with no upstream dependency today are forbidden (the rules pass now and block new ones), existing upstream dependencies are listed as exceptions to fix.', inputSchema: S({ mode: str('packages | folders (default: packages when the project has 2+)'), depth: int('folder depth 1-3') }) },
   { name: 'staged_check', description: 'Pre-commit check of the staged changes (git index) against HEAD: risk, dependents, health score change and NEW findings; reports BLOCKING architecture problems (forbidden layer dependencies, import cycles, package cycles) the commit would introduce. Run after `git add`, before committing.', inputSchema: S() },
   { name: 'refresh', description: 'Re-run the analysis after files changed on disk.', inputSchema: S() },
 ];
@@ -153,11 +156,11 @@ export function createServer(opts = {}) {
       case 'ask_map': { const Q = st.CM.MapQuery, p = Q.parse(a.question, st.graph), r = Q.run(st.graph, p.spec); return Q.describe(r, p.spec, lang === 'pl' ? 'pl' : 'en'); }
       case 'test_skeleton': { const r = st.CM.TestGen.generate(st.graph, fileNode(st, a.path), { lang: lang === 'pl' ? 'pl' : 'en' }); return `proposed file: ${r.path}${r.framework ? ' (' + r.framework + ')' : ''}\n\`\`\`\n${r.code}\`\`\``; }
       case 'architecture': return architectureMarkdown(st.CM, st.graph, st.report, { lang: lang === 'pl' ? 'pl' : 'en', version: opts.version || st.CM.VERSION });
+      case 'propose_rules': return proposalText(proposeRules(st.CM, st.graph, { mode: a.mode, depth: a.depth, lang: 'en' }));
       case 'refresh': { const s2 = await analyze(); return `re-analysed: ${s2.report.stats.files} files, health score ${s2.report.score}/100`; }
       case 'vulnerable_dependencies': {
         if (!opts.osv) throw new Error('start the server with --osv to query OSV.dev');
-        const vi = st.graph.vulnInfo; if (!vi) return 'OSV.dev check did not run (network error?)';
-        return vi.items.length ? `${vi.items.length} of ${vi.checked} packages vulnerable:\n` + vi.items.map((it) => `- ${it.name} ${it.version} (${it.ecosystem}${it.direct === false ? ', transitive' : ''}): ${it.level || '?'} — ${it.vulns.slice(0, 4).map((v) => v.id).join(', ')}${it.fixed ? ' · fixed in ' + it.fixed : ''}`).join('\n') : `none of ${vi.checked} packages has known vulnerabilities`;
+        return vulnSummary(st.graph.vulnInfo);
       }
       default: throw new Error('unknown tool: ' + name);
     }

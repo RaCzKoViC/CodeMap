@@ -160,6 +160,18 @@ rozpakowywane. Historia git jest czytana z `.git` analizowanego katalogu albo na
 nadrzędnego (analiza podkatalogu monorepo), także gdy `.git` jest plikiem (`git worktree`, submoduł);
 płytki klon (`fetch-depth: 1`) daje historię tylko od granicy klonu.
 
+### Reguły architektury z macierzy zależności: `codemap rules`
+
+```bash
+codemap rules --out .codemap.rules.json          # pakiety (monorepo) albo foldery poziomu 1
+codemap rules --folders --depth 2 --out .codemap.rules.json
+```
+
+Warstwy = jednostki macierzy zależności w kolejności dostawcy → konsumenci; zakazane są zależności dostawcy od
+konsumentów, ale tylko tam, gdzie dziś ich nie ma — reguły od razu przechodzą, a akcja z `fail-on: archviolation`
+albo `codemap check` zatrzymuje każdą nową zależność „pod prąd". Istniejące (cykle) są wypisane na stderr jako
+wyjątki do naprawy. To samo w aplikacji: okno „Macierz zależności" → Zaproponuj reguły → Zatwierdź.
+
 ### Przed commitem: `codemap check`
 
 ```bash

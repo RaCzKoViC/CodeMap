@@ -14,7 +14,7 @@ const T = {
     hot: 'Hotspots', hotNote: 'Changed often and complex (git history) — where bugs and the cost of change accumulate.', hotNoGit: 'Large and complex files (no git history).', changes: 'changes', owner: 'owner',
     own: 'Ownership', bus: 'bus factor', tests: 'Tests', testsLine: '{t} of {c} code files have tests ({p} %).', conv: 'Convention: {k}, {f}.',
     convKinds: { sibling: 'tests next to the code', __tests__: 'tests in `__tests__/` next to the code', mirror: 'tests in a mirrored tree `{r}/`', flat: 'tests in `{r}/`', inline: 'test module in the same file', java: 'tests in `src/test/…`' },
-    rules: 'Rules and cycles', rulesFile: '`.codemap.rules.json`: layers {l}, forbidden dependencies {f}, violations {v}.', noRules: 'No `.codemap.rules.json` — the layers above can serve as a starting point.',
+    rules: 'Rules and cycles', rulesFile: '`.codemap.rules.json`: layers {l}, forbidden dependencies {f}, violations {v}.', noRules: 'No `.codemap.rules.json` — `codemap rules` proposes one from the layers above (DSM window: Propose rules).',
     cycles: 'Import cycles: {n}{big}.', noCycles: 'No import cycles between files.', pkgCycles: 'Package cycles: {l}.',
     hidden: 'Hidden coupling', hiddenNote: 'Code files changed together without an import between them (git history).' },
   pl: { title: 'Architektura', gen: 'Wygenerowane przez CodeMap {v} z kodu i historii git — odśwież: `codemap analyze . --architecture ARCHITECTURE.md`; nie edytuj ręcznie.',
@@ -26,7 +26,7 @@ const T = {
     hot: 'Hotspoty', hotNote: 'Często zmieniane i złożone (historia git) — tu kumulują się błędy i koszt zmian.', hotNoGit: 'Duże i złożone pliki (bez historii git).', changes: 'zmian', owner: 'właściciel',
     own: 'Własność', bus: 'bus factor', tests: 'Testy', testsLine: 'Pliki kodu z testami: {t} z {c} ({p} %).', conv: 'Konwencja: {k}, {f}.',
     convKinds: { sibling: 'testy obok kodu', __tests__: 'testy w `__tests__/` obok kodu', mirror: 'testy w lustrzanym drzewie `{r}/`', flat: 'testy w `{r}/`', inline: 'moduł testów w tym samym pliku', java: 'testy w `src/test/…`' },
-    rules: 'Reguły i cykle', rulesFile: '`.codemap.rules.json`: warstw {l}, zakazanych zależności {f}, naruszeń {v}.', noRules: 'Brak `.codemap.rules.json` — warstwy powyżej mogą być punktem wyjścia.',
+    rules: 'Reguły i cykle', rulesFile: '`.codemap.rules.json`: warstw {l}, zakazanych zależności {f}, naruszeń {v}.', noRules: 'Brak `.codemap.rules.json` — `codemap rules` zaproponuje go z warstw powyżej (okno DSM: Zaproponuj reguły).',
     cycles: 'Cykle importów: {n}{big}.', noCycles: 'Brak cykli importów między plikami.', pkgCycles: 'Cykle pakietów: {l}.',
     hidden: 'Ukryte sprzężenia', hiddenNote: 'Pliki kodu zmieniane razem bez importu między nimi (historia git).' },
 };

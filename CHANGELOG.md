@@ -56,6 +56,16 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   98,1 / 100 %, petite-vue 98,1 / 100 %, Preact 98,9 / 100 %, Preact Signals 93,9 / 99,5 % (reszta to wywołania przez
   interfejs, gdzie CodeMap wskazuje implementację). Osobne progi w CI: `--min-call-precision 0.9 --min-call-recall 0.97`.
 
+- **Propozycja reguł architektury z warstw macierzy zależności** (`CM.DSM.proposeRules`): warstwa = jednostka macierzy
+  (katalog pakietu / folderu `dir/**`, zagnieżdżone przed rodzicem, korzeń `**` albo `*`, `*/*`… na końcu; powtórzone
+  nazwy z katalogiem), zakazy dostawca → konsumenci jako listy — tylko pary bez dzisiejszej zależności pod prąd, więc
+  reguły od razu przechodzą i blokują nowe; istniejące zależności pod prąd = wyjątki do naprawy; `noCycles`, gdy nie ma
+  cykli plików. Okno DSM: **Zaproponuj reguły** → podgląd JSON, wyjątki, **Zatwierdź** (jedno kliknięcie: reguły od
+  razu w Inspect przez `graph.rulesDraft` + plik — zapis do folderu na żywo, `CM.Live.writeFile`, inaczej pobranie),
+  akcja ChatBota `proposeRules`; CLI `codemap rules [--packages | --folders --depth N] [--out plik]`; narzędzie MCP
+  `propose_rules`; ARCHITECTURE.md bez reguł podpowiada `codemap rules`. `.codemap.rules.json`: `from` / `to` mogą być
+  listami (rozwijane na pary).
+
 ### Poprawione — Faza 14 (graf wywołań)
 - Wywołania metod prywatnych `this.#m()` nie były rozpoznawane (`private_property_identifier`) — na ky kompletność
   61 % → 100 %.

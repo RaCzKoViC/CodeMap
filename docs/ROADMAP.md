@@ -211,7 +211,7 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
 - ✅ Trend zdrowia w tle (`js/trend-worker.js` — te same moduły co CLI z atrapami API strony) i z pamięcią punktów
   per commit (sha + wersja CodeMap, ≤ 400); bez workera — w wątku strony jak dotąd.
 
-## Faza 14 — dokładność 2.0 — W TOKU 2026-09-27
+## Faza 14 — dokładność 2.0 — WYKONANA 2026-09-27
 
 - ✅ Korpus: monorepo pnpm Preact Signals (16 pakietów, zagnieżdżone, `paths` z tsconfig) — pliki i poziom pakietów
   (lista pakietów + krawędzie pakiet → pakiet) vs esbuild i package.json: 100 % / 100 %; w galerii aplikacji.
@@ -221,7 +221,8 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
   (Requests dołączony do korpusu, importy vs grimp 55/55).
 - ✅ Dokładność grafu wywołań: tree-sitter + resolveCalls vs checker TypeScript 5.9 w korpusie (94–99 % / 99,5–100 %);
   poprawione metody prywatne `#m`, nazwy importów w rozwiązywaniu, metody wbudowane, `this.` / owijki.
-- Propozycja reguł architektury z warstw macierzy zależności — do zatwierdzenia jednym klikiem.
+- ✅ Propozycja reguł architektury z warstw macierzy zależności (`CM.DSM.proposeRules`): okno DSM → „Zatwierdź" jednym
+  kliknięciem (Inspect od razu + plik), `codemap rules`, MCP `propose_rules`; reguły dziś przechodzą, wyjątki do naprawy.
 
 ## Faza 15 — CodeMap dla agentów AI — WYKONANA 2026-09-27
 

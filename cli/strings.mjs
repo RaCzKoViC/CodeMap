@@ -11,6 +11,9 @@ Użycie:
                          kod 1 przy nowych znaleziskach z --fail-on (domyślnie archviolation,cycles,pkgcycle)
   codemap check --install-hook | --uninstall-hook
                          hook pre-commit wołający codemap check (cudzego hooka nie nadpisuje)
+  codemap rules [ścieżka=.] [--packages | --folders --depth N] [--out .codemap.rules.json]
+                         propozycja reguł architektury z warstw macierzy zależności (dziś przechodzą,
+                         blokują nowe zależności pod prąd; istniejące — lista wyjątków na stderr)
   codemap mcp [ścieżka=.] [--osv] [--no-git] [--exclude glob]… [--lang pl|en]
                          serwer MCP (stdio) dla agentów AI: te same analizy jako narzędzia tylko do odczytu
   codemap --help | --version
@@ -74,6 +77,7 @@ Reguły: {rules}`,
     failRule: 'reguła „{rule}" ({title}): {n} (--fail-on)',
     failMax: '{n} > --max-findings {max}',
     failDrop: 'health score spadł o {d} (z {b} do {s}) > --max-score-drop {max}', eBaselineNoBase: '--baseline i --pr-md wymagają --base <ref>',
+    rulesSum: 'Propozycja reguł ({m}): warstwy {l}, zakazy {f}, wyjątki do naprawy (zależności pod prąd) {e}',
     prLine: 'Zmiany vs {base}', prVal: 'ryzyko {risk}/100 ({lvl}) · plików {n} (+{a} / −{d}) · zależnych {dep}',
     blLine: 'Zdrowie vs {base}', blVal: '{b} → {s} ({sign}{d}) · nowe znaleziska: {nf}, usunięte: {rf}',
     warn: 'uwaga', err: 'błąd',
@@ -106,6 +110,9 @@ Usage:
                          exit 1 on new findings from --fail-on (default archviolation,cycles,pkgcycle)
   codemap check --install-hook | --uninstall-hook
                          a pre-commit hook running codemap check (an existing foreign hook is left alone)
+  codemap rules [path=.] [--packages | --folders --depth N] [--out .codemap.rules.json]
+                         architecture rules proposed from the dependency-matrix layers (pass today,
+                         block new upstream dependencies; existing ones listed as exceptions on stderr)
   codemap mcp [path=.] [--osv] [--no-git] [--exclude glob]… [--lang pl|en]
                          MCP server (stdio) for AI agents: the same analysis as read-only tools
   codemap --help | --version
@@ -169,6 +176,7 @@ Rules: {rules}`,
     failRule: 'rule "{rule}" ({title}): {n} (--fail-on)',
     failMax: '{n} > --max-findings {max}',
     failDrop: 'health score dropped by {d} (from {b} to {s}) > --max-score-drop {max}', eBaselineNoBase: '--baseline and --pr-md need --base <ref>',
+    rulesSum: 'Proposed rules ({m}): layers {l}, forbidden {f}, exceptions to fix (upstream dependencies) {e}',
     prLine: 'Changes vs {base}', prVal: 'risk {risk}/100 ({lvl}) · {n} files (+{a} / −{d}) · {dep} dependents',
     blLine: 'Health vs {base}', blVal: '{b} → {s} ({sign}{d}) · new findings: {nf}, resolved: {rf}',
     warn: 'warning', err: 'error',

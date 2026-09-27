@@ -254,6 +254,17 @@
       run:async()=>{ const r=await remembered(); if(!r||!r.handle) return '—'; const b=$('#st-live-resume'); if(b) b.remove(); const ok=await start(r.handle); return ok?T('load.live','Folder na żywo (obserwuj zmiany)')+': '+r.name:T('live.denied','Brak uprawnień do odczytu folderu.'); }});
     A.registerAction({name:'liveStop', sig:'', desc:'stop watching the live folder', descPl:'zakończ obserwację folderu', auto:true, run:()=>{ const was=S.on; stop(); return was?T('live.stopped','Zakończono obserwację folderu.'):'—'; }});
   }
-  CM.Live={pick, start, stop, poll, offerResume, remembered, forget, pause:()=>setPaused(true), resume:()=>setPaused(false), state:()=>({on:S.on, paused:S.paused, name:S.name, files:S.files.size, observer:!!S.observer, interval:S.interval})};
+  // zapis pliku w korzeniu obserwowanego folderu (np. zatwierdzone reguły architektury) — przeglądarka pyta
+  // o uprawnienie do zapisu; kolejny poll wczytuje plik jak każdą inną zmianę
+  async function writeFile(name, text){
+    if(!S.on || !S.dir) throw new Error('live off');
+    if(S.dir.queryPermission && await S.dir.queryPermission({mode:'readwrite'}) !== 'granted'
+       && (!S.dir.requestPermission || await S.dir.requestPermission({mode:'readwrite'}) !== 'granted')) throw new Error('permission denied');
+    const fh=await S.dir.getFileHandle(name, {create:true}), w=await fh.createWritable();
+    await w.write(new Blob([text])); await w.close();
+    poll();
+    return true;
+  }
+  CM.Live={pick, start, stop, poll, writeFile, offerResume, remembered, forget, pause:()=>setPaused(true), resume:()=>setPaused(false), state:()=>({on:S.on, paused:S.paused, name:S.name, files:S.files.size, observer:!!S.observer, interval:S.interval})};
   setTimeout(wire, 0);
 })();

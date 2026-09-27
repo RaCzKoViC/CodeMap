@@ -516,6 +516,27 @@ const dsmRes = await evalJs(`(async()=>{ try{
 check(dsmRes && !dsmRes.error && dsmRes.menu && dsmRes.rows === 4 && dsmRes.up === 1 && dsmRes.pairs === 1 && dsmRes.hi === 2 && dsmRes.cyc === 2
   && /@m\/core ↔ @m\/ui/.test(dsmRes.chat) && dsmRes.rule === 1,
   `macierz zależności: menu, okno, cykl nad przekątną, pary importów, reguła pkgcycle, akcja ChatBota: ${JSON.stringify(dsmRes)}`);
+// propozycja reguł z warstw macierzy (faza 14): przycisk w oknie DSM → JSON do zatwierdzenia z wyjątkiem (cykl core ↔ ui
+// poza regułami), „Zatwierdź" = reguły w sesji (graph.rulesDraft) + plik (pobranie podmienione na atrapę), Inspect
+// bez naruszeń; akcja ChatBota proposeRules
+const rulesRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const U=CM.util, dl=U.download; let saved=null; U.download=(n,t)=>{ saved={n, t}; };
+  try{
+    document.getElementById('btn-dsm').click(); await sleep(250);
+    document.getElementById('dsm-propose').click(); await sleep(100);
+    const box=document.querySelector('#modal-dsm .dsm-propose'), json=JSON.parse(box.querySelector('.dsm-json').textContent);
+    const exc=box.querySelectorAll('.dsm-pair').length;
+    document.getElementById('dsm-approve').click(); await sleep(150);
+    const draft=!!CMApp.graph.rulesDraft, rep=await CM.Inspect.run(CMApp.graph), av=rep.findings.find(f=>f.rule==='archviolation');
+    document.querySelector('#modal-dsm .modal-x').click();
+    const chat=String(CMApp.exec('proposeRules',{})); document.querySelector('#modal-dsm .modal-x').click();
+    return {layers:json.layers.map(l=>l.name), forbid:json.forbid.length, exc, file:saved&&saved.n, same:saved&&JSON.stringify(JSON.parse(saved.t))===JSON.stringify(json), draft, violations:av?av.count:0, chat};
+  } finally { U.download=dl; }
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(rulesRes && !rulesRes.error && rulesRes.layers.length === 4 && rulesRes.forbid >= 1 && rulesRes.exc === 1 && rulesRes.file === '.codemap.rules.json'
+  && rulesRes.same && rulesRes.draft && rulesRes.violations === 0 && /4 (warstw|layers)/.test(rulesRes.chat),
+  `propozycja reguł w oknie DSM: JSON, wyjątek cyklu, zatwierdzenie jednym kliknięciem, Inspect bez naruszeń, akcja: ${JSON.stringify(rulesRes)}`);
 // CODEOWNERS (faza 10): deklarowany @ala, a plik zmieniał tylko Bob → sekcja panelu z „rozjazd", nakładka
 // „Właściciel (CODEOWNERS)" z legendą (bez właściciela), akcja ChatBota codeOwners
 const coRes = await evalJs(`(async()=>{ try{

@@ -94,3 +94,12 @@ describe('evaluate', () => {
     assert.deepEqual(host(v.map((x) => x.from)), ['src/lib/util.js']);
   });
 });
+
+describe('forbid z listami (propozycje z macierzy zależności)', () => {
+  test('from / to jako lista rozwijane na pary; pojedyncza nazwa jak dotąd', () => {
+    const r = CM.Rules.parse({ layers: [{ name: 'a', match: 'a/**' }, { name: 'b', match: 'b/**' }, { name: 'c', match: 'c/**' }],
+      forbid: [{ from: ['a', 'b'], to: 'c', why: 'x' }, { from: 'c', to: ['a'] }] });
+    assert.deepEqual(host(r.forbid.map((f) => f.from + '→' + f.to)), ['a→c', 'b→c', 'c→a']);
+    assert.deepEqual(host(r.warnings), []);
+  });
+});

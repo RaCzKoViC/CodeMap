@@ -80,6 +80,10 @@ Click **“✨ See demo”** or open `index.html#demo`.
 - **Dependency matrix (DSM)** — Project → Dependency matrix: monorepo packages (package.json, Cargo.toml, go.mod, pubspec,
   pyproject) or folders (level 1/2) ordered providers → consumers, so healthy dependencies sit below the diagonal and red
   cells above it are cycles; a click shows the import pairs and highlights the files. Inspect rule **Cycles between packages**.
+  **Propose rules** turns the layers into a `.codemap.rules.json` (a provider must not depend on its consumers; only
+  pairs without an upstream dependency today are forbidden, so the rules pass right away; existing ones are listed
+  to fix) — **Approve** enforces them in Inspect at once and saves the file (straight into a live folder, otherwise
+  as a download). CLI: `codemap rules [--out .codemap.rules.json]`, MCP: `propose_rules`, ChatBot: `proposeRules`.
 - **Checked against the ecosystems' own tools**: `npm run corpus` compares CodeMap's import edges on pinned releases of
   Express, Preact, ky, petite-vue, Flask, Requests and Gin with esbuild (JS/TS), grimp (Python) and `go list` (Go) —
   precision and recall per repository, a CI job fails below 97 %. The pnpm monorepo Preact Signals (16 packages) is also
@@ -267,7 +271,7 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   the same analysis as read-only tools: `project_overview`, `find_files`, `code_search` (BM25), `file_info`,
   `dependencies`, `dependents`, `change_impact` (paths or a git `base` — risk with reasons, impacted files, reviewers),
   `hotspots`, `findings`, `cycles`, `owners`, `tests`, `change_coupling`, `ask_map` (natural-language questions),
-  `test_skeleton`, `architecture` (the same `ARCHITECTURE.md`), `staged_check` (`codemap check` on the
+  `test_skeleton`, `architecture` (the same `ARCHITECTURE.md`), `propose_rules` (rules from the matrix layers), `staged_check` (`codemap check` on the
   staged changes — the agent can verify its own commit) and `refresh`; `--osv` adds `vulnerable_dependencies` (only package names and versions go to OSV.dev).
 - Claude Code: `claude mcp add codemap -- node /path/to/CodeMap/cli/codemap.mjs mcp /path/to/project`; other clients
   (`.mcp.json`): `{"mcpServers": {"codemap": {"command": "node", "args": ["/path/to/CodeMap/cli/codemap.mjs", "mcp", "."]}}}`.
