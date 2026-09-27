@@ -21,7 +21,7 @@ const RESULTS = [
     { name: 'helper', kind: 'function', line: 2, endLine: 2, calls: ['helper', 'log'] },
   ] },
   { path: 'src/index.js', symbols: [
-    { name: 'main', kind: 'function', line: 8, endLine: 8, calls: ['App', 'run'] },
+    { name: 'main', kind: 'function', line: 8, endLine: 8, calls: ['App', 'run'], member: ['run'] },   // new App().run()
   ] },
   { path: 'nie/istnieje.js', symbols: [{ name: 'x', kind: 'function', line: 1, endLine: 1, calls: [] }] },
 ];
@@ -48,6 +48,28 @@ describe('SymbolsCore', () => {
     const edges = host(Core.resolveCalls(perFile, (p) => imports[p] || []));
     assert.deepEqual(edges, [{ source: 'a#f', target: 'a#g' }, { source: 'a#f', target: 'b#h' }]);
   });
+  test('resolveCalls z nazwami importów: goła nazwa tylko importowana, przez kropkę każdy import, bez metod wbudowanych (poza this.), metoda-owijka', () => {
+    const perFile = [
+      { path: 'a.js', symbols: [
+        { id: 'a#caller', name: 'caller', calls: ['imported', 'notImported', 'method', 'get', 'wrap', 'viaDefault'], member: ['method', 'get'] },
+        { id: 'a#wrap', name: 'wrap', calls: ['wrap'] },                                   // wrap(){ return wrap(x) } — z importu
+        { id: 'a#own', name: 'own', calls: ['get'], member: ['get'], self: ['get'] },     // this.get()
+        { id: 'a#get', name: 'get', calls: [] },
+      ] },
+      { path: 'b.js', symbols: ['imported', 'notImported', 'method', 'get', 'wrap'].map((n) => ({ id: 'b#' + n, name: n, calls: [] })) },
+      { path: 'c.js', symbols: [{ id: 'c#viaDefault', name: 'viaDefault', calls: [] }] },
+    ];
+    const imports = { 'a.js': [{ path: 'b.js', names: ['imported', 'wrap'] }, { path: 'c.js', names: ['default'] }] };
+    const edges = host(Core.resolveCalls(perFile, (p) => imports[p] || [])).map((e) => e.source + ' → ' + e.target).sort();
+    assert.deepEqual(edges, [
+      'a#caller → a#wrap',           // lokalna definicja inna niż wołający
+      'a#caller → b#imported',
+      'a#caller → b#method',         // przez kropkę: nazwa nie musi być importowana
+      'a#caller → c#viaDefault',     // import domyślny — lokalna nazwa dowolna
+      'a#own → a#get',               // this.get() — własna metoda, mimo nazwy wbudowanej
+      'a#wrap → b#wrap',             // jedyna lokalna „wrap" to wołający, a wrap jest jawnie importowane
+    ]);                              // bez: notImported (goła, nieimportowana), caller → get (x.get() — Map.get)
+  });
   test('resolveCalls: lokalna definicja ma pierwszeństwo przed importem o tej samej nazwie', () => {
     const perFile = [
       { path: 'a.js', symbols: [{ id: 'a#f', name: 'f', calls: ['h'] }, { id: 'a#h', name: 'h', calls: [] }] },
@@ -69,6 +91,13 @@ describe('tree-sitter: prawdziwe parsowanie 12 języków', async () => {
       for (const s of res[0].symbols) { assert.ok(s.line >= 1 && s.endLine >= s.line); }
     });
   }
+  test('extract: wywołania gołe, przez kropkę (member) i przez this. (self), także metody prywatne #p', { skip: ts ? false : 'brak pakietów' }, async () => {
+    const src = 'class A { m(){ this.b(); x.get(); helper(); this.#p(); } b(){} #p(){} }\nfunction helper(){ return y.z(); }\n';
+    const [r] = await RealCore.analyzeBatch(ts.Parser, [{ path: 'a.js', lang: 'js', content: src }], ts.load, {});
+    const m = r.symbols.find((s) => s.name === 'm'), h = r.symbols.find((s) => s.name === 'helper');
+    assert.deepEqual(host([m.calls, m.member, m.self]), [['b', 'get', 'helper', '#p'], ['b', 'get', '#p'], ['b', '#p']]);
+    assert.deepEqual(host([h.calls, h.member, h.self || null]), [['z'], ['z'], null]);
+  });
   test('analyzeBatch: plik bez gramatyki pominięty, anulowanie przerywa partię, postęp raportowany', { skip: ts ? false : 'brak pakietów' }, async () => {
     const files = [{ path: 'a.md', lang: 'md', content: '# x' }];
     for (let i = 0; i < 45; i++) files.push({ path: `f${i}.js`, lang: 'js', content: `function f${i}(){ return g(); }` });

@@ -73,6 +73,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   enumy i traity jako węzły drugiego poziomu pod plikiem, a wywołania rozwiązane w pliku i przez importy
   jako krawędzie. 12 gramatyk (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsowanie
   w Web Workerze; dwuklik na pliku rozwija jego symbole, przy zwiniętych plikach wywołania łączą pliki.
+  Goła nazwa `f()` idzie przez import tylko wtedy, gdy `f` jest importowane z tego pliku; `x.m()` przez każdy import,
+  ale nie dla nazw metod wbudowanych (`map.get()`), chyba że przez `this.`. Sprawdzane checkerem TypeScriptu na
+  korpusie: precyzja 94–99 %, kompletność 99,5–100 % (ky, petite-vue, Preact, Preact Signals).
 - Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
 - **Macierz zależności (DSM)** — Projekt → Macierz zależności: pakiety monorepo (package.json, Cargo.toml, go.mod, pubspec,
   pyproject) albo foldery (poziom 1/2) w kolejności dostawcy → konsumenci, więc zdrowe zależności leżą pod przekątną,

@@ -887,6 +887,7 @@ CM.Analysis = (function(){
       if(old){ if(old.typeOnly && !typeOnly) delete old.typeOnly; }
       else { if(typeOnly) e.typeOnly = true; seen.set(k, e); edges.push(e); }
       if(dep){
+        if(dep.reexport) e.reexport = true;                    // barrel: graf wywołań idzie przez niego dalej
         if(dep.star) e.star = true;
         else if(!dep.names) e.names = ['*'];
         else if(!e.names) e.names = dep.names.slice();

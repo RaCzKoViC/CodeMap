@@ -79,8 +79,8 @@ jobs:
           go-version: stable
           cache: false
       - run: npm ci
-      - name: Korpus referencyjny (precyzja i kompletność ≥ 97 %)
-        run: node tools/corpus.mjs --require-all --min-precision 0.97 --min-recall 0.97 --show 40 --json corpus.json --summary
+      - name: Korpus referencyjny (importy, pakiety, martwy kod ≥ 97 %; graf wywołań vs TypeScript ≥ 90 / 97 %)
+        run: node tools/corpus.mjs --require-all --min-precision 0.97 --min-recall 0.97 --min-call-precision 0.9 --min-call-recall 0.97 --show 40 --json corpus.json --summary
       - uses: actions/upload-artifact@v4
         if: always()
         with:

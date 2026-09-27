@@ -73,6 +73,9 @@ Click **“✨ See demo”** or open `index.html#demo`.
   enums and traits become second-level nodes under their file, and calls resolved within the file and through
   imports become edges. 12 grammars (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsed
   in a Web Worker; double-click a file to expand its symbols — while files are collapsed, calls connect the files.
+  A plain `f()` resolves through an import only when `f` is imported from that file; `x.m()` resolves through any
+  import but not for built-in method names (`map.get()`), except on `this.`. Checked against the TypeScript checker
+  on the reference corpus: precision 94–99 %, recall 99.5–100 % (ky, petite-vue, Preact, Preact Signals).
 - Graph: neighbors, upstream and downstream **dependency impact**, **cycles** (Tarjan SCC), signatures for comparisons.
 - **Dependency matrix (DSM)** — Project → Dependency matrix: monorepo packages (package.json, Cargo.toml, go.mod, pubspec,
   pyproject) or folders (level 1/2) ordered providers → consumers, so healthy dependencies sit below the diagonal and red

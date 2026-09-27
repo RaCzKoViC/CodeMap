@@ -219,7 +219,8 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
   z monorepo); pliki bez importujących = istniejąca reguła osieroconych plików.
 - ✅ Martwy kod Python (funkcje i klasy najwyższego poziomu bez odwołań) zgodny z vulture 2.14: Flask 3/3, Requests 9/9
   (Requests dołączony do korpusu, importy vs grimp 55/55).
-- Dokładność grafu wywołań: tree-sitter porównany z „znajdź odwołania" kompilatora TypeScript.
+- ✅ Dokładność grafu wywołań: tree-sitter + resolveCalls vs checker TypeScript 5.9 w korpusie (94–99 % / 99,5–100 %);
+  poprawione metody prywatne `#m`, nazwy importów w rozwiązywaniu, metody wbudowane, `this.` / owijki.
 - Propozycja reguł architektury z warstw macierzy zależności — do zatwierdzenia jednym klikiem.
 
 ## Faza 15 — CodeMap dla agentów AI — WYKONANA 2026-09-27

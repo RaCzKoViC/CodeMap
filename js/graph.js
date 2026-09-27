@@ -472,17 +472,24 @@ CM.Graph = (function(){
           if(!f.children) f.children = [];
           f.children.push(id);
           this.edges.push({id:'sc' + this.edges.length, source:f.id, target:id, type:'contains'});
-          syms.push({id, name:s.name, calls:s.calls || []});
+          syms.push({id, name:s.name, calls:s.calls || [], member:s.member || [], self:s.self || []});
         });
         if(syms.length){ f.symbolCount = syms.length; f.collapsed = true; perFile.push({path:f.id, symbols:syms}); count += syms.length; }
       }
-      // pliki importowane przez plik (+ pliki w importowanym folderze — pakiety Go)
+      // pliki importowane przez plik (+ pliki w importowanym folderze — pakiety Go) z nazwami z klauzul importu (JS/TS:
+      // e.names) i o jeden poziom dalej przez barrel (`export *` / `export {x} from`) — resolveCalls sprawdza nazwy
+      const importEdges = new Map();
+      for(const e of this.edges) if(e.type === 'import'){ if(!importEdges.has(e.source)) importEdges.set(e.source, []); importEdges.get(e.source).push(e); }
       const importsOf = (path)=>{
-        const n = this.nodes.get(path); const out = [];
-        for(const id of ((n && n.importsOut) || [])){
-          const t = this.nodes.get(id); if(!t) continue;
-          if(t.type === 'file') out.push(id);
-          else if(t.type === 'folder') for(const c of (t.children || [])){ const cn = this.nodes.get(c); if(cn && cn.type === 'file') out.push(c); }
+        const out = [], seen = new Set();
+        const push = (id, names)=>{ if(seen.has(id)) return; seen.add(id); out.push(names ? {path:id, names} : id); };
+        for(const e of (importEdges.get(path) || [])){
+          const t = this.nodes.get(e.target); if(!t) continue;
+          if(t.type === 'file'){
+            push(e.target, e.names || null);
+            for(const b of (importEdges.get(e.target) || [])) if((b.star || b.reexport) && this.nodes.get(b.target) && this.nodes.get(b.target).type === 'file') push(b.target, e.names || null);
+          }
+          else if(t.type === 'folder') for(const c of (t.children || [])){ const cn = this.nodes.get(c); if(cn && cn.type === 'file') push(c, null); }
         }
         return out;
       };

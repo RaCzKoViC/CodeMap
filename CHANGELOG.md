@@ -50,6 +50,20 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   docstringi, komentarze i napisy wygaszone). Świadome różnice: pomijane definicje z dekoratorem (rejestruje je framework),
   dundery i nazwy importowane w `__init__.py` (API pakietu). Korpus: **vulture 2.14** — Flask 3/3 i nowe repozytorium
   **Requests 2.32.5** 9/9 (importy vs grimp 55/55), 100 % / 100 %.
+- **Dokładność grafu wywołań vs TypeScript** (korpus): krawędzie wywołań CodeMap (tree-sitter z devDependencies +
+  `CM.SymbolsCore.resolveCalls`, `graph.addSymbols` jak w aplikacji) porównane z checkerem **TypeScript 5.9.3**
+  (każde wywołanie i `new` w ciele definicji, aliasy importów rozwinięte, przeciążenie → deklaracja z ciałem): ky
+  98,1 / 100 %, petite-vue 98,1 / 100 %, Preact 98,9 / 100 %, Preact Signals 93,9 / 99,5 % (reszta to wywołania przez
+  interfejs, gdzie CodeMap wskazuje implementację). Osobne progi w CI: `--min-call-precision 0.9 --min-call-recall 0.97`.
+
+### Poprawione — Faza 14 (graf wywołań)
+- Wywołania metod prywatnych `this.#m()` nie były rozpoznawane (`private_property_identifier`) — na ky kompletność
+  61 % → 100 %.
+- Rozwiązywanie wywołań korzysta z nazw importów: goła nazwa `f()` idzie przez import tylko, gdy `f` jest z tego pliku
+  importowane (albo `*` / `default`), także o poziom dalej przez barrel; wywołanie przez kropkę (`s.member`) — przez
+  każdy import, ale nie dla metod wbudowanych (`map.get()`, `arr.push()`, `console.warn()`…), chyba że przez `this.` /
+  `self.` (`s.self`); metoda-owijka `m(){ m(x) }` łączy się z importowanym `m`. Precyzja na monorepo 85,8 % → 93,9 %.
+- `./x` bez pliku źródłowego rozwiązuje się do `x.d.ts`; typy z JSDoc `import('./x').T` są zależnościami tylko typu.
 
 ### Zmienione — Faza 13 (wydajność)
 - **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym

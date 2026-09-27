@@ -50,7 +50,7 @@
   const CALL = new Set(['call_expression', 'call', 'new_expression', 'method_invocation', 'object_creation_expression',
     'invocation_expression', 'function_call_expression', 'member_call_expression', 'scoped_call_expression',
     'nullsafe_member_call_expression']);
-  const ID_T = new Set(['identifier', 'property_identifier', 'field_identifier', 'type_identifier', 'name', 'constant',
+  const ID_T = new Set(['identifier', 'property_identifier', 'private_property_identifier', 'field_identifier', 'type_identifier', 'name', 'constant',
     'shorthand_property_identifier', 'simple_identifier', 'namespace_identifier']);
   const SKIP = new Set(['this', 'super', 'self', 'Self', 'parent', 'static']);
   const KIND_CODE = { function:'FN', method:'MTH', constructor:'NEW', class:'CLS', interface:'IF', struct:'ST', enum:'EN',
@@ -114,8 +114,15 @@
   // Przejście drzewa kursorem (bez tworzenia obiektów dla każdego węzła) — węzeł materializujemy tylko,
   // gdy jego typ to definicja albo wywołanie. Wywołanie przypisujemy do najbliższej obejmującej definicji.
   const MAX_SYMS = 400, MAX_CALLS = 150;
+  // wywołanie przez kropkę / ścieżkę (`obj.m()`, `Vec::new()`) — resolveCalls traktuje je inaczej niż gołą nazwę
+  const MEMBER_T = new Set(['member_expression', 'attribute', 'field_expression', 'selector_expression', 'scoped_identifier',
+    'qualified_identifier', 'member_access_expression', 'scoped_call_expression', 'member_call_expression', 'nullsafe_member_call_expression']);
+  const isMemberCall = (n, callee)=> !!callee && (MEMBER_T.has(callee.type) || MEMBER_T.has(n.type) ||
+    (n.type === 'method_invocation' && !!n.childForFieldName('object')) || (n.type === 'call' && !!n.childForFieldName('receiver')));
+  // `this.m()` / `self.m()` — metoda tej klasy albo klasy bazowej (nie Map.get z biblioteki)
+  const isSelfCall = (callee)=>{ const o = callee && callee.childForFieldName('object'); return !!o && (o.type === 'this' || (o.type === 'identifier' && o.text === 'self')); };
   function extract(tree){
-    const syms = [], sets = [];
+    const syms = [], sets = [], bare = [], self = [];
     const cur = tree.walk();
     const visit = (owner)=>{
       const t = cur.nodeType;
@@ -124,13 +131,17 @@
         const d = defOf(node, owner >= 0 ? syms[owner].kind : null);
         if(d && syms.length < MAX_SYMS){
           syms.push({ name:d.name, kind:d.kind, line:node.startPosition.row+1, endLine:node.endPosition.row+1, calls:[] });
-          sets.push(new Set());
+          sets.push(new Set()); bare.push(new Set()); self.push(new Set());
           return syms.length - 1;
         }
       } else if(owner >= 0 && CALL.has(t)){
-        const nm = calleeName(calleeNode(cur.currentNode));
+        const node = cur.currentNode, callee = calleeNode(node), nm = calleeName(callee);
         const s = syms[owner], seen = sets[owner];
-        if(nm && nm.length <= 80 && !SKIP.has(nm) && !seen.has(nm) && s.calls.length < MAX_CALLS){ seen.add(nm); s.calls.push(nm); }
+        if(nm && nm.length <= 80 && !SKIP.has(nm)){
+          if(!seen.has(nm) && s.calls.length < MAX_CALLS){ seen.add(nm); s.calls.push(nm); }
+          if(seen.has(nm) && !isMemberCall(node, callee)) bare[owner].add(nm);
+          else if(seen.has(nm) && isSelfCall(callee)) self[owner].add(nm);
+        }
       }
       return owner;
     };
@@ -146,6 +157,11 @@
       ownerAt[depth] = visit(depth > 0 ? ownerAt[depth-1] : -1);
     }
     cur.delete();
+    // member = nazwy wołane wyłącznie przez kropkę (bez gołego wywołania), self = z nich przez this./self. — tylko gdy są
+    syms.forEach((s, i)=>{
+      const m = s.calls.filter((nm)=>!bare[i].has(nm)); if(m.length) s.member = m;
+      const me = m.filter((nm)=>self[i].has(nm)); if(me.length) s.self = me;
+    });
     return syms;
   }
 
@@ -177,9 +193,19 @@
     return out;
   }
 
-  // Rozwiązywanie wywołań: nazwa → definicja w tym samym pliku (inna niż wołający; rekurencja nie daje
-  // krawędzi), inaczej w plikach importowanych przez ten plik (kolejność importów), inaczej pomijana.
-  // perFile = [{path, symbols:[{id, name, calls}]}], importsOf(path) → [path…]. Wynik: [{source, target}].
+  // metody wbudowane (Map, Array, Promise, DOM, console…): `x.get()` przez import nie wskazuje naszej definicji `get`
+  const BUILTIN_METHODS = new Set(('get set has delete add clear push pop shift unshift splice slice concat map filter forEach reduce ' +
+    'find findIndex some every includes indexOf join split replace trim then catch finally call apply bind toString valueOf keys ' +
+    'values entries assign freeze from of warn log error info debug postMessage addEventListener removeEventListener ' +
+    'dispatchEvent querySelector querySelectorAll appendChild removeChild setAttribute getAttribute setProperty emit on off once ' +
+    'next return throw resolve reject test exec match write read close open send sort reverse fill flat flatMap').split(' '));
+
+  // Rozwiązywanie wywołań: nazwa → definicja w tym samym pliku (inna niż wołający; rekurencja nie daje krawędzi),
+  // inaczej w plikach importowanych przez ten plik (kolejność importów), inaczej pomijana. importsOf(path) → [path…]
+  // albo [{path, names}] (names z klauzul importu, CM.Analysis): gołe wywołanie `f()` idzie przez import tylko, gdy f
+  // jest importowane z tego pliku (albo '*' / 'default' / brak wiedzy); wywołanie przez kropkę (`x.m()`, s.member) —
+  // przez każdy import, ale bez nazw metod wbudowanych. perFile = [{path, symbols:[{id, name, calls, member?}]}].
+  // Wynik: [{source, target}].
   function resolveCalls(perFile, importsOf){
     const byFile = new Map();
     for(const f of perFile){
@@ -191,10 +217,22 @@
     for(const f of perFile){
       const local = byFile.get(f.path); const imps = (importsOf ? importsOf(f.path) : null) || [];
       for(const s of f.symbols){
+        const member = new Set(s.member || []), self = new Set(s.self || []);
         for(const name of (s.calls || [])){
+          // `map.get()`, `arr.push()` — metoda wbudowana, nie nasza definicja (także w tym samym pliku); `this.get()` — tak
+          if(member.has(name) && !self.has(name) && BUILTIN_METHODS.has(name)) continue;
           const l = local.get(name); let tgt = null;
           if(l) tgt = l.find((id)=>id !== s.id) || null;
-          else for(const p of imps){ const c = byFile.get(p) && byFile.get(p).get(name); if(c && c.length){ tgt = c[0]; break; } }
+          // lokalnie tylko sam wołający (rekurencja albo metoda-owijka `m(){ m(x) }`): import tylko jawnie z tą nazwą
+          const selfOnly = !!l && !tgt;
+          if(!tgt) for(const imp of imps){
+            const p = typeof imp === 'string' ? imp : imp.path, names = typeof imp === 'string' ? null : imp.names;
+            const c = byFile.get(p) && byFile.get(p).get(name); if(!c || !c.length) continue;
+            if(selfOnly && !(names && names.includes(name))) continue;
+            if(member.has(name)){ /* przez kropkę: każdy import (wbudowane odfiltrowane wyżej) */ }
+            else if(names && !names.includes(name) && !names.includes('*') && !names.includes('default')) continue;
+            tgt = c[0]; break;
+          }
           if(!tgt) continue;
           const k = s.id + '|' + tgt; if(seen.has(k)) continue; seen.add(k);
           edges.push({ source:s.id, target:tgt });

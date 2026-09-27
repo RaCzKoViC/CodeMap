@@ -7,12 +7,14 @@
 // Wynik: precyzja (ile krawędzi CodeMap jest prawdziwych) i kompletność (ile prawdziwych CodeMap znalazł) per
 // repozytorium + rozbieżności do poprawiania analizatora. Brak narzędzia (np. Go lokalnie) → repozytorium pominięte.
 //   node tools/corpus.mjs [--only ky,flask] [--show 20] [--json out.json] [--min-precision 0.9 --min-recall 0.9]
+//                         [--min-call-precision 0.9 --min-call-recall 0.95] (graf wywołań vs TypeScript)
 //                         [--require-all] (pominięte = błąd, w CI) [--summary] (tabela do $GITHUB_STEP_SUMMARY)
 import { execFileSync, execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, mkdirSync, writeFileSync, rmSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 const CACHE = process.env.CODEMAP_CORPUS_DIR || join(tmpdir(), 'codemap-corpus');
@@ -20,20 +22,22 @@ const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ?
 const ONLY = (arg('only', '') || '').split(',').filter(Boolean), SHOW = +arg('show', 12), OUT = arg('json', null);
 const MIN_P = parseFloat(arg('min-precision', '0')) || 0, MIN_R = parseFloat(arg('min-recall', '0')) || 0;
 const REQUIRE_ALL = process.argv.includes('--require-all'), SUMMARY = process.argv.includes('--summary');
+// graf wywołań: własne progi (rozwiązywanie po nazwach — nie osiągnie 100 % jak importy)
+const MIN_CP = parseFloat(arg('min-call-precision', '0')) || 0, MIN_CR = parseFloat(arg('min-call-recall', '0')) || 0;
 
 // repozytoria z galerii (js/gallery.js) przypięte do wydań; scope = katalogi kodu, którego dotyczy porównanie
 // deadcode: martwy kod (CM.DeadCode) porównany z knip (JS/TS; tylko ESM — knip nie widzi użycia `require('x').y`)
 // albo vulture (Python: funkcje i klasy najwyższego poziomu)
 export const CORPUS = [
   { id: 'express', repo: 'expressjs/express', ref: 'v5.2.1', oracle: 'esbuild', scope: ['lib', 'index.js'] },
-  { id: 'preact', repo: 'preactjs/preact', ref: '10.29.8', oracle: 'esbuild', deadcode: 'knip', scope: ['src', 'hooks/src', 'compat/src', 'debug/src', 'devtools/src', 'jsx-runtime/src', 'test-utils/src'] },
-  { id: 'ky', repo: 'sindresorhus/ky', ref: 'v2.1.0', oracle: 'esbuild', deadcode: 'knip', scope: ['source'] },
-  { id: 'petite-vue', repo: 'vuejs/petite-vue', ref: 'v0.4.1', oracle: 'esbuild', deadcode: 'knip', scope: ['src'] },
+  { id: 'preact', repo: 'preactjs/preact', ref: '10.29.8', oracle: 'esbuild', deadcode: 'knip', calls: true, scope: ['src', 'hooks/src', 'compat/src', 'debug/src', 'devtools/src', 'jsx-runtime/src', 'test-utils/src'] },
+  { id: 'ky', repo: 'sindresorhus/ky', ref: 'v2.1.0', oracle: 'esbuild', deadcode: 'knip', calls: true, scope: ['source'] },
+  { id: 'petite-vue', repo: 'vuejs/petite-vue', ref: 'v0.4.1', oracle: 'esbuild', deadcode: 'knip', calls: true, scope: ['src'] },
   { id: 'flask', repo: 'pallets/flask', ref: '3.1.3', oracle: 'grimp', deadcode: 'vulture', scope: ['src/flask'], pkg: 'flask', pyroot: 'src' },
   { id: 'requests', repo: 'psf/requests', ref: 'v2.32.5', oracle: 'grimp', deadcode: 'vulture', scope: ['src/requests'], pkg: 'requests', pyroot: 'src' },
   { id: 'gin', repo: 'gin-gonic/gin', ref: 'v1.12.0', oracle: 'golist', scope: ['.'] },
   // monorepo pnpm (13 pakietów, zagnieżdżone utils/runtime, importy po nazwie przez `paths` z tsconfig): także poziom pakietów
-  { id: 'signals', repo: 'preactjs/signals', ref: '@preact/signals@2.9.4', oracle: 'esbuild', tsconfig: 'tsconfig.json', workspaces: true, deadcode: 'knip',
+  { id: 'signals', repo: 'preactjs/signals', ref: '@preact/signals@2.9.4', oracle: 'esbuild', tsconfig: 'tsconfig.json', workspaces: true, deadcode: 'knip', calls: true,
     scope: ['core', 'debug', 'devtools-adapter', 'devtools-ui', 'eslint-plugin-signals', 'preact', 'preact/utils', 'preact-transform',
       'react', 'react/runtime', 'react/utils', 'react-transform', 'vite-plugin'].map((p) => 'packages/' + p + '/src') },
 ];
@@ -178,19 +182,24 @@ function esbuildPkgEdges(c, dir) {   // pakiety z plików package.json (niezale�
 // Obie strony z tymi samymi wejściami: wejścia pakietów wg CodeMap + pliki kodu, których nikt nie importuje (skrypty,
 // konfiguracje) + testy — knip przechodzi graf od wejść, CodeMap liczy użycie z każdego importującego. Pluginy knipa
 // wykonujące pliki konfiguracyjne (vite, vitest…) wyłączone — bez node_modules nie wstaną; monorepo = config per workspace.
-const KNIP = { knip: '6.38.0', typescript: '7.0.2' };
+// narzędzia wyroczni JS w cache korpusu, przypięte: knip (martwy kod), TypeScript 5 z klasycznym API (graf wywołań —
+// TypeScript 7 ma w JS tylko niestabilne API)
+const TOOLS = { knip: '6.38.0', typescript: '5.9.3' };
 const KNIP_OFF = ['vite', 'vitest', 'rollup', 'webpack', 'jest', 'babel', 'eslint', 'prettier', 'playwright', 'storybook', 'mocha', 'ava',
   'karma', 'tsup', 'nx', 'typescript', 'github-actions', 'husky', 'lint-staged', 'size-limit', 'xo'];
-function knipBin() {
-  const tools = join(CACHE, '_tools'), pkg = join(tools, 'node_modules/knip/package.json');
-  const ver = () => { try { return JSON.parse(readFileSync(pkg, 'utf8')).version; } catch { return null; } };
-  if (ver() !== KNIP.knip) {
-    mkdirSync(tools, { recursive: true });
-    if (!existsSync(join(tools, 'package.json'))) writeFileSync(join(tools, 'package.json'), '{ "private": true }');
-    execSync('npm i --no-audit --no-fund --silent ' + Object.entries(KNIP).map(([k, v]) => k + '@' + v).join(' '), { cwd: tools, stdio: 'ignore' });
+function tools() {
+  const dir = join(CACHE, '_tools');
+  const ver = (p) => { try { return JSON.parse(readFileSync(join(dir, 'node_modules', p, 'package.json'), 'utf8')).version; } catch { return null; } };
+  const need = Object.entries(TOOLS).filter(([p, v]) => ver(p) !== v);
+  if (need.length) {
+    mkdirSync(dir, { recursive: true });
+    if (!existsSync(join(dir, 'package.json'))) writeFileSync(join(dir, 'package.json'), '{ "private": true }');
+    execSync('npm i --no-audit --no-fund --silent ' + need.map(([k, v]) => k + '@' + v).join(' '), { cwd: dir, stdio: 'ignore' });
   }
-  return join(tools, 'node_modules/knip/bin/knip.js');
+  return dir;
 }
+const knipBin = () => join(tools(), 'node_modules/knip/bin/knip.js');
+const KNIP = { knip: TOOLS.knip };
 const analyzeInProcess = async (dir) => {   // żywy graf z podglądami treści (mapa JSON ich nie ma)
   const { runAnalysis } = await import('file:///' + join(ROOT, 'cli/analyze.mjs').replace(/\\/g, '/'));
   return runAnalysis(dir, { git: false, coverage: false, lang: 'en' });
@@ -251,6 +260,67 @@ async function deadcodeSets(c, dir) {
   return c.deadcode === 'vulture' ? vultureSets(c, dir, await analyzeInProcess(dir)) : knipSets(c, dir);
 }
 
+// ---------------- graf wywołań: CodeMap (tree-sitter + CM.SymbolsCore.resolveCalls) vs TypeScript checker ----------------
+// Krawędź = definicja wołająca → definicja wołana, klucz „ścieżka#nazwa" (bez linii). TypeScript: każde wywołanie i `new`
+// w ciele funkcji / metody / klasy / stałej z funkcją, symbol wołanego przez checker (aliasy importów rozwinięte,
+// przeciążenie → deklaracja z ciałem). Wywołanie przez interfejs nie ma ciała → brak krawędzi po stronie wyroczni.
+let TS_PARSER = null;   // web-tree-sitter inicjuje się raz na proces (drugie init() już nie istnieje)
+async function treeSitter() {
+  if (TS_PARSER) return TS_PARSER;
+  const req = createRequire(join(ROOT, 'package.json')), NM = join(ROOT, 'node_modules');
+  if (!existsSync(join(NM, 'web-tree-sitter')) || !existsSync(join(NM, 'tree-sitter-wasms', 'out'))) throw new Error('brak web-tree-sitter / tree-sitter-wasms (npm ci)');
+  const Parser = req(join(NM, 'web-tree-sitter')); await Parser.init();
+  const cache = new Map(), load = (g) => { if (!cache.has(g)) cache.set(g, Parser.Language.load(join(NM, 'tree-sitter-wasms', 'out', 'tree-sitter-' + g + '.wasm'))); return cache.get(g); };
+  return (TS_PARSER = { Parser, load });
+}
+async function codemapCallEdges(c, dir) {
+  const { runAnalysis } = await import('file:///' + join(ROOT, 'cli/analyze.mjs').replace(/\\/g, '/'));
+  const r = await runAnalysis(dir, { git: false, coverage: false, lang: 'en', modules: ['symbols-core'] });
+  const { Parser, load } = await treeSitter();
+  const files = [...r.graph.nodes.values()].filter((n) => n.type === 'file' && inScope(c, n.path) && !/\.d\.[cm]?ts$/.test(n.path) && r.CM.SymbolsCore.grammarFor(n.lang, n.path))
+    .map((n) => ({ path: n.path, lang: n.lang, content: readFileSync(join(dir, n.path), 'utf8') }));
+  r.graph.addSymbols(await r.CM.SymbolsCore.analyzeBatch(Parser, files, load));
+  const key = (id) => id.replace(/@\d+$/, ''), out = new Set();
+  for (const e of r.graph.edges) if (e.type === 'call') { const a = key(e.source), b = key(e.target); if (a !== b && inScope(c, a.split('#')[0]) && inScope(c, b.split('#')[0])) out.add(a + ' > ' + b); }
+  return out;
+}
+function tscCallEdges(c, dir) {
+  const ts = createRequire(join(tools(), 'package.json'))('typescript');
+  const files = walk(dir).filter((p) => inScope(c, p) && /\.(m?[jt]sx?|c[jt]s)$/.test(p) && !/\.d\.[cm]?ts$/.test(p));
+  const co = { allowJs: true, noEmit: true, skipLibCheck: true, jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext, module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler, allowImportingTsExtensions: true, types: [] };
+  if (c.tsconfig) { const t = JSON.parse(readFileSync(join(dir, c.tsconfig), 'utf8')).compilerOptions || {}; if (t.paths) { co.paths = t.paths; co.baseUrl = dir; } }
+  const program = ts.createProgram(files.map((f) => join(dir, f)), co), checker = program.getTypeChecker();
+  const rel = (sf) => posix(relative(dir, sf.fileName)), isFn = (x) => x && (ts.isArrowFunction(x) || ts.isFunctionExpression(x));
+  const defKey = (d) => {   // te same rodzaje definicji co CM.SymbolsCore (funkcja, metoda, klasa, stała / pole z funkcją)
+    if (!d || !d.getSourceFile) return null;
+    const f = rel(d.getSourceFile());
+    if ((ts.isVariableDeclaration(d) || ts.isPropertyDeclaration(d)) && isFn(d.initializer) && d.name && (ts.isIdentifier(d.name) || ts.isPrivateIdentifier(d.name))) return f + '#' + d.name.text;
+    if (ts.isClassDeclaration(d) && d.name) return f + '#' + d.name.text;
+    if ((ts.isFunctionDeclaration(d) || ts.isMethodDeclaration(d)) && d.name && d.body) return f + '#' + d.name.getText();
+    if (ts.isConstructorDeclaration(d) && d.body) return f + '#constructor';
+    return null;
+  };
+  const out = new Set();
+  for (const sf of program.getSourceFiles()) {
+    if (sf.isDeclarationFile || !inScope(c, rel(sf))) continue;
+    const visit = (node, owner) => {
+      owner = defKey(node) || owner;
+      if (owner && (ts.isCallExpression(node) || ts.isNewExpression(node))) {
+        let ex = node.expression; while (ex && ts.isParenthesizedExpression(ex)) ex = ex.expression;
+        const at = ex && (ts.isIdentifier(ex) ? ex : ts.isPropertyAccessExpression(ex) ? ex.name : null);
+        let sym = at && checker.getSymbolAtLocation(at);
+        if (sym && sym.flags & ts.SymbolFlags.Alias) { try { sym = checker.getAliasedSymbol(sym); } catch { /* nierozwiązywalny alias */ } }
+        const ds = (sym && sym.declarations) || [], t = defKey(ds.find((d) => d.body) || (sym && sym.valueDeclaration) || ds[0]);
+        if (t && t !== owner && inScope(c, t.split('#')[0])) out.add(owner + ' > ' + t);
+      }
+      ts.forEachChild(node, (ch) => visit(ch, owner));
+    };
+    visit(sf, null);
+  }
+  return out;
+}
+
 const compare = (cm, or) => {
   const common = [...cm].filter((e) => or.has(e));
   return { common: common.length, precision: cm.size ? common.length / cm.size : 1, recall: or.size ? common.length / or.size : 1,
@@ -298,6 +368,14 @@ for (const c of CORPUS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
         diffs(k.extra, k.missing);
       } catch (e) { r.deadcode = { oracle: c.deadcode, error: String((e && e.message) || e).split('\n')[0].slice(0, 300) }; console.log(`✖   martwy kod  błąd: ${r.deadcode.error}`); }
     }
+    if (c.calls) {   // graf wywołań: tree-sitter + resolveCalls vs TypeScript checker (osobne progi — to heurystyka po nazwach)
+      try {
+        const cmE = await codemapCallEdges(c, dir), tsE = tscCallEdges(c, dir), k = compare(cmE, tsE);
+        r.calls = { oracle: 'typescript ' + TOOLS.typescript, codemap: cmE.size, oracleEdges: tsE.size, common: k.common, precision: +k.precision.toFixed(4), recall: +k.recall.toFixed(4), extra: k.extra, missing: k.missing };
+        console.log(`${k.precision >= MIN_CP && k.recall >= MIN_CR ? '✔' : '✖'} ${'  wywołania'.padEnd(11)} tsc     CodeMap ${String(cmE.size).padStart(4)} · wyrocznia ${String(tsE.size).padStart(4)} · wspólne ${String(k.common).padStart(4)} · precyzja ${pct(k.precision)} · kompletność ${pct(k.recall)}`);
+        diffs(k.extra, k.missing);
+      } catch (e) { r.calls = { oracle: 'typescript', error: String((e && e.message) || e).split('\n')[0].slice(0, 300) }; console.log(`✖   wywołania  błąd: ${r.calls.error}`); }
+    }
   } catch (e) { console.log(`✖ ${c.id.padEnd(11)} błąd: ${String(e && e.message || e).split('\n')[0].slice(0, 200)}`); results.push({ id: c.id, error: String(e && e.message || e) }); }
 }
 const done = results.filter((r) => r.codemap != null);
@@ -312,12 +390,15 @@ if (SUMMARY && process.env.GITHUB_STEP_SUMMARY) {
     ? [`| ${r.id} | \`${r.ref}\` | ${r.oracle} | ${r.codemap} | ${r.oracleEdges} | ${pc(r.precision)} | ${pc(r.recall)} |`,
       ...(r.packages ? [`| ${r.id} — pakiety (${r.packages.found}/${r.packages.expected}) | | package.json + esbuild | ${r.packages.codemap} | ${r.packages.oracleEdges} | ${pc(r.packages.precision)} | ${pc(r.packages.recall)} |`] : []),
       ...(r.deadcode ? [r.deadcode.error ? `| ${r.id} — nieużywane eksporty | | ${r.deadcode.oracle} | — | — | błąd | |`
-        : `| ${r.id} — nieużywane eksporty | | ${r.deadcode.oracle} | ${r.deadcode.codemap} | ${r.deadcode.oracleEdges} | ${pc(r.deadcode.precision)} | ${pc(r.deadcode.recall)} |`] : [])]
+        : `| ${r.id} — nieużywane eksporty | | ${r.deadcode.oracle} | ${r.deadcode.codemap} | ${r.deadcode.oracleEdges} | ${pc(r.deadcode.precision)} | ${pc(r.deadcode.recall)} |`] : []),
+      ...(r.calls ? [r.calls.error ? `| ${r.id} — graf wywołań | | typescript | — | — | błąd | |`
+        : `| ${r.id} — graf wywołań | | ${r.calls.oracle} | ${r.calls.codemap} | ${r.calls.oracleEdges} | ${pc(r.calls.precision)} | ${pc(r.calls.recall)} |`] : [])]
     : [`| ${r.id} | | ${r.skipped || ''} | — | — | ${r.error ? 'błąd' : 'pominięte'} | |`]);
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, ['### Korpus referencyjny — krawędzie importów CodeMap vs wyrocznia', '',
     '| repozytorium | wersja | wyrocznia | krawędzie CodeMap | krawędzie wyroczni | precyzja | kompletność |', '|---|---|---|--:|--:|--:|--:|', ...rows, ''].join('\n'));
 }
 const pkBad = (k) => !!k && (k.precision < MIN_P || k.recall < MIN_R || (MIN_P > 0 && (k.lostPackages.length || k.extraPackages.length)));
 const dcBad = (d) => !!d && (!!d.error || d.precision < MIN_P || d.recall < MIN_R);
-const bad = results.filter((r) => r.error || (REQUIRE_ALL && r.skipped) || (r.codemap != null && (r.precision < MIN_P || r.recall < MIN_R || pkBad(r.packages) || dcBad(r.deadcode))));
-if (bad.length && (MIN_P || MIN_R || REQUIRE_ALL || bad.some((r) => r.error))) process.exit(1);
+const clBad = (d) => !!d && (!!d.error || d.precision < MIN_CP || d.recall < MIN_CR);
+const bad = results.filter((r) => r.error || (REQUIRE_ALL && r.skipped) || (r.codemap != null && (r.precision < MIN_P || r.recall < MIN_R || pkBad(r.packages) || dcBad(r.deadcode) || clBad(r.calls))));
+if (bad.length && (MIN_P || MIN_R || MIN_CP || MIN_CR || REQUIRE_ALL || bad.some((r) => r.error))) process.exit(1);
