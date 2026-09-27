@@ -18,8 +18,9 @@
       'ht.date':'date','ht.commit':'commit','ht.score':'score','ht.files':'files','ht.high':'high','ht.med':'med','ht.low':'low','ht.msg':'message','ht.cancelled':'Health trend cancelled.','ht.act':'Health trend: '},
   };
   const t=(k,sub)=>{ const l=(I&&I.getLang&&I.getLang())==='en'?'en':'pl'; let s=(STR[l]&&STR[l][k])||STR.pl[k]||k; if(sub) for(const p in sub) s=s.split('{'+p+'}').join(sub[p]); return s; };
-  const PILL=CM.UIKit.pill(I.t('ca.cancelLoad','Anuluj'), ()=>{ if(job) job.abort(); });
+  const PILL=CM.UIKit.pill(I.t('ca.cancelLoad','Anuluj'), ()=>{ if(job) job.cancel(); });
   let job=null, last=null, n=10;
+  const TREND_URL=(()=>{ const sc=document.querySelector('script[src*="js/health-trend-ui.js"]'); const v=(sc&&sc.src.match(/[?&]v=([\w.-]+)/)||[])[1]||''; return 'js/trend-worker.js'+(v?'?v='+v:''); })();
 
   const local=()=>!!(A.state && A.state.side && ((A.state.side.git&&A.state.side.git.length) || A.state.side.gitEntry));
   const sign=(d)=>(d>0?'+':d<0?'−':'±')+Math.abs(d);
@@ -52,14 +53,44 @@
     dlg.body.appendChild(el('div',{class:'ht-wrap'}, tbl));
   }
 
+  // pamięć punktów per commit (sha → punkt) — klucz z wersją CodeMap, bo reguły zmieniają się między wersjami; ≤ 400
+  const CACHE_KEY='codemap_trend_points';
+  function loadKnown(){ const c=U.lsJSON(CACHE_KEY, null); return c && c.v===CM.VERSION && c.pts ? c.pts : {}; }
+  function saveKnown(points){
+    const pts=loadKnown(); for(const p of points) pts[p.sha]=p;
+    const keys=Object.keys(pts); for(const k of keys.slice(0, Math.max(0, keys.length-400))) delete pts[k];
+    U.lsSet(CACHE_KEY, JSON.stringify({v:CM.VERSION, pts}));
+  }
+  const progress=(p,i,tot)=>PILL.show(t('ht.progress',{i, n:tot, sha:p.sha.slice(0,7), s:p.score}));
+  // worker (trend-worker.js): graf i analiza każdego punktu poza wątkiem interfejsu; null = worker niedostępny
+  function viaWorker(files, known){
+    if(typeof Worker==='undefined') return null;
+    let w; try{ w=new Worker(TREND_URL); }catch(e){ return null; }
+    return new Promise((resolve, reject)=>{
+      let started=false;
+      w.onmessage=(e)=>{ const d=e.data||{}; started=true;
+        if(d.type==='progress') progress(d.p, d.i, d.total);
+        else if(d.type==='done'){ w.terminate(); resolve(d.h); }
+        else if(d.type==='error'){ w.terminate(); reject(Object.assign(new Error(d.message), {code:d.code})); } };
+      w.onerror=(e)=>{ w.terminate(); if(!started){ e.preventDefault&&e.preventDefault(); resolve(null); } else reject(new Error((e&&e.message)||'worker')); };
+      job.cancel=()=>{ w.terminate(); reject(Object.assign(new Error('aborted'), {name:'AbortError'})); };
+      w.postMessage({type:'trend', id:1, files, n, known});
+    });
+  }
   async function compute(dlg){
     if(job) return null;
-    const ctrl=new AbortController(); job=ctrl;
+    const ctrl=new AbortController(); job={cancel:()=>ctrl.abort()};
     try{
       await CM.Loaders.resolveSide(A.state.side);
-      const repo=await CM.GitLocal.open(A.state.side.git);
-      const h=await HT.compute(repo, {n, signal:ctrl.signal, tick:()=>new Promise(r=>setTimeout(r,0)),
-        onPoint:(p,i,tot)=>PILL.show(t('ht.progress',{i, n:tot, sha:p.sha.slice(0,7), s:p.score}))});
+      const known=loadKnown();
+      let h=await viaWorker(A.state.side.git, known);
+      if(!h){                                                        // bez workera — w wątku strony, z oddechem między punktami
+        job.cancel=()=>ctrl.abort();
+        const repo=await CM.GitLocal.open(A.state.side.git);
+        h=await HT.compute(repo, {n, signal:ctrl.signal, tick:()=>new Promise(r=>setTimeout(r,0)), onPoint:progress,
+          cache:{get:(sha)=>known[sha]||null, set:()=>{}}});
+      }
+      saveKnown(h.points);
       last={h, graph:A.graph};
       if(dlg) render(dlg);
       return h;
@@ -105,5 +136,5 @@
       const p=h.points, d=p[p.length-1].score-p[0].score; return t('ht.act')+t('ht.sum',{n:p.length, c:h.chain, a:p[0].score, b:p[p.length-1].score, d:sign(d)}); }});
   // gotowy wynik (np. z raportu CLI --history --json) — to samo okno z wykresem
   function show(h){ last={h, graph:A.graph}; return open(); }
-  CM.HealthTrendUI={open, show, compute:()=>compute(null), last:()=>last};
+  CM.HealthTrendUI={open, show, compute:()=>compute(null), last:()=>last, _cacheKey:CACHE_KEY};
 })();

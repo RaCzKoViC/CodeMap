@@ -23,7 +23,8 @@ CM.HealthTrend = (function(){
     return !bad(rel);
   }
 
-  // repo = wynik CM.GitLocal.open(files); o: {n, sub, exclude, maxContent, maxCommits, signal, onPoint(p, i, total), tick()}
+  // repo = wynik CM.GitLocal.open(files); o: {n, sub, exclude, maxContent, maxCommits, signal, onPoint(p, i, total), tick(),
+  //   cache:{get(sha) → punkt|undefined, set(sha, punkt)}} — punkt z pamięci nie jest liczony od nowa (drugie otwarcie od razu)
   // → {points:[{sha, date, time, message, score, files, lines, totals, rules}] od najstarszego, chain, sampled}
   async function compute(repo, o){
     o = o || {};
@@ -42,7 +43,9 @@ CM.HealthTrend = (function(){
     const points = [];
     for(const i of idx){
       if(aborted()) throw Object.assign(new Error('aborted'), {name: 'AbortError'});
-      const cm = chain[i], snap = await repo.snapshot(cm.sha), files = [];
+      const cm = chain[i], hit = o.cache && o.cache.get ? o.cache.get(cm.sha) : null;
+      if(hit){ points.push(hit); if(o.onPoint) o.onPoint(hit, points.length, idx.length); continue; }
+      const snap = await repo.snapshot(cm.sha), files = [];
       let withContent = 0;
       for(const f of snap.files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))){
         if(pre && !f.path.startsWith(pre)) continue;
@@ -72,6 +75,7 @@ CM.HealthTrend = (function(){
       const p = {sha: cm.sha, date: time ? new Date(time).toISOString().slice(0, 10) : null, time, message: String(cm.message || '').split('\n')[0].slice(0, 120),
         score: rep.score, files: files.length, lines, totals, rules};
       points.push(p);
+      if(o.cache && o.cache.set) o.cache.set(cm.sha, p);
       if(o.onPoint) o.onPoint(p, points.length, idx.length);
       if(o.tick) await o.tick();
     }

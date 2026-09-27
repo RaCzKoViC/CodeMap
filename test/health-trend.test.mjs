@@ -44,6 +44,15 @@ describe('HealthTrend', () => {
     const ctrl = new AbortController(); ctrl.abort();
     await assert.rejects(HT.compute(fakeRepo(), { n: 3, signal: ctrl.signal }), (e) => e.name === 'AbortError');
   });
+  test('cache: punkt z pamięci nie jest liczony (bez snapshot), nowe trafiają do set', async () => {
+    const repo = fakeRepo(), snaps = [], saved = [];
+    const orig = repo.snapshot; repo.snapshot = async (sha) => { snaps.push(sha); return orig(sha); };
+    const stored = { sha: 'c1', date: '2026-01-02', message: 'z pamięci', score: 42, files: 2, lines: 5, totals: { findings: 0, high: 0, med: 0, low: 0, info: 0 }, rules: {} };
+    const h = host(await HT.compute(repo, { n: 10, cache: { get: (sha) => (sha === 'c1' ? stored : null), set: (sha) => saved.push(sha) } }));
+    assert.deepEqual(snaps, ['c0', 'c2', 'c3']);
+    assert.deepEqual(saved, ['c0', 'c2', 'c3']);
+    assert.equal(h.points[1].message, 'z pamięci');
+  });
   test('ruleDeltas: zmiany między pierwszym a ostatnim, malejąco po wartości bezwzględnej', () => {
     const pts = [{ rules: { a: 1, b: 5 } }, { rules: { a: 4, c: 2 } }];
     assert.deepEqual(host(HT.ruleDeltas(pts)), [['b', -5], ['a', 3], ['c', 2]]);

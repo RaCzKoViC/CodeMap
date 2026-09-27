@@ -654,6 +654,37 @@ const dupwRes = await evalJs(`(async()=>{ try{
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 check(dupwRes && !dupwRes.error && dupwRes.pairs >= 1 && dupwRes.same && dupwRes.loaded,
   `duplikaty w workerze: te same pary co w wątku głównym, js/dup-worker.js załadowany: ${JSON.stringify(dupwRes)}`);
+// trend zdrowia w workerze (faza 13): prawdziwe mini-repozytorium .git zbudowane w przeglądarce (obiekty zlib,
+// SHA-1) → trend-worker.js liczy 2 punkty (puste catch w drugim), zapis w pamięci; drugi przebieg z pamięci
+const trendwRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const enc=new TextEncoder(), files=[];
+  const hex=(b)=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const cat=(...ps)=>{ const o=new Uint8Array(ps.reduce((s,x)=>s+x.length,0)); let k=0; for(const x of ps){ o.set(x,k); k+=x.length; } return o; };
+  const obj=async(type, body)=>{ const full=cat(enc.encode(type+' '+body.length+'\\0'), body); const sha=hex(await crypto.subtle.digest('SHA-1', full));
+    const z=new Uint8Array(await new Response(new Blob([full]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+    files.push({path:'objects/'+sha.slice(0,2)+'/'+sha.slice(2), file:new Blob([z])}); return sha; };
+  const bytes=(h)=>Uint8Array.from(h.match(/../g).map(x=>parseInt(x,16)));
+  const tree=(es)=>obj('tree', cat(...es.flatMap(e=>[enc.encode(e[0]+' '+e[1]+'\\0'), bytes(e[2])])));
+  const commit=(t, par, msg, ts)=>obj('commit', enc.encode('tree '+t+'\\n'+(par?'parent '+par+'\\n':'')+'author Ala <a@x.pl> '+ts+' +0000\\ncommitter Ala <a@x.pl> '+ts+' +0000\\n\\n'+msg+'\\n'));
+  const a=await obj('blob', enc.encode('export const a = 1;\\n'));
+  const b=await obj('blob', enc.encode("import { a } from './a.js';\\ntry { a(); } catch (e) {}\\nexport const b = a;\\n"));
+  const c1=await commit(await tree([['40000','src',await tree([['100644','a.js',a]])]]), null, 'start', 1767225600);
+  const c2=await commit(await tree([['40000','src',await tree([['100644','a.js',a],['100644','b.js',b]])]]), c1, 'b z pustym catch', 1767312000);
+  files.push({path:'HEAD', file:new Blob(['ref: refs/heads/main\\n'])}, {path:'refs/heads/main', file:new Blob([c2+'\\n'])});
+  CMApp.loadDemo(); await sleep(900);
+  localStorage.removeItem(CM.HealthTrendUI._cacheKey);
+  CM.App.state.side={git:files, gitEntry:null, gitFile:null, coverage:[], coverageEntries:[]};
+  const h1=await CM.HealthTrendUI.compute();
+  const cached=Object.keys((JSON.parse(localStorage.getItem(CM.HealthTrendUI._cacheKey)||'{}').pts)||{}).length;
+  const worker=performance.getEntriesByType('resource').some(e=>/js\\/trend-worker\\.js/.test(e.name));
+  const t0=performance.now(); const h2=await CM.HealthTrendUI.compute(); const ms2=Math.round(performance.now()-t0);
+  CM.App.state.side=null;
+  return {pts:h1?h1.points.map(p=>p.sha.slice(0,7)+':'+(p.rules.emptycatch||0)+':'+p.files).join(','):null, c2:c2.slice(0,7), chain:h1&&h1.chain, cached, worker,
+    same:!!(h2&&JSON.stringify(h2.points)===JSON.stringify(h1.points)), ms2};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(trendwRes && !trendwRes.error && trendwRes.chain === 2 && /:0:1,.+:1:2$/.test(trendwRes.pts || '') && trendwRes.pts.endsWith(trendwRes.c2 + ':1:2')
+  && trendwRes.cached === 2 && trendwRes.worker && trendwRes.same,
+  `trend zdrowia w workerze: prawdziwe .git w przeglądarce, 2 punkty, pamięć punktów, drugi przebieg z pamięci: ${JSON.stringify(trendwRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

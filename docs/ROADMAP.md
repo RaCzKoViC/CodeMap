@@ -196,7 +196,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Strona z dokumentacją i przewodnikami na Pages, nagrania ekranu.
 - Backend na serwerze (konfiguracja w `deploy/`).
 
-## Faza 13 — wydajność na dużych repozytoriach — W TOKU 2026-09-27
+## Faza 13 — wydajność na dużych repozytoriach — WYKONANA 2026-09-27
 
 Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s całej analizy statycznej.
 - ✅ Przyczyna w CLI / Action / VS Code / testach: kontekst `vm` z interceptorami globalnych (ten sam kod poza `vm`
@@ -204,10 +204,12 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
   linii) ≈ 2,3 s na rozgrzanym dysku (zimny odczyt przez Defendera: 17 s — nie po stronie CodeMap).
 - ✅ Duplikaty: w aplikacji w workerze (`js/dup-worker.js`) z pamięcią odcisków po skrócie treści (tylko zmienione pliki
   od nowa); w CLI przyspieszone przez kontekst bez kontekstyfikacji.
-- Analiza statyczna (Inspect) w tle — interfejs nie zamarza, wyniki pojawiają się stopniowo.
+- ✅ Analiza statyczna (Inspect) w tle: ciężka część (duplikaty) w workerze; reszta reguł to ~0,1 s na 268 plikach i
+  już działa asynchronicznie z oddechem co paczkę plików — osobny worker dla całości nie jest potrzebny.
 - ✅ Benchmark na prawdziwych dużych repozytoriach: `tools/bench-cli.mjs` (django 5.1 — 6 743 plików w 5,4 s, vite 6.0.0
   — 1,5 s), próg regresji 1,5× + 1 s w CI.
-- Trend zdrowia w tle i z pamięcią punktów per commit (drugie otwarcie natychmiast).
+- ✅ Trend zdrowia w tle (`js/trend-worker.js` — te same moduły co CLI z atrapami API strony) i z pamięcią punktów
+  per commit (sha + wersja CodeMap, ≤ 400); bez workera — w wątku strony jak dotąd.
 
 ## Faza 14 — dokładność 2.0
 
