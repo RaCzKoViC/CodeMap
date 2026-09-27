@@ -94,8 +94,7 @@
         detailed:st.detailed!=null?st.detailed:null, rateLimited:!!st.rateLimited});
       job=null; hidePill();
       invalidate();
-      A.apply({relayout:false, persist:true});
-      CM.UI.renderDetails(A.renderer.selected||null, g, A.handlers);
+      A.refreshView();
       const bf=g.gitInfo.busFactor, au=g.gitInfo.authors;
       let msg=T('git.doneA','Historia git: ')+U.fmtNum(res.commits)+T('git.doneCommits',' commitów · ')+U.fmtNum(au.filter(a=>!a.bot).length)
         +T('git.doneAuthors',' autorów · bus factor ')+bf.value+(bf.authors.length?' ('+bf.authors.slice(0,3).map(i=>au[i].name).join(', ')+')':'')

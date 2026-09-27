@@ -221,6 +221,7 @@ CM.Graph = (function(){
         if(e.type==='import' && !F.import) continue;
         if(e.type==='reference' && !F.reference) continue;
         if(e.type==='call' && (!F.symbols || F.call===false)) continue;   // wywołania symbol → symbol; przy zwiniętym pliku agregują się do plik → plik
+        if(e.type==='test' && F.test===false) continue;                   // test → testowany kod (CM.TestMap)
         const sN = this.nodes.get(e.source), tN = this.nodes.get(e.target);
         if(!sN || !tN) continue;
         const s = this._rep(sN, vis), t = this._rep(tN, vis);

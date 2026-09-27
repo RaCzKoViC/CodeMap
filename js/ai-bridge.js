@@ -193,6 +193,8 @@
       F('src/index.html', '<!doctype html>\n<html><head><link rel="stylesheet" href="styles/theme.css"></head>\n<body><script src="app.js"></script></body></html>'),
       F('docs/arch.md', '# Architektura\nModuł `store` zarządza stanem, `components` to UI, `services` to integracje.\nPatrz [api](../src/services/api.js).'),
       F('tests/format.test.js', "import { format } from '../src/utils/format.js';\ndescribe('format', ()=>{ it('trims', ()=>{ expect(format(' a ')).toBe('a'); }); });\n"),
+      F('src/store/reducer.test.js', "import { reducer } from './reducer.js';\nimport { ACTIONS } from './actions.js';\ndescribe('reducer', ()=>{ it('keeps state on INC', ()=>{ expect(reducer({}, {type:ACTIONS.INC})).toEqual({}); }); });\n"),
+      F('src/components/Button.test.jsx', "import { Button } from './Button.jsx';\ntest('Button formats its label', ()=>{ expect(Button({label:' Menu '})).toBe('Menu'); });\n"),
       F('scripts/build.py', "import os, sys\nfrom pathlib import Path\n# prosty skrypt build\ndef build():\n    print('building...')\nif __name__=='__main__':\n    build()\n"),
     ];
   }

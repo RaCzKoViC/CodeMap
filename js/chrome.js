@@ -36,7 +36,7 @@
 
   const SETTINGS_INPUTS=['rng-trans','rng-menu','rng-blur','rng-tint','col-accent','col-bg',
     'rng-nscale','rng-spacing','rng-fscale','sel-layout','sel-metric',
-    'show-folders','show-files','show-externals','show-symbols','edge-contains','edge-import','edge-reference','edge-call',
+    'show-folders','show-files','show-externals','show-symbols','edge-contains','edge-import','edge-reference','edge-call','edge-test',
     'opt-grid','opt-curved','opt-lockall','opt-hover-preview'];
   function collectSettings(){
     const s={};
@@ -434,7 +434,7 @@
     // toggling a filter keeps existing node positions (relayout:false) so the map never re-scrambles
     const bind=(id,key)=>{ $('#'+id).onchange=(e)=>{ filters[key]=e.target.checked; A.apply({relayout:false}); }; };
     bind('show-folders','folders'); bind('show-files','files'); bind('show-externals','externals');
-    bind('edge-contains','contains'); bind('edge-import','import'); bind('edge-reference','reference'); bind('edge-call','call');
+    bind('edge-contains','contains'); bind('edge-import','import'); bind('edge-reference','reference'); bind('edge-call','call'); bind('edge-test','test');
     // symbole: pierwsze włączenie dla danego grafu uruchamia analizę tree-sittera (w tle, w workerze)
     { const sc=$('#show-symbols'); if(sc) sc.onchange=(e)=>{ filters.symbols=e.target.checked; A.apply({relayout:false}); if(filters.symbols) A.ensureSymbols(); }; }
     if(CM.Overlays) CM.Overlays.wire();   // „Kolorowanie": język / złożoność / git / pokrycie
@@ -541,6 +541,7 @@
       const items=Array.from(dt.items||[]).filter(i=>i.kind==='file');
       const entries=items.map(i=> i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
       const files=Array.from(dt.files||[]);
+      if(A.dropCoverage && A.dropCoverage(files, entries)) return;   // raport pokrycia na wczytaną mapę (tests-ui.js) zamiast nowego projektu
       A.ingest((p)=>Loaders.fromDrop(entries, files, p),I.t('ca.readingDropped','Czytanie upuszczonych plików…'));
     });
   }

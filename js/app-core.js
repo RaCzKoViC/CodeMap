@@ -23,7 +23,7 @@
     gidSeq:0,
     cyclesOn:false,
   };
-  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, symbols:false, call:true, langsOff:new Set(), metric:'lines', minMetric:0};
+  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, symbols:false, call:true, test:true, langsOff:new Set(), metric:'lines', minMetric:0};
 
   // ---------------- init ----------------
   function init(){
@@ -265,6 +265,17 @@
     if(persist) saveSessionDebounced();
   }
 
+  // nowe dane na węzłach (historia git, testy, pokrycie) BEZ zatrzymywania osiadającej symulacji —
+  // apply() ją zatrzymuje, więc świeżo wczytany projekt w układzie siłowym zamarzłby w połowie
+  function refreshView(){
+    const R=A.renderer; if(!R) return;
+    if(state.sim && (state.sim._worker || state.sim.running)){
+      state.vis=A.graph.getVisible(filters); R.setData(A.graph, state.vis, state.sim);
+      if(CM.Overlays) CM.Overlays.refresh(); else R.kick();
+    } else apply({relayout:false, persist:true});
+    UI.renderDetails(R.selected||null, A.graph, handlers);
+  }
+
   // seed only nodes that have never been placed (e.g. just-revealed by a filter) near their parent,
   // so toggling filters never re-scrambles the whole map
   function seedUnplaced(nodes){
@@ -442,9 +453,9 @@
     const sp=$('#rng-spacing'); if(sp){ sp.value=Math.round(spacing*100); $('#val-spacing').textContent=Math.round(spacing*100)+'%'; }
     // very large graphs: declutter (drop edges + externals) so the structure stays legible
     if(N > 1200){
-      filters.contains=false; filters.import=false; filters.reference=false; filters.externals=false;
+      filters.contains=false; filters.import=false; filters.reference=false; filters.externals=false; filters.test=false;
       const set=(id,v)=>{ const e=$('#'+id); if(e) e.checked=v; };
-      set('edge-contains',false); set('edge-import',false); set('edge-reference',false); set('show-externals',false);
+      set('edge-contains',false); set('edge-import',false); set('edge-reference',false); set('show-externals',false); set('edge-test',false);
       U.toast(I.t('ca.bigRepo','Duże repozytorium — automatycznie odchudzono widok (bez połączeń, małe figury, duży rozrzut).'),'',4200);
     }
   }
@@ -572,6 +583,6 @@
     applyImpact, toggleImpact, toggleCollapse, toggleLang, revealNode, focusNode, biggestInFolder, tick,
     showLoading, setLoadingText, setProgress, hideLoading, hideEmpty, resetProjectState, ingest, autoTuneView,
     countsInit, updateStatus, refreshProjectLabel, clearAll, loadFromJSON, boot, autoTutorial,
-    onProjectLoaded, runProjectHooks,
+    onProjectLoaded, runProjectHooks, refreshView,
   });
 })();

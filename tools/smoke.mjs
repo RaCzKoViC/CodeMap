@@ -180,6 +180,51 @@ const gitRes = await evalJs(`(async()=>{ try{
     hot, persisted:!!(round.gitInfo && round.nodes.get(files[0]).git), after:CMApp.renderer().nodes.length};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// testy ↔ kod i pokrycie (CM.TestMap + tests-ui.js) na demo: krawędzie test i isTest, filtr „Testy", pokrycie
+// z syntetycznego lcov (API i ścieżka UI przez File), nakładki tests / coverage przez colorBy, sekcja w panelu,
+// niepokryte linie w podglądzie pliku, akcje ChatBota tests / coverage, Inspect, zapis i odczyt mapy
+const testsRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const old=CMApp.graph; CMApp.loadDemo();
+  for(let i=0;i<80;i++){ const g=CMApp.graph; if(g!==old && g.testInfo && g.nodes.size>20) break; await sleep(100); }
+  const g=CMApp.graph;
+  const tEdges=g.edges.filter(e=>e.type==='test').map(e=>e.source+'>'+e.target+':'+e.via).sort();
+  const isTest=[...g.nodes.values()].filter(n=>n.isTest).map(n=>n.id).sort();
+  const ovIds=()=>CM.Overlays.list().map(o=>o.id);
+  const ovBefore=ovIds();
+  CMApp.exec('colorBy',{mode:'tests'}); const cur1=CM.Overlays.current();
+  const legend1=((document.querySelector('#overlay-legend')||{}).textContent||'').length>0;
+  const visT=()=>CMApp.graph.getVisible(CM.App.filters).edges.filter(e=>e.type==='test').length;
+  const cb=document.getElementById('edge-test');
+  const vis1=visT(); cb.checked=false; cb.dispatchEvent(new Event('change',{bubbles:true}));
+  const vis0=visT(), rend0=CMApp.renderer().edges.filter(e=>e.type==='test').length;
+  cb.checked=true; cb.dispatchEvent(new Event('change',{bubbles:true})); const vis2=visT();
+  const lcov=['TN:','SF:/home/ci/demo-app/src/utils/format.js','DA:1,4','DA:2,4','end_of_record',
+    'SF:C:\\\\ci\\\\demo-app\\\\src\\\\store\\\\reducer.js','DA:1,2','DA:2,0','DA:3,0','BRDA:2,0,0,1','BRDA:2,0,1,0','end_of_record',
+    'SF:./src/services/api.js','DA:1,1','DA:2,0','DA:3,0','DA:4,0','end_of_record','SF:/elsewhere/zzz/nope.js','DA:1,0','end_of_record'].join('\\n');
+  const info=CM.TestMap.applyCoverage(g, CM.TestMap.parseCoverage(lcov,'lcov.info'), {source:'smoke'}); CM.TestsUI.refresh();
+  const ovAfter=ovIds();
+  CMApp.exec('colorBy',{mode:'coverage'}); const cur2=CM.Overlays.current();
+  const colF=CMApp.renderer().colorFn ? CMApp.renderer().colorFn(g.nodes.get('src/utils/format.js')) : null;
+  const info2=await CM.TestsUI.loadCoverage([new File([lcov],'lcov.info')], {show:true});
+  const drop=CM.App.dropCoverage([new File([lcov],'lcov.info')],[])===true && CM.App.dropCoverage([new File(['x'],'a.js')],[])===false; await sleep(100);
+  const loadAct=typeof CMApp.exec('loadCoverage',{})==='string' && !!document.getElementById('btn-coverage');
+  CM.App.select(g.nodes.get('src/store/reducer.js')); await sleep(50);
+  const det=(document.querySelector('#details-body')||{}).textContent||'';
+  CM.App.handlers.openFile(g.nodes.get('src/store/reducer.js')); await sleep(50);
+  const unc=document.querySelectorAll('#fileview-body .fv-unc').length;
+  document.getElementById('modal-fileview').classList.add('hidden');
+  const tSum=CMApp.exec('tests',{}), tFile=CMApp.exec('tests',{query:'format.js'}), cSum=CMApp.exec('coverage',{}), cFile=CMApp.exec('coverage',{query:'reducer.js'});
+  const rep=await CM.Inspect.run(g);
+  CMApp.loadFromJSON(JSON.parse(JSON.stringify(g.toJSON()))); await sleep(100);
+  const g2=CMApp.graph, cov2=g2.nodes.get('src/utils/format.js').coverage;
+  const tE2=g2.edges.filter(e=>e.type==='test').length, tb2=(g2.nodes.get('src/store/reducer.js').testedBy||[]).length;
+  CMApp.exec('colorBy',{mode:'lang'}); CM.App.select(null);
+  return {tEdges, isTest, ovBefore, cur1, legend1, vis1, vis0, rend0, vis2, info:{files:info.files, matched:info.matched, total:info.total, pct:info.pct},
+    ovAfter, cur2, colF, info2:info2&&info2.files, drop, loadAct, det:/Testy i pokrycie|Tests and coverage/.test(det) && /reducer\\.test\\.js/.test(det), unc,
+    tSum, tFile, cSum, cFile, score:typeof rep.score, tE2, tb2, cov2:!!(cov2 && cov2.pct===100)};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -198,6 +243,19 @@ check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitR
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
   `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
+{
+  const r = testsRes || {};
+  const EDGES = ['src/components/Button.test.jsx>src/components/Button.jsx:name', 'src/store/reducer.test.js>src/store/actions.js:import',
+    'src/store/reducer.test.js>src/store/reducer.js:name', 'tests/format.test.js>src/utils/format.js:name'];
+  const ok = !r.error && JSON.stringify(r.tEdges) === JSON.stringify(EDGES) && r.isTest.length === 3
+    && r.ovBefore.includes('tests') && !r.ovBefore.includes('coverage') && r.cur1 === 'tests' && r.legend1
+    && r.vis1 === 4 && r.vis0 === 0 && r.rend0 === 0 && r.vis2 === 4
+    && r.info.files === 3 && r.info.matched === 3 && r.info.total === 4 && r.info.pct === 44.4
+    && r.ovAfter.includes('coverage') && r.cur2 === 'coverage' && r.colF === '#22c55e' && r.info2 === 3 && r.drop && r.loadAct && r.det && r.unc === 2
+    && /: 3 /.test(r.tSum) && /format\.test\.js/.test(r.tFile) && /44[,.]4/.test(r.cSum) && /2–3/.test(r.cFile)
+    && r.score === 'number' && r.tE2 === 4 && r.tb2 === 1 && r.cov2;
+  check(ok, `testy ↔ kod i pokrycie (lcov, nakładki tests/coverage, panel, ChatBot, zapis mapy)${ok ? '' : ': ' + JSON.stringify(r)}`);
+}
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
