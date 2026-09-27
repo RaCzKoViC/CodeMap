@@ -202,10 +202,11 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
 - ✅ Przyczyna w CLI / Action / VS Code / testach: kontekst `vm` z interceptorami globalnych (ten sam kod poza `vm`
   10× szybszy) → `vm.constants.DONT_CONTEXTIFY`; analiza CodeMap 2,9 → 0,7 s, Odysseus-Lab (1 649 plików, 464 tys.
   linii) ≈ 2,3 s na rozgrzanym dysku (zimny odczyt przez Defendera: 17 s — nie po stronie CodeMap).
-- Duplikaty: szybsze odciski i parowanie, pamięć odcisków (tylko zmienione pliki liczone od nowa), liczenie poza
-  wątkiem interfejsu.
+- ✅ Duplikaty: w aplikacji w workerze (`js/dup-worker.js`) z pamięcią odcisków po skrócie treści (tylko zmienione pliki
+  od nowa); w CLI przyspieszone przez kontekst bez kontekstyfikacji.
 - Analiza statyczna (Inspect) w tle — interfejs nie zamarza, wyniki pojawiają się stopniowo.
-- Benchmark na prawdziwych dużych repozytoriach: wczytanie, analiza statyczna, pamięć — z progiem regresji w CI.
+- ✅ Benchmark na prawdziwych dużych repozytoriach: `tools/bench-cli.mjs` (django 5.1 — 6 743 plików w 5,4 s, vite 6.0.0
+  — 1,5 s), próg regresji 1,5× + 1 s w CI.
 - Trend zdrowia w tle i z pamięcią punktów per commit (drugie otwarcie natychmiast).
 
 ## Faza 14 — dokładność 2.0

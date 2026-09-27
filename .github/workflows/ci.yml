@@ -62,6 +62,9 @@ jobs:
   # przypiętych wydaniach prawdziwych repozytoriów; spadek poniżej progu albo pominięta wyrocznia = regres analizatora
   corpus:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read   # artefakt benchmarku analizy z poprzedniego przebiegu
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -83,6 +86,22 @@ jobs:
         with:
           name: corpus
           path: corpus.json
+          if-no-files-found: ignore
+      # pełna analiza CLI na dużych repozytoriach (django, vite): regres = ponad 1,5× wyniku ostatniego zielonego main
+      # i więcej niż 1 s (tools/bench-cli.mjs); poprzedni wynik z artefaktu `bench-cli`
+      - name: Poprzedni wynik benchmarku analizy (ostatni zielony przebieg main)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list -R "$GITHUB_REPOSITORY" -w CI -b main -s success -L 1 --json databaseId -q '.[0].databaseId')
+          if [ -n "$id" ]; then gh run download "$id" -R "$GITHUB_REPOSITORY" -n bench-cli -D bench-cli-base; fi
+      - name: Benchmark analizy na dużych repozytoriach (próg regresji 1,5×)
+        run: node tools/bench-cli.mjs --json bench-cli.json --summary --baseline bench-cli-base/bench-cli.json --tolerance 1.5
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench-cli
+          path: bench-cli.json
           if-no-files-found: ignore
 
   backend:

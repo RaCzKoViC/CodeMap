@@ -406,6 +406,7 @@ Zasady, które utrzymują projekt prostym:
 - `index.html` edytuj narzędziem zachowującym UTF-8;
 - przed commitem `npm run verify` (testy, lint, sonda gramatyk, sonda `.git` zgodna z `git log`) i `node tools/smoke.mjs` (headless Chrome);
   po zmianach w rozwiązywaniu importów `npm run corpus` (wymaga gita; Python i Go dla wyroczni Flask i Gin);
+  po pracy nad wydajnością `node tools/bench-cli.mjs` (pełna analiza CLI przypiętych wydań django i vite);
   po zmianach w wyglądzie `node tools/screenshots.mjs` odświeża zrzuty w `docs/`.
 
 Historia zmian: [CHANGELOG.md](CHANGELOG.md).

@@ -407,6 +407,7 @@ The rules that keep the project simple:
 - edit `index.html` with a tool that preserves UTF-8;
 - before committing, run `npm run verify` (tests, lint, grammar probe, a `.git` probe checked against `git log`) and `node tools/smoke.mjs` (headless Chrome);
   after changing import resolution, `npm run corpus` (needs git; Python and Go for the Flask and Gin oracles);
+  after performance work, `node tools/bench-cli.mjs` (full CLI analysis of pinned django and vite releases);
   after visual changes, `node tools/screenshots.mjs` refreshes the screenshots in `docs/`.
 
 Changelog: [CHANGELOG.md](CHANGELOG.md) (in Polish).

@@ -14,6 +14,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Duplikaty kodu w aplikacji liczone w workerze** (`js/dup-worker.js`, `CM.Metrics.findDuplicatesAsync`): odciski i
   parowanie poza wątkiem interfejsu, z pamięcią odcisków po skrócie treści pliku — ponowna analiza (tryb na żywo, drugi
   Inspect) liczy od nowa tylko zmienione pliki; bez Workera (CLI, testy) albo gdy worker nie wstanie — jak dotąd.
+- **Benchmark analizy na dużych repozytoriach** (`tools/bench-cli.mjs`): pełny przebieg CLI na przypiętych django 5.1
+  (6 743 plików, 648 tys. linii — 5,4 s, 329 MB) i vite 6.0.0 (2 219 plików — 1,5 s); czasy etapów, pamięć, szybszy z
+  dwóch przebiegów; w CI (zadanie `corpus`) próg regresji 1,5× względem ostatniego zielonego main i ponad 1 s.
 
 ## [1.5.1] — 2026-09-27
 
