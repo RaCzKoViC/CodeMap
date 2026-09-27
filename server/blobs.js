@@ -1,6 +1,6 @@
 /* Strumieniowy zapis blobów na dysk (.part → rename) i rozliczanie quoty. */
 import { createWriteStream, createReadStream } from 'node:fs';
-import { mkdir, rename, rm } from 'node:fs/promises';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
@@ -53,6 +53,24 @@ export function sendBlob(reply, relPath, headers = {}) {
   reply.header('content-type', 'application/octet-stream');
   for (const [k, v] of Object.entries(headers)) reply.header(k, v);
   return reply.send(createReadStream(blobAbs(relPath)));
+}
+
+/* Zapis bufora o ZNANYM rozmiarze (publiczne linki: mapa zwalidowana i zserializowana w pamięci) z tą samą
+   atomową rezerwacją quoty co upload strumieniowy. false = brak miejsca (nic nie zapisano, nic nie zarezerwowano). */
+export async function storeBuffer(userId, relPath, buf) {
+  const size = buf.length;
+  if (reserve.run(size, userId, size, 0).changes !== 1) return false;
+  const abs = blobAbs(relPath), tmp = abs + '.part';
+  try {
+    await mkdir(dirname(abs), { recursive: true });
+    await writeFile(tmp, buf);
+    await rename(tmp, abs);
+  } catch (e) {
+    bumpUsage(userId, -size);
+    await rm(tmp, { force: true });
+    throw e;
+  }
+  return true;
 }
 
 /* Wspólna obsługa PUT-a strumieniowego: precheck Content-Length, rezerwacja quoty, zapis,

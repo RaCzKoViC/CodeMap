@@ -362,8 +362,9 @@
     filters.langsOff.clear(); filters.minMetric=0; const mr=$('#rng-minmetric'); if(mr){ mr.value=0; } A.updateMetricLabel();
     state.side=null;   // .git / raporty pokrycia poprzedniego projektu
     if(CM.Overlays) CM.Overlays.reset();
-    // a shared-view hash describes the PREVIOUS project — drop it (but not while restoring from it)
-    if(!A._restoring && location.hash.startsWith('#v=')){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
+    state.linkSrc=null;   // mapa z Gista / publicznego linku (links.js) — ustawiane ponownie po udanym wczytaniu
+    // a shared-view / deep-link hash describes the PREVIOUS project — drop it (but not while restoring from it)
+    if(!A._restoring && /^#(v|repo|gist|share)=/.test(location.hash)){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
   }
 
   // generation token: a newer load (or Cancel) invalidates every still-running older ingest,
@@ -435,6 +436,8 @@
       if(filters.symbols) ensureSymbols();   // graf symboli był włączony → policz dla nowego projektu (w tle)
       runProjectHooks('ingest');
       if(meta.warnings && meta.warnings.length) U.toast(I.t('ca.skippedArchivesPre','Pominięto nieobsługiwane archiwa (RAR/7z itp.): ')+meta.warnings.join(', ')+I.t('ca.skippedArchivesPost','. Rozpakuj je lub użyj ZIP / TAR.'),'',6500);
+      if(gen===A._ingestGen) hideLoading();
+      return true;   // wczytano (deep-linki pokazują wtedy źródło); wszystkie inne ścieżki zwracają undefined
     }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
     if(gen===A._ingestGen) hideLoading();
   }
@@ -502,9 +505,14 @@
   }
 
   const MAP_FORMAT_VERSION=2;   // = Graph.toJSON().version; starsze wczytujemy (format zgodny wstecz), nowsze odrzucamy
-  function loadFromJSON(obj){
-    if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return; }
-    if((Number(obj.version)||1)>MAP_FORMAT_VERSION){ U.toast(I.t('ca.mapTooNew','Ten plik pochodzi z nowszej wersji CodeMap — zaktualizuj aplikację.'),'error',6000); return; }
+  // opts.toast=false — bez komunikatu „wczytana z pliku" (links.js pokazuje własny, ze źródłem). Zwraca true po wczytaniu.
+  function loadFromJSON(obj, opts){
+    opts=opts||{};
+    if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return false; }
+    if((Number(obj.version)||1)>MAP_FORMAT_VERSION){ U.toast(I.t('ca.mapTooNew','Ten plik pochodzi z nowszej wersji CodeMap — zaktualizuj aplikację.'),'error',6000); return false; }
+    // mapa bywa niezaufana (plik od kogoś, Gist, publiczny link): adresy repo / profilu / awatarów trafiają do href,
+    // window.open i <img src> — zostają tylko https z github.com / gitlab.com / bitbucket.org i hostów awatarów
+    if(CM.DeepLink) CM.DeepLink.sanitizeMap(obj);
     resetProjectState();
     A.graph=Graph.fromJSON(obj);
     for(const n of A.graph.nodes.values()){ if(Number.isFinite(n.x)&&Number.isFinite(n.y)) n._placed=true; }
@@ -518,9 +526,10 @@
     UI.renderLangFilters(A.graph, {langsOff:filters.langsOff}, handlers);
     updateStatus(); A.renderer.drawMinimap($('#minimap'));
     requestAnimationFrame(()=>A.renderer.fit());
-    U.toast(I.t('ca.mapLoaded','📂 Mapa wczytana z pliku.'),'success');
+    if(opts.toast!==false) U.toast(I.t('ca.mapLoaded','📂 Mapa wczytana z pliku.'),'success');
     if(filters.symbols && !A.graph.symbolsInfo) ensureSymbols();
     runProjectHooks('json');
+    return true;
   }
 
   // ---- hooki „projekt wczytany" (historia git, testy/pokrycie, nakładki) ----
@@ -533,8 +542,11 @@
 
   // ---------------- go ----------------
   function boot(){ init();
-    if(location.hash==='#demo') setTimeout(A.loadDemo,150);
-    else if(location.hash.startsWith('#v=')) setTimeout(()=>{ A.restoreView().catch(()=>{}); },150);
+    const h=location.hash;
+    if(h==='#demo') setTimeout(A.loadDemo,150);
+    else if(h.startsWith('#v=')) setTimeout(()=>{ A.restoreView().catch(()=>{}); },150);
+    // deep-linki #repo= / #gist= / #share= (links.js + deeplink.js); błąd sieci = toast, start aplikacji bez zmian
+    else if(/^#(repo|gist|share)=/.test(h) && A.openDeepLink) setTimeout(()=>{ A.openDeepLink(h).catch(()=>{}); },150);
     autoTutorial();
   }
   // First launch of the INSTALLED app (also after a re-install) → start the tutorial automatically.

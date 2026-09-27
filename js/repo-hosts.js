@@ -154,24 +154,40 @@
 
   // ---- shareable view: encode src + layout + camera + selection into the URL hash ----
   let _hashT=0; A._restoring=false;   // _restoring czyta też resetProjectState (app-core.js)
+  // src/b/sub = repozytorium (GitHub/GitLab/Bitbucket); gist/share = mapa wczytana z Gista / publicznego linku
+  // (links.js, state.linkSrc) — wtedy link odtwarza TĘ mapę, nie repozytorium, z którego kiedyś powstała
   function serializeView(){
     if(A._restoring || !A.graph || !A.graph.nodes || A.graph.nodes.size===0) return '';
-    const c=A.renderer.cam, m=A.graph.meta||{};
+    const c=A.renderer.cam, m=A.graph.meta||{}, ls=state.linkSrc;
     const o={ v:1, ly:state.layout, cam:[+c.x.toFixed(1),+c.y.toFixed(1),+c.zoom.toFixed(4),+c.rot.toFixed(4),+c.tilt.toFixed(3)] };
-    if(m.html && /^(github|gitlab|bitbucket)$/.test(m.kind||'')){ o.src=m.html; if(m.branch) o.b=m.branch; }
+    if(ls && (ls.type==='gist' || ls.type==='share')) o[ls.type]=ls.id;
+    else if(m.html && /^(github|gitlab|bitbucket)$/.test(m.kind||'')){ o.src=m.html; if(m.branch) o.b=m.branch; if(m.sub) o.sub=m.sub; }
     if(A.renderer.selected) o.sel=A.renderer.selected.id;
     return '#v='+encodeURIComponent(JSON.stringify(o));
   }
   function updateHash(){ clearTimeout(_hashT); _hashT=setTimeout(()=>{
     const h=serializeView(); if(h && h!==location.hash){ try{ history.replaceState(null,'',h); }catch(e){} }
   },450); }
+  // „Kopiuj link do widoku" pokrywa też „link do repozytorium": #v= niesie źródło (repo@gałąź/podkatalog albo
+  // gist/publiczny link), układ, kamerę i zaznaczenie. Mapa lokalna (folder, plik) nie ma źródła do odtworzenia.
   function copyViewLink(){
     const h=serializeView(); if(!h){ U.toast(I.t('ca.noViewYet','Najpierw wczytaj projekt, aby udostępnić widok.'),'error'); return; }
     const url=location.origin+location.pathname+h;
+    let o={}; try{ o=JSON.parse(decodeURIComponent(h.slice(3))); }catch(e){}
+    const msg=(o.src||o.gist||o.share) ? I.t('ca.linkCopied','🔗 Skopiowano link do tego widoku.')
+      : I.t('dl.localView','🔗 Skopiowano link do widoku. Uwaga: mapa jest lokalna — link przenosi tylko widok; aby udostępnić samą mapę, użyj Gista albo publicznego linku.');
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(
-      ()=>U.toast(I.t('ca.linkCopied','🔗 Skopiowano link do tego widoku.'),'success'),
+      ()=>U.toast(msg,'success',(o.src||o.gist||o.share)?3200:7000),
       ()=>U.toast(url,'',6000)); }
     else U.toast(url,'',6000);
+  }
+  // układ z linku — tylko wartość istniejąca w #sel-layout (bez składania selektorów z danych z linku)
+  function setLayoutSelect(ly){
+    const s=$('#sel-layout'); if(!s || !ly) return false;
+    const opt=Array.from(s.options).find(op=>op.value===ly); if(!opt) return false;
+    s.value=ly;
+    const lbl=$('#layout-menu-label'); if(lbl) lbl.textContent=opt.textContent;
+    return true;
   }
   async function restoreView(){
     const raw=location.hash; if(!raw || !raw.startsWith('#v=')) return false;
@@ -187,14 +203,21 @@
         A.renderer.onChange(); A.renderer.kick();
       }catch(e){}
     };
+    // mapa z Gista / publicznego linku (links.js): kamera po wczytaniu (układ zapisany w mapie)
+    if(o.gist!=null && A.openGist) return A.openGist(String(o.gist), {onLoaded:applyCam});
+    if(o.share!=null && A.openShare) return A.openShare(String(o.share), {onLoaded:applyCam});
     if(o.src){
+      // link jest danymi z zewnątrz: źródło, gałąź i podkatalog przechodzą tę samą walidację co #repo=
+      // (tylko github.com / gitlab.com / bitbucket.org, bez „..", „%" i znaków sterujących)
+      const DL=CM.DeepLink, spec=DL && DL.parseRepoSpec(String(o.src));
+      const br=o.b!=null ? String(o.b) : '', sub=DL ? DL.normSub(o.sub) : '';
+      if(!spec || (br && !DL.validRef(br)) || !DL.validSub(sub)){ U.toast(I.t('dl.badView','Link do widoku zawiera nieprawidłowe źródło repozytorium — pominięto.'),'error',6000); return false; }
       A._restoring=true;
       // set the target layout first — ingest reads #sel-layout for its own (single) layout + refit pass
-      if(o.ly){ const s=$('#sel-layout'); if(s && Array.from(s.options).some(op=>op.value===o.ly)){ s.value=o.ly;
-        const lbl=$('#layout-menu-label'), opt=s.querySelector('option[value="'+o.ly+'"]'); if(lbl&&opt) lbl.textContent=opt.textContent; } }
+      if(o.ly) setLayoutSelect(String(o.ly));
       // restore the camera when the layout SETTLES (onSettle) instead of on a fixed timer that lost the race
       state._pendingViewRestore=applyCam;
-      try{ await A.ingest((p,s)=>Loaders.fromRepoURL(o.src, {branch:o.b, fetchContent:true}, p, s), I.t('ca.connectingToRepo','Łączenie z repozytorium…')); }
+      try{ await A.ingest((p,s)=>Loaders.fromRepoURL(spec.url, {branch:br||spec.branch||undefined, sub:sub||spec.sub||undefined, fetchContent:true}, p, s), I.t('ca.connectingToRepo','Łączenie z repozytorium…')); }
       catch(e){}
       A._restoring=false;
       // fallback for static layouts (no physics settle → onSettle may not fire): apply if still pending
@@ -291,15 +314,25 @@
     try{
       const content=JSON.stringify(A.graph.toJSON());
       const res=await Loaders.createGist(content, 'CodeMap — '+(A.graph.meta.name||'mapa'), token, false);
-      try{ navigator.clipboard&&navigator.clipboard.writeText(res.url); }catch(e){}
-      U.toast(I.t('ca.gistDone','✅ Gist utworzony (URL skopiowany).'),'success',6000);
-      window.open(res.url,'_blank','noopener');
+      const id=String(res.id||'').toLowerCase(), gistUrl=safeUrl(res.url);
+      if(CM.DeepLink && CM.DeepLink.isGistId(id)){
+        // link …/#gist=<id> otwiera mapę prosto w CodeMap (links.js) — to on trafia do schowka, URL gista obok
+        const link=location.origin+location.pathname+'#gist='+id;
+        let copied=false; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(link); copied=true; } }catch(e){}
+        const a=(href,txt)=>'<a href="'+escapeHtml(href)+'" target="_blank" rel="noopener">'+escapeHtml(txt)+'</a>';
+        U.toast(escapeHtml(copied ? I.t('ca.gistDoneLink','✅ Gist utworzony — skopiowano link otwierający mapę w CodeMap:') : I.t('ca.gistDoneLinkNoClip','✅ Gist utworzony — link otwierający mapę w CodeMap:'))
+          +'<br>'+a(link, link)+(gistUrl ? ' · '+a(gistUrl, I.t('ca.gistView','zobacz gist')) : ''), {html:true, kind:'success'}, 12000);
+      } else {
+        try{ navigator.clipboard&&navigator.clipboard.writeText(res.url); }catch(e){}
+        U.toast(I.t('ca.gistDone','✅ Gist utworzony (URL skopiowany).'),'success',6000);
+        if(gistUrl) window.open(gistUrl,'_blank','noopener');
+      }
     }catch(e){ U.toast(I.t('ca.gistFail','Gist nie powiódł się: ')+e.message,'error',6500); }
   }
 
   Object.assign(A, {
     ghAvatarUrl, refreshAuthors, centroidOf, positionAuthors, ensureAuthorCard, closeAuthorCard, fmtJoined, renderAuthorCard,
-    escapeHtml, safeUrl, openAuthorCard, repoHostName, nodeRepoUrl, serializeView, updateHash, copyViewLink,
+    escapeHtml, safeUrl, openAuthorCard, repoHostName, nodeRepoUrl, serializeView, updateHash, copyViewLink, setLayoutSelect,
     restoreView, recentRepos, pushRecentRepo, renderRecentRepos, fillRefList, refreshGhRate, compareBranches, exportGist,
   });
 })();

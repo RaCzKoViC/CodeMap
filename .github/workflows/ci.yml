@@ -44,6 +44,8 @@ jobs:
       - run: npm ci
       - name: Audyt zależności (high+)
         run: npm audit --omit=dev --audit-level=high
+      - name: Testy backendu (node:test, app.inject na tymczasowej bazie)
+        run: npm test
       - name: Serwer wstaje i odpowiada na /api/health
         run: |
           cp .env.example .env

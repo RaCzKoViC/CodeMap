@@ -42,7 +42,7 @@ module.exports = [
     rules: CORE_RULES,
   },
   {
-    files: ['test/**/*.mjs', 'tools/**/*.mjs'],
+    files: ['test/**/*.mjs', 'tools/**/*.mjs', 'server/test/**/*.mjs'],
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node },
     rules: CORE_RULES,
   },

@@ -90,6 +90,23 @@ CREATE TABLE IF NOT EXISTS vault_files (
   PRIMARY KEY (user_id, album, name)
 );
 
+-- Publiczne linki do map (Faza 4): kopia mapy (.codemap.json) dostępna BEZ logowania dla każdego, kto zna
+-- losowe id (18 bajtów z crypto.randomBytes → 24 znaki base64url). Treść w magazynie blobów
+-- (<user>/shares/<id>.json), rozmiar liczony do quoty właściciela. expires_at NULL = bez wygasania;
+-- wygasłe są niewidoczne od razu, a sprzątane co godzinę (gcShares).
+CREATE TABLE IF NOT EXISTS shares (
+  id          TEXT PRIMARY KEY,
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  size_bytes  INTEGER NOT NULL,
+  blob_path   TEXT NOT NULL,
+  created_at  INTEGER NOT NULL,
+  expires_at  INTEGER,
+  views       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_shares_user ON shares(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_shares_exp ON shares(expires_at) WHERE expires_at IS NOT NULL;
+
 -- Nieudane logowania per adres (także dla nieistniejących kont — bez wyroczni istnienia).
 -- Po 5 porażkach blokada rośnie wykładniczo (30 s → 15 min); sukces kasuje wpis.
 CREATE TABLE IF NOT EXISTS login_attempts (

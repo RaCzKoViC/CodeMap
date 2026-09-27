@@ -225,6 +225,46 @@ const testsRes = await evalJs(`(async()=>{ try{
     tSum, tFile, cSum, cFile, score:typeof rep.score, tE2, tb2, cov2:!!(cov2 && cov2.pct===100)};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// deep-linki i publiczne linki (faza 4) BEZ sieci: fetch podstawiony w stronie. #gist= → mapa (adresy z mapy
+// oczyszczone), #v= niesie gist; #share= bez backendu → czytelny błąd, mapa bez zmian; #repo= z podkatalogiem
+// i układem przez podstawione API GitHub; obcy host odrzucony bez żadnego zapytania; „Udostępnij publiczny
+// link…" ukryte bez backendu (serwer smoke nie ma /api)
+const linksRes = await evalJs(`(async()=>{ try{
+  const DL=CM.DeepLink, A=CM.App;
+  const btn=document.getElementById('btn-share');
+  const hidden=!!btn && btn.classList.contains('hidden') && document.body.classList.contains('no-backend');
+  const parsed=[DL.parseHash('#repo=o/r@main/src&layout=treemap').kind, DL.parseHash('#gist=javascript:alert(1)').kind, DL.parseHash('#repo=https://evil.example/o/r').kind].join(',');
+  const map=JSON.parse(JSON.stringify(CMApp.graph.toJSON()));
+  map.meta={name:'gist-map', kind:'github', html:'javascript:alert(1)', owner:{login:'x', url:'javascript:alert(2)', avatar:'https://evil.example/p.png'}};
+  const GID='0123456789abcdef0123456789abcdef', SID='AAAAAAAAAAAAAAAAAAAAAAAA';
+  const J=(o,s)=>new Response(typeof o==='string'?o:JSON.stringify(o),{status:s||200,headers:{'content-type':'application/json'}});
+  const routes={
+    ['https://api.github.com/gists/'+GID]:()=>J({id:GID, owner:{login:'ala'}, files:{'codemap.json':{filename:'codemap.json', size:10, truncated:false, content:JSON.stringify(map)}}}),
+    'https://api.github.com/repos/o/r':()=>J({default_branch:'main', html_url:'https://github.com/o/r', owner:{login:'o', avatar_url:'https://avatars.githubusercontent.com/u/1', html_url:'https://github.com/o'}}),
+    'https://api.github.com/repos/o/r/git/trees/main?recursive=1':()=>J({tree:[{type:'blob',path:'src/a.js',sha:'1',size:40},{type:'blob',path:'src/lib/b.js',sha:'2',size:20},{type:'blob',path:'README.md',sha:'3',size:9}]}),
+    'https://raw.githubusercontent.com/o/r/main/src/a.js':()=>new Response("import b from './lib/b.js';\\nexport default b;\\n"),
+    'https://raw.githubusercontent.com/o/r/main/src/lib/b.js':()=>new Response('export default 1;\\n'),
+  };
+  const calls=[], real=window.fetch;
+  window.fetch=async(u)=>{ const k=String(u); calls.push(k); const r=routes[k]; return r ? r() : J({error:'notfound'},404); };
+  try{
+    const okGist=await A.openDeepLink('#gist='+GID);
+    const g=CMApp.graph, m=g.meta||{};
+    const sanitized=m.name==='gist-map' && !m.html && !(m.owner&&m.owner.url) && !(m.owner&&m.owner.avatar);
+    const view=JSON.parse(decodeURIComponent(CMApp.serializeView().slice(3)));
+    const okShare=await A.openDeepLink('#share='+SID);
+    const keptGist=CMApp.graph===g;
+    const okRepo=await A.openDeepLink('#repo=o/r@main/src&layout=treemap');
+    const g2=CMApp.graph, files=[...g2.nodes.values()].filter(n=>n.type==='file').map(n=>n.path).sort();
+    const layout=document.getElementById('sel-layout').value;
+    const view2=JSON.parse(decodeURIComponent(CMApp.serializeView().slice(3)));
+    const n=calls.length, bad=await A.openDeepLink('#repo=https://evil.example/o/r'), badCalls=calls.length-n;
+    const foreign=calls.filter(u=>!/^https:\\/\\/(api\\.github\\.com|raw\\.githubusercontent\\.com)\\/|^\\/api\\/share\\//.test(u));
+    return {hidden, parsed, okGist, sanitized, viewGist:view.gist||null, viewSrc:view.src||null, okShare, keptGist, okRepo, files, sub:g2.meta.sub,
+      layout, view2:{src:view2.src||null, b:view2.b||null, sub:view2.sub||null, gist:view2.gist||null}, bad, badCalls, foreign};
+  } finally { window.fetch=real; }
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -256,7 +296,16 @@ check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good
     && r.score === 'number' && r.tE2 === 4 && r.tb2 === 1 && r.cov2;
   check(ok, `testy ↔ kod i pokrycie (lcov, nakładki tests/coverage, panel, ChatBot, zapis mapy)${ok ? '' : ': ' + JSON.stringify(r)}`);
 }
-check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
+{
+  const r = linksRes || {};
+  const ok = !r.error && r.hidden && r.parsed === 'repo,error,error' && r.okGist === true && r.sanitized
+    && r.viewGist === '0123456789abcdef0123456789abcdef' && r.viewSrc === null && r.okShare === false && r.keptGist
+    && r.okRepo === true && JSON.stringify(r.files) === '["a.js","lib/b.js"]' && r.sub === 'src' && r.layout === 'treemap'
+    && r.view2.src === 'https://github.com/o/r' && r.view2.b === 'main' && r.view2.sub === 'src' && r.view2.gist === null
+    && r.bad === false && r.badCalls === 0 && r.foreign.length === 0;
+  check(ok, `deep-linki #gist= / #share= / #repo= (podstawiony fetch, sanityzacja mapy, #v= z gistem i podkatalogiem, udostępnianie ukryte bez backendu)${ok ? '' : ': ' + JSON.stringify(r)}`);
+}
+check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
 

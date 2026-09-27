@@ -21,6 +21,12 @@ użytkownika (tabela w [README → Prywatność](README.md#-prywatność--co-opu
   trafiają do promptu, więc traktujemy je jako dane niezaufane (prompt injection).
 - Runner uruchamia kod w `iframe sandbox="allow-scripts allow-modals"` bez `allow-same-origin`
   (opaque origin, brak dostępu do strony, `localStorage` ani plików).
+- Deep-linki (`#repo=`, `#gist=`, `#share=`, a także źródło w `#v=`) to dane z zewnątrz: źródło repozytorium
+  tylko z github.com / gitlab.com / bitbucket.org (albo skrót `owner/nazwa`), bez `..`, `%`, znaków sterujących,
+  danych logowania i portu w adresie; id gista `[0-9a-f]{20,40}`, plik gista tylko z `gist.githubusercontent.com`,
+  limit 25 MB. Link nigdy nie używa tokenu z okna „Wczytaj…". Mapa z pliku lub linku jest niezaufana:
+  adresy repozytorium, profilu i awatarów trafiają do `href` / `window.open` / `<img>` tylko jako `https`
+  ze znanych hostów.
 - Sejf: AES-GCM-256, klucz z PBKDF2-SHA256 (600 000 iteracji dla nowych haseł; albumy sprzed
   wersji 1.1 odszyfrowują się z 210 000 i przechodzą na nową wartość przy zmianie hasła — pole
   `kdf` w metadanych albumu), losowe IV, weryfikator przez AEAD, minimum 8 znaków hasła.
@@ -38,6 +44,14 @@ użytkownika (tabela w [README → Prywatność](README.md#-prywatność--co-opu
 - Wygasłe sesje, tokeny e-mail, blokady i dziennik maili są sprzątane co godzinę.
 - Wszystkie zapytania SQL parametryzowane; każdy zasób ograniczony do `user_id` sesji.
 - Uploady strumieniowe z twardym limitem rozmiaru i atomową rezerwacją quoty.
+- Publiczne linki do map (`/api/share/<id>`): **każdy, kto ma link, widzi kopię mapy bez logowania** —
+  nazwy i ścieżki plików, metryki, zależności, a jeśli właściciel ich nie wyłączy — podgląd treści plików
+  i dane historii git (domyślnie wysyłane bez podglądu treści i bez e-maili autorów). Id to 144 losowe bity;
+  404 jest identyczne dla linku nieistniejącego, wygasłego i unieważnionego; odpowiedź `application/json` +
+  `nosniff`, `Cross-Origin-Resource-Policy: same-origin`, bez CORS, bez ciasteczek, `no-store` (unieważnienie
+  działa natychmiast), `noindex`; rate limit per IP. Tworzenie tylko po zalogowaniu (sesja sprawdzana przed
+  odczytem ciała), limit 25 MB, walidacja formatu, quota i limit aktywnych linków; usuwa tylko właściciel.
+  Id linku nie trafia do logów (maskowane w ścieżce).
 - Serwer dev nasłuchuje na `127.0.0.1` i serwuje tylko pliki frontendu z allowlisty.
 - Produkcja: Caddy z HSTS i nagłówkami bezpieczeństwa, unit systemd z hardeningiem
   (`deploy/`). CSP jest w trybie report-only — przełączenie na tryb wymuszający wymaga
@@ -50,3 +64,6 @@ zwracające błędne analizy (nie są wykonywane bez potwierdzenia poza akcjami 
 
 - Serwer widzi nazwy, rozmiary i daty plików Sejfu (nie treść). Szyfrowanie nazw jest w planie.
 - CSP działa w trybie report-only do czasu dostosowania Runnera.
+- Publiczny link jest kluczem na okaziciela: kto go ma (także z historii przeglądarki, czatu, logów proxy
+  po stronie odbiorcy), ten widzi mapę do czasu wygaśnięcia lub unieważnienia. Mapy udostępnionej przez Gist
+  (tajny gist) nie da się unieważnić z CodeMap — usuń gist na GitHubie.
