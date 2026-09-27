@@ -286,7 +286,12 @@ js/ui.js                   # details panels, filters, history, diff
 js/settings.js             # settings, tutorial, user manual
 js/inspect.js              # static analysis (16 rules + architecture rules, health score)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
-js/mindmap.js  js/mmdraw.js  # MindMap mode + drawing layer
+js/mindmap.js  js/mmdraw.js  # MindMap mode: editor, rendering, interaction + drawing layer
+js/mindmap-strings.js      # MindMap: text dictionaries (i18n keys + Polish fallbacks)
+js/mindmap-templates.js    # MindMap: 16 card frames, 34 diagram types, thumbnails, code card
+js/mindmap-layout.js       # MindMap: layout algorithms + "Layout scheme" dialog
+js/mindmap-io.js           # MindMap: Markdown import/export, .mindmap.json, SVG/PNG, local saves, snapshots
+js/mindmap-ui.js           # MindMap: widgets (text prompt, popover, menus, node ring buttons)
 js/drive.js                # Drive (File System Access) and Vault (OPFS + AES-GCM)
 js/auth.js  js/sync.js     # account and sync (backend only)
 js/app-core.js             # CM.App — shared context (graph, renderer, state, filters, handlers) + core:
