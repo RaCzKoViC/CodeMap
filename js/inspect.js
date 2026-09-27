@@ -84,21 +84,26 @@ CM.Inspect = (function(){
   const LIMIT=60;                                                 // max stored items per rule (UI shows fewer)
   // MessageChannel yield: gives the event loop room WITHOUT the background-tab setTimeout
   // throttling (~1s/tick hidden) — chunked analysis stays fast even in a non-focused tab
-  const tick=()=>new Promise(r=>{ const ch=new MessageChannel(); ch.port1.onmessage=()=>r(); ch.port2.postMessage(0); });
+  // (bez MessageChannel — Node/CLI — zwykły setTimeout; port z onmessage trzymałby tam proces przy życiu)
+  const tick=typeof MessageChannel==='undefined' ? ()=>new Promise(r=>setTimeout(r,0))
+    : ()=>new Promise(r=>{ const ch=new MessageChannel(); ch.port1.onmessage=()=>r(); ch.port2.postMessage(0); });
   const ENTRY_RE=/^(index|main|app|server|cli|setup|conf(ig)?|__init__|__main__|mod|lib|test.*|.*\.(test|spec)|.*\.d)$/i;
   const CODE_JS=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte)$/i;
   // real programming languages only — manifests/docs/styles being "orphans" is normal, not a smell
   const CODE_RE=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte|py|java|go|rb|php|cs|cpp|cxx|cc|c|h|hpp|rs|kt|kts|swift|scala|dart|lua|pl|r|jl|ex|exs|erl|hs|ml|fs|clj|groovy|zig|nim|v|sol)$/i;
+  // kolejność reguł w raporcie (= wszystkie identyfikatory reguł; CLI waliduje nimi --fail-on)
+  const ORDER=['archviolation','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
 
-  // returns {findings:[{rule,sev,items:[{id,name,path,detail}],count}], score, files, ms}
+  // returns {findings:[{rule,sev,items:[{id,name,path,detail,sev,related?}],count}], score, files, ms}
+  // item.sev = ważność tej pozycji (f.sev = pierwszej; liczy się do wyniku), related = id powiązanych węzłów (SARIF)
   async function run(graph){
     const t0=performance.now();
     const nodes=[...graph.nodes.values()];
     const files=nodes.filter(n=>n.type==='file');
     const folders=nodes.filter(n=>n.type==='folder');
     const N=files.length||1;
-    const add=(map,rule,sev,n,detail)=>{ let f=map.get(rule); if(!f){ f={rule,sev,items:[],count:0}; map.set(rule,f); }
-      f.count++; if(f.items.length<LIMIT) f.items.push({id:n.id,name:n.name,path:n.path||n.name,detail}); };
+    const add=(map,rule,sev,n,detail,related)=>{ let f=map.get(rule); if(!f){ f={rule,sev,items:[],count:0}; map.set(rule,f); }
+      f.count++; if(f.items.length<LIMIT){ const it={id:n.id,name:n.name,path:n.path||n.name,detail,sev}; if(related&&related.length) it.related=related; f.items.push(it); } };
     const F=new Map();
 
     // ---- graph rules: fan-in / fan-out over import+reference edges (single O(E) pass) ----
@@ -194,7 +199,7 @@ CM.Inspect = (function(){
       const pairs=CM.Metrics.pairDuplicates(cand, fps);
       for(const p of pairs.slice(0,LIMIT)){
         const a=graph.nodes.get(p.a), b=graph.nodes.get(p.b); if(!a||!b) continue;
-        add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.shared}));
+        add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.shared}), [b.id]);
       }
       if(pairs.length>LIMIT){ const f=F.get('dupcode'); if(f) f.count=pairs.length; }
     }catch(e){} }
@@ -204,7 +209,7 @@ CM.Inspect = (function(){
       for(const comp of (res.components||[]).slice(0,LIMIT)){
         const first=graph.nodes.get(comp[0]); if(!first) continue;
         const names=comp.slice(0,4).map(id=>{ const n=graph.nodes.get(id); return n?n.name:id; }).join(' → ');
-        add(F,'cycles', comp.length>=4?'high':'med', first, names+(comp.length>4?' → …':'')+'  ('+comp.length+')');
+        add(F,'cycles', comp.length>=4?'high':'med', first, names+(comp.length>4?' → …':'')+'  ('+comp.length+')', comp.slice(1,101));
       }
       if(res.components&&res.components.length>LIMIT){ const f=F.get('cycles'); if(f) f.count=res.components.length; }
     }catch(e){}
@@ -221,7 +226,7 @@ CM.Inspect = (function(){
           for(const x of v.slice(0,LIMIT)){
             const n=graph.nodes.get(x.from); if(!n) continue;
             const tn=graph.nodes.get(x.to);
-            add(F,'archviolation','high',n, '→ '+(tn?tn.name:x.to)+' · '+x.rule+(x.why?' — '+x.why:''));
+            add(F,'archviolation','high',n, '→ '+(tn?tn.name:x.to)+' · '+x.rule+(x.why?' — '+x.why:''), [x.to]);
           }
           if(v.length>LIMIT){ const f=F.get('archviolation'); if(f) f.count=v.length; }
         }
@@ -231,8 +236,7 @@ CM.Inspect = (function(){
     // ---- health score: 100 minus severity-weighted density ----
     let penalty=0; for(const f of F.values()) penalty+=SEV_W[f.sev]*f.count;
     const score=Math.max(0, Math.round(100 - 100*penalty/(penalty + 3*N)));
-    const order=['archviolation','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
-    const findings=[...F.values()].sort((a,b)=>order.indexOf(a.rule)-order.indexOf(b.rule));
+    const findings=[...F.values()].sort((a,b)=>ORDER.indexOf(a.rule)-ORDER.indexOf(b.rule));
     return {findings, score, files:files.length, ms:Math.round(performance.now()-t0)};
   }
 
@@ -299,21 +303,26 @@ CM.Inspect = (function(){
       list.appendChild(box);
     }
   }
-  function exportMD(){
-    if(!lastReport) return;
-    const g=graphRef(); const name=(g&&g.meta&&(g.meta.name||g.meta.source))||'project';
-    const L=['# CodeMap — '+t('title')+': '+name,'', t('score')+': **'+lastReport.score+'/100** — '+lastReport.files+' '+t('files'),''];
-    for(const f of lastReport.findings){
+  // raport Markdown bez DOM (eksport w aplikacji i CLI); extra = linie wstawiane po wierszu z wynikiem (CLI: podsumowanie)
+  function toMarkdown(rep, name, extra){
+    const L=['# CodeMap — '+t('title')+': '+(name||'project'),'', t('score')+': **'+rep.score+'/100** — '+rep.files+' '+t('files'),''];
+    if(extra&&extra.length) L.push(...extra);
+    for(const f of rep.findings){
       L.push('## '+t('r.'+f.rule)+' ('+f.count+') — '+t('sev.'+f.sev)); L.push(t('r.'+f.rule+'.d')); L.push('');
       for(const it of f.items) L.push('- `'+it.path+'` — '+(it.detail||''));
       if(f.count>f.items.length) L.push('- '+t('and',{n:f.count-f.items.length}));
       L.push('');
     }
-    U.download('codemap-analysis.md', L.join('\n'), 'text/markdown');
+    return L.join('\n');
+  }
+  function exportMD(){
+    if(!lastReport) return;
+    const g=graphRef(); const name=(g&&g.meta&&(g.meta.name||g.meta.source))||'project';
+    U.download('codemap-analysis.md', toMarkdown(lastReport, name), 'text/markdown');
   }
   function open(){ buildOverlay().classList.remove('hidden'); render(); }
   function close(){ if(overlay) overlay.classList.add('hidden'); }
   if(I.onChange) I.onChange(()=>{ if(overlay&&!overlay.classList.contains('hidden')) render(); });
 
-  return { open, close, run:_g=>run(_g||graphRef()), _rules:{SEV_W,LIMIT} };
+  return { open, close, run:_g=>run(_g||graphRef()), toMarkdown, text:t, RULES:ORDER, _rules:{SEV_W,LIMIT} };
 })();

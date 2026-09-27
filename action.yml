@@ -1,0 +1,107 @@
+# CodeMap — akcja GitHub (kompozytowa): ta sama analiza co w aplikacji, uruchomiona w CI przez
+# cli/codemap.mjs (Node, bez zależności npm). Raport Markdown trafia do podsumowania kroku,
+# SARIF do pliku (np. do github/codeql-action/upload-sarif), progi ustawiają kod wyjścia.
+# Przykłady: docs/github-action.md
+name: 'CodeMap — analiza kodu'
+description: 'Mapa zależności, cykle, hotspoty z historii git, testy i pokrycie, reguły architektury — raport SARIF i Markdown, progi health score.'
+author: 'RaCzKoViC'
+branding:
+  icon: 'map'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Katalog do analizy (względem katalogu roboczego).'
+    required: false
+    default: '.'
+  min-score:
+    description: 'Minimalny health score (0–100); niższy wynik kończy krok porażką. Puste = bez progu.'
+    required: false
+    default: ''
+  fail-on:
+    description: 'Porażka, gdy wystąpią znaleziska: poziom ważności (high | med | low | info — ten lub wyższy) albo identyfikatory reguł, po przecinku (np. "cycles,archviolation"). Puste = bez progu.'
+    required: false
+    default: ''
+  max-findings:
+    description: 'Porażka, gdy znalezisk łącznie jest więcej niż N. Puste = bez progu.'
+    required: false
+    default: ''
+  sarif:
+    description: 'Ścieżka pliku SARIF 2.1.0. Puste = bez SARIF.'
+    required: false
+    default: 'codemap.sarif'
+  markdown:
+    description: 'Ścieżka pliku z raportem Markdown (raport i tak trafia do podsumowania kroku). Puste = plik tymczasowy.'
+    required: false
+    default: ''
+  lang:
+    description: 'Język raportów: pl | en.'
+    required: false
+    default: 'pl'
+  git:
+    description: 'Czytać historię git z .git (hotspoty zmian, wiedza w jednej głowie, bus factor). Pełna historia wymaga actions/checkout z fetch-depth: 0.'
+    required: false
+    default: 'true'
+  args:
+    description: 'Dodatkowe argumenty CLI (np. "--coverage coverage/lcov.info --exclude docs/**").'
+    required: false
+    default: ''
+  node-version:
+    description: 'Wersja Node.js (≥ 20.6).'
+    required: false
+    default: '22'
+
+outputs:
+  score:
+    description: 'Health score projektu (0–100).'
+    value: ${{ steps.analyze.outputs.score }}
+  findings:
+    description: 'Łączna liczba znalezisk.'
+    value: ${{ steps.analyze.outputs.findings }}
+  sarif-file:
+    description: 'Ścieżka zapisanego pliku SARIF (pusta, gdy wyłączony).'
+    value: ${{ steps.analyze.outputs.sarif-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - id: analyze
+      shell: bash
+      # wejścia przez zmienne środowiskowe, nie wklejane w skrypt (bez wstrzykiwania poleceń)
+      env:
+        CM_PATH: ${{ inputs.path }}
+        CM_MIN_SCORE: ${{ inputs.min-score }}
+        CM_FAIL_ON: ${{ inputs.fail-on }}
+        CM_MAX_FINDINGS: ${{ inputs.max-findings }}
+        CM_SARIF: ${{ inputs.sarif }}
+        CM_MARKDOWN: ${{ inputs.markdown }}
+        CM_LANG: ${{ inputs.lang }}
+        CM_GIT: ${{ inputs.git }}
+        CM_ARGS: ${{ inputs.args }}
+      run: |
+        set -uo pipefail
+        tmp="${RUNNER_TEMP:-/tmp}/codemap-$$"
+        mkdir -p "$tmp"
+        md="${CM_MARKDOWN:-$tmp/codemap.md}"
+        json="$tmp/codemap.json"
+        args=(analyze "$CM_PATH" --lang "$CM_LANG" --json "$json" --md "$md")
+        [ -n "$CM_SARIF" ] && args+=(--sarif "$CM_SARIF")
+        [ -n "$CM_MIN_SCORE" ] && args+=(--min-score "$CM_MIN_SCORE")
+        [ -n "$CM_FAIL_ON" ] && args+=(--fail-on "$CM_FAIL_ON")
+        [ -n "$CM_MAX_FINDINGS" ] && args+=(--max-findings "$CM_MAX_FINDINGS")
+        case "$CM_GIT" in false|False|FALSE|0|no|off) args+=(--no-git) ;; esac
+        if [ -n "$CM_ARGS" ]; then read -r -a extra <<< "$CM_ARGS"; args+=("${extra[@]}"); fi
+
+        node "$GITHUB_ACTION_PATH/cli/codemap.mjs" "${args[@]}"
+        code=$?
+
+        if [ -f "$md" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$md" >> "$GITHUB_STEP_SUMMARY"; fi
+        if [ -f "$json" ]; then
+          node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log("score="+r.score);console.log("findings="+r.totals.findings)' "$json" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -n "$CM_SARIF" ] && [ -f "$CM_SARIF" ]; then echo "sarif-file=$CM_SARIF" >> "$GITHUB_OUTPUT"; else echo "sarif-file=" >> "$GITHUB_OUTPUT"; fi
+        exit $code
