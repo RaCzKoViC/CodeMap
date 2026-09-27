@@ -3,7 +3,9 @@
    (regex) i hash — czyli wszystko, co dotąd blokowało UI w graph.build (jeden synchroniczny przebieg
    po 4000 plikach). Pracuje chunkami i raportuje postęp; anulowanie = nowa generacja. Główny wątek
    dostaje wyniki i buduje z nich graf (foldery, krawędzie) bez parsowania. Samowystarczalny: importuje
-   te same moduły co strona (util → languages → analysis), więc regexy parserów mają jedno źródło. */
+   te same moduły co strona (util → languages → analysis), więc regexy parserów mają jedno źródło.
+   Pamięć analizy (analysis-cache.js): plik o zgodnym rozmiarze, ale niepewnej tożsamości (inna data modyfikacji)
+   przychodzi z zapamiętanym wynikiem `cached` — przy tym samym skrócie treści wynik wraca bez parsowania (`hit`). */
 self.window = self;                                   // util.js: window.CM = window.CM || {}
 // wersja z URL-a workera (?v=…): bez niej importScripts dostałby nieaktualną kopię z cache service workera
 const V = (self.location && self.location.search.match(/[?&]v=([\w.-]+)/) || [])[1] || '';
@@ -28,8 +30,10 @@ self.onmessage = (e) => {
       const info = L.lookup(A.basename(path));
       if (!info.text) continue;
       try {
+        const hash = U.hashString(f.content), c = f.cached;
+        if (c && c.s === f.content.length && c.h === hash) { results.push({ path, metrics: c.m, deps: c.d, symbols: c.y, hash, hit: 1 }); continue; }
         const r = A.analyzeFile(f.content, info.key);
-        results.push({ path, metrics: r.metrics, deps: r.deps, symbols: r.symbols, hash: U.hashString(f.content) });
+        results.push({ path, metrics: r.metrics, deps: r.deps, symbols: r.symbols, hash });
       } catch (err) { results.push({ path, error: String((err && err.message) || err) }); }
     }
     self.postMessage({ type: 'progress', gen, done: i, total });

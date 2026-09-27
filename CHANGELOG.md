@@ -30,9 +30,18 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   i przez `renderOption {backend}`; utrata kontekstu albo błąd GL → canvas 2D. Gęste zależności są wygaszane według
   pokrycia pikseli w oknie (długość krawędzi przyciętych do okna / pole mapy) zamiast pomijane jak w LOD canvas.
   20 tys. plików / 60 tys. krawędzi: ~1–2 ms na klatkę (canvas 2D 30–150 ms).
+- **Pamięć analizy w OPFS** (`js/analysis-cache.js`): wyniki analizy plików (metryki, importy, symbole — bez treści)
+  zapamiętane per projekt (gzip, indeks, najwyżej 12 projektów / 200 MB, najstarsze wypadają), unieważniane stemplem
+  wersji zasobów. Niezmieniony plik — ten sam rozmiar i data modyfikacji z dysku albo sha bloba git — nie jest
+  analizowany ani nawet haszowany; zgodny sam rozmiar → worker porównuje skrót treści. Ponowne wczytanie 2800 plików:
+  analiza 2,4 s → 0,05 s (całość 2,6 → 0,2 s); zmiana jednego pliku analizuje tylko ten plik. Ustawienia → Instalacja
+  → „Wyczyść pamięć analizy" (z liczbą projektów i rozmiarem); „Usuń wszystkie dane" też ją czyści.
+- **Analiza w kilku workerach naraz** (do 4, pliki rozdzielone po rozmiarze od największych): pierwsze wczytanie
+  ok. 2,3× szybsze niż w jednym workerze (pomiar: 1 → 5,9 s, 4 → 2,6 s; 8 workerów nie przyspiesza).
 - `tools/bench.mjs` (`npm run bench`): syntetyczne projekty 5k / 20k plików, wczytanie + klatka z wymuszoną
   rasteryzacją dla obu backendów, `--json`, `--summary`, `--max-frame`; krok informacyjny w CI z artefaktem.
-- Krok smoke: demo wymuszone na GPU — piksel w środku węzła ma kolor węzła, hit-test i eksport PNG działają.
+- Kroki smoke: demo wymuszone na GPU — piksel w środku węzła ma kolor węzła, hit-test i eksport PNG działają;
+  pamięć analizy — drugie wczytanie bez analizy i bez workerów, zmieniony plik od nowa, graf identyczny.
 
 ### Zmienione
 - Kamera: `toScreen` bez sklejania klucza z liczb i bez `DOMPoint` (`cam.xf()` = współczynniki jako liczby),

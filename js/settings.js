@@ -66,6 +66,7 @@ CM.Settings = (function(){
     'install.update':'Sprawdź aktualizacje / przeładuj','install.update.hint':'Pobiera najnowszą wersję i odświeża aplikację.',
     'install.uninstall':'Wyczyść pamięć podręczną (offline)','install.uninstall.hint':'Usuwa service workera i pamięć podręczną. Mapy i ustawienia pozostają.',
     'install.uninstall.done':'Wyczyszczono pamięć podręczną offline. Odśwież stronę.',
+    'install.acache':'Wyczyść pamięć analizy','install.acache.hint':'Wyniki analizy plików zapamiętane w przeglądarce (OPFS) — ponowne wczytanie projektu pomija niezmienione pliki. Tylko metryki, importy i nazwy symboli.','install.acache.stat':'Teraz: {n} proj., {mb} MB.','install.acache.done':'Wyczyszczono pamięć analizy.',
     'install.wipe':'Usuń wszystkie dane','install.wipe.hint':'Trwale usuwa migawki, zapisane mapy, mapy myśli, ustawienia i język. Nieodwracalne.',
     'install.wipe.confirm':'Na pewno usunąć WSZYSTKIE dane (migawki, mapy, ustawienia)? Tej operacji nie można cofnąć.',
     'install.wipe.done':'Usunięto wszystkie dane aplikacji.',
@@ -178,6 +179,7 @@ CM.Settings = (function(){
     'install.update':'Check for updates / reload','install.update.hint':'Fetches the latest version and refreshes the app.',
     'install.uninstall':'Clear offline cache','install.uninstall.hint':'Removes the service worker and cache. Maps and settings remain.',
     'install.uninstall.done':'Offline cache cleared. Refresh the page.',
+    'install.acache':'Clear analysis cache','install.acache.hint':'File analysis results kept in the browser (OPFS) — reloading a project skips unchanged files. Only metrics, imports and symbol names.','install.acache.stat':'Now: {n} projects, {mb} MB.','install.acache.done':'Analysis cache cleared.',
     'install.wipe':'Delete all data','install.wipe.hint':'Permanently deletes snapshots, saved maps, mind maps, settings and language. Irreversible.',
     'install.wipe.confirm':'Really delete ALL data (snapshots, maps, settings)? This cannot be undone.',
     'install.wipe.done':'All application data deleted.',
@@ -388,7 +390,7 @@ CM.Settings = (function(){
     const b=el('button',{class:'set-big'+(danger?' danger':''),onclick:fn},
       el('span',{class:'set-big-ic',html:ic.svg(icon,{size:20})}),
       el('span',{class:'set-big-txt'}, el('b',{text:label}), el('span',{class:'set-big-hint',text:hint})));
-    c.appendChild(b);
+    c.appendChild(b); return b;
   }
   function tabInstall(c){
     section(c, t('install.head'), 'install.desc');
@@ -405,6 +407,14 @@ CM.Settings = (function(){
     bigBtn(c,'power',t('install.uninstall'),t('install.uninstall.hint'),async()=>{
       if(handlers.uninstall) await handlers.uninstall(); U.toast(t('install.uninstall.done'),'success',5000);
     });
+    // pamięć analizy plików (OPFS): liczba projektów i rozmiar dopisywane po odczycie indeksu
+    if(CM.AnalysisCache){
+      const b=bigBtn(c,'refresh',t('install.acache'),t('install.acache.hint'),async()=>{
+        await CM.AnalysisCache.clear(); U.toast(t('install.acache.done'),'success'); fill(); });
+      const hint=b.querySelector('.set-big-hint');
+      const fill=()=>CM.AnalysisCache.stats().then(s=>{ if(hint) hint.textContent=t('install.acache.hint')+(s.available?' '+t('install.acache.stat').replace('{n}',s.projects).replace('{mb}',(s.bytes/1048576).toFixed(1)):''); }).catch(()=>{});
+      fill();
+    }
     bigBtn(c,'trash',t('install.wipe'),t('install.wipe.hint'),async()=>{
       if(confirm(t('install.wipe.confirm'))){ if(handlers.clearAllData) await handlers.clearAllData(); U.toast(t('install.wipe.done'),'success'); }
     }, true);

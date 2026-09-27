@@ -230,6 +230,26 @@ const glRes = await evalJs(`(async()=>{ try{
     disp, back:R.activeBackend, hidden:L.canvas.style.display==='none'};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// pamięć analizy w OPFS (faza 6): 80 plików wczytanych dwa razy z tymi samymi datami → drugi raz bez analizy
+// i bez workerów; zmieniony plik analizowany na nowo; te same daty inne, treść ta sama → trafienia po skrócie;
+// graf identyczny jak po pełnej analizie; „wyczyść" usuwa pamięć
+const cacheRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const AC=CM.AnalysisCache; await AC.clear();
+  const mk=(mt, extra)=>Array.from({length:80}, (_,i)=>{ let c="import { h } from './m"+((i+1)%80)+".js';\\nexport function f"+i+"(a){ if(a) return h(a); return "+i+"; }\\n"; if(extra&&i===7) c+=extra;
+    return {path:'src/m'+i+'.js', size:c.length, content:c, mtime:mt}; });
+  const meta={name:'smoke-cache', source:'smoke', kind:'local'};
+  const sig=()=>[...CMApp.graph.nodes.values()].filter(x=>x.type==='file').map(x=>x.path+JSON.stringify(x.metrics)+(x.symbols||[]).map(s=>s.name).join()).sort().join('|')+'#'+CMApp.graph.edges.length;
+  const load=async(files)=>{ await CMApp.loadFiles(files, meta); for(let i=0;i<100&&CMApp.graph.nodes.size<80;i++) await sleep(50); await sleep(100); return Object.assign({}, CM.App._lastAnalysis); };
+  const a1=await load(mk(5)); const s1=sig();
+  for(let i=0;i<40 && !(await AC.stats()).projects;i++) await sleep(100);
+  const a2=await load(mk(5)); const same2=sig()===s1;
+  const a3=await load(mk(9, 'export function nowy(){ return 1; }\\n')); const changed=!!(CMApp.graph.nodes.get('src/m7.js').symbols||[]).find(s=>s.name==='nowy');
+  for(let i=0;i<40;i++){ await sleep(100); }
+  const a4=await load(mk(11)); const same4=sig()===s1;
+  await AC.clear(); const after=await AC.stats();
+  return {a1:a1.hits, a2:[a2.hits, a2.workers], same2, a3:a3.hits, changed, a4:a4.hits, same4, cleared:after.projects===0};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 // deep-linki i publiczne linki (faza 4) BEZ sieci: fetch podstawiony w stronie. #gist= → mapa (adresy z mapy
 // oczyszczone), #v= niesie gist; #share= bez backendu → czytelny błąd, mapa bez zmian; #repo= z podkatalogiem
 // i układem przez podstawione API GitHub; obcy host odrzucony bez żadnego zapytania; „Udostępnij publiczny
@@ -330,6 +350,9 @@ check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitR
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexHits > 0 && ragRes.had && ragRes.localOnly,
   `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
+check(cacheRes && !cacheRes.error && cacheRes.a1 === 0 && cacheRes.a2[0] === 80 && cacheRes.a2[1] === 0 && cacheRes.same2
+  && cacheRes.a3 === 79 && cacheRes.changed && cacheRes.a4 === 79 && cacheRes.same4 && cacheRes.cleared,
+  `pamięć analizy (OPFS): ponowne wczytanie bez analizy, zmieniony plik od nowa, trafienia po skrócie: ${JSON.stringify(cacheRes)}`);
 if (glRes && glRes.skip) console.log('– renderer WebGL: pominięto — przeglądarka bez WebGL2');
 else check(glRes && !glRes.error && glRes.err === 0 && glRes.stats && glRes.stats.nodes > 20 && glRes.close && glRes.hit && glRes.png
   && glRes.disp === 'block' && glRes.back === 'canvas' && glRes.hidden && /backend=webgl/.test(glRes.act),

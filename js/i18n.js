@@ -261,7 +261,7 @@ CM.i18n = (function(){
     "ca.acJoined":"Joined: ","ca.acGists":" gists","ca.acOpenProfile":"Open full profile","ca.acOnHost":" on ",
     "ca.ghRateLimit":"GitHub API rate limit (add a token in the “Load…” dialog).","ca.currentState":"current state",
     "ca.filesSuffix":" files","ca.noMatchingFiles":"No matching files found.","ca.buildingMapPre":"Analyzing and building the map (",
-    "ca.buildingMapPost":" files)…","ca.loadedPre":"Loaded <b>","ca.loadedMid":"</b> files — “","ca.loadedPost":"”.",
+    "ca.buildingMapPost":" files)…","ca.loadedPre":"Loaded <b>","ca.loadedMid":"</b> files — “","ca.loadedPost":"”.","ca.fromCache":" From the analysis cache: ",
     "ca.skippedArchivesPre":"Skipped unsupported archives (RAR/7z etc.): ","ca.skippedArchivesPost":". Unpack them or use ZIP / TAR.",
     "cb.execLang":"Language: ","cb.execTut":"Tutorial started: ","cb.needUrl":"Provide a repository URL (GitHub/GitLab/Bitbucket).",
     "cb.execRepo":"Loading repository: ","cb.execClear":"Project cleared.","cb.execPanel":"Panel ","cb.on":"on","cb.off":"off",

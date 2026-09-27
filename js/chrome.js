@@ -170,6 +170,7 @@
         try{ if(CM.Storage.clearSession) await CM.Storage.clearSession(); }catch(e){}
         try{ indexedDB.deleteDatabase('codemap-db'); }catch(e){}
         try{ indexedDB.deleteDatabase('codemap-drive'); }catch(e){}
+        try{ if(CM.AnalysisCache) await CM.AnalysisCache.clear(); }catch(e){}
         // wipe EVERY app key (settings, mindmaps, snapshots, AI keys, chatbot convs, recents…),
         // not a hardcoded subset that drifts as features are added
         try{

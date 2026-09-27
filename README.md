@@ -79,6 +79,10 @@ Click **“✨ See demo”** or open `index.html#demo`.
   20,000 files with 60,000 edges: ~1–2 ms per frame instead of 30–150 ms on canvas 2D; dense edges fade by their
   on-screen density instead of being dropped. Left panel → Map → *Map rendering* (automatic / Canvas 2D / WebGL);
   without WebGL2 the canvas stays. `npm run bench` measures both on synthetic projects (also in CI).
+- **Fast reloads:** files are analysed in up to 4 Web Workers in parallel, and the results are cached in the browser
+  (OPFS, gzip, per project). Reloading the same folder or repository skips unchanged files — same size and modification
+  time (or git blob sha), otherwise the content hash decides: 2,800 files load in ~0.2 s instead of ~2.6 s. Only metrics,
+  imports and symbol names are stored; Settings → Installation → *Clear analysis cache*.
 - Pan, zoom to cursor, **rotation**, pseudo-3D, minimap, neighborhood radar, `WASD` fly mode, impact view,
   code preview on hover, context menu, command palette (`Ctrl+K`), search (`/`).
 - **PNG** (2×/4×) and **SVG** export, link to the current view (`#v=`).
@@ -241,7 +245,8 @@ js/util.js                 # camera (pan/zoom/rotate/tilt), utilities, CM.VERSIO
 js/icons.js  js/i18n.js    # SVG icons, PL/EN translations
 js/languages.js            # registry of 150+ formats
 js/analysis.js             # metrics, import parsing, dependency resolution
-js/analysis-worker.js      # file analysis (metrics, imports, symbols) in a Web Worker
+js/analysis-worker.js      # file analysis (metrics, imports, symbols) in up to 4 Web Workers
+js/analysis-cache.js       # analysis cache in OPFS: unchanged files (size + mtime / git blob sha, else content hash) are not re-analysed
 js/symbols-core.js  js/symbols.js  js/symbols-worker.js   # symbol graph: tree-sitter in a worker
 js/graph.js                # model: hierarchy, aggregates, collapsing, cycles, impact, (de)serialization, diff
 js/layouts.js              # 13 layouts (+ physics), js/sim-worker.js — Web Worker

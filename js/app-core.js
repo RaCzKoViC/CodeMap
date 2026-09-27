@@ -374,29 +374,78 @@
   // graph.build był jednym synchronicznym blokiem: przy 4000 plikach z treścią UI zamierało na sekundy.
   // Teraz parsowanie idzie do analysis-worker.js (chunki + postęp), a główny wątek składa z wyników
   // tylko strukturę i krawędzie. Bez Workera (file://) — te same kroki chunkami z oddawaniem wątku.
-  function analyzeFiles(files, gen, onProgress){
+  // Kilka workerów naraz (pliki rozdzielone po rozmiarze, najpierw największe) i pamięć analizy w OPFS
+  // (analysis-cache.js): niezmieniony plik — ta sama ścieżka, rozmiar i skrót treści — nie jest parsowany ponownie.
+  // Wynik: Map ścieżka → {metrics, deps, symbols, hash}; `stats` = {workers, hits, total} do paska postępu i testów.
+  async function analyzeFiles(files, gen, onProgress, meta){
     const withContent=files.filter(f=>f&&f.content!=null);
-    if(!withContent.length) return Promise.resolve(new Map());
-    if(!_workerOK) return analyzeInline(withContent, gen, onProgress);
-    return new Promise((resolve)=>{
-      let w; try{ w=new Worker(ANALYSIS_WORKER_URL); }catch(e){ resolve(null); return; }
-      let settled=false;
-      const finish=(v)=>{ if(settled) return; settled=true; try{ w.terminate(); }catch(e){} resolve(v); };
-      w.onerror=(e)=>{ console.warn('analysis worker failed — falling back to main thread', e&&e.message); finish(null); };
-      w.onmessage=(ev)=>{ const d=ev.data||{}; if(d.gen!==gen) return;
-        if(gen!==A._ingestGen){ finish(new Map()); return; }          // anulowane w trakcie
-        if(d.type==='progress'){ if(onProgress) onProgress(d.done, d.total); }
-        else if(d.type==='done'){ const m=new Map(); for(const r of (d.results||[])) if(r&&!r.error) m.set(r.path, r); finish(m); } };
-      w.postMessage({type:'analyze', gen, files:withContent.map(f=>({path:f.path, content:f.content}))});
-    }).then(m=> m || analyzeInline(withContent, gen, onProgress));
+    const st={workers:0, hits:0, total:withContent.length, ms:0}; A._lastAnalysis=st; const t0=performance.now();
+    if(!withContent.length) return new Map();
+    const AC=CM.AnalysisCache; let cache=null;
+    if(AC && meta){ try{ cache=await AC.load(meta, ASSET_V); }catch(e){ cache=null; } }
+    const norm=CM.Analysis.normPath;
+    // tożsamość pliku: sha bloba git (repozytorium) albo data modyfikacji z dysku; zgodna tożsamość + rozmiar =
+    // trafienie od razu, bez liczenia skrótu (73 MB treści to ~1 s na głównym wątku); zgodny sam rozmiar —
+    // plik idzie do workera razem z zapamiętanym wynikiem, a ten porównuje skrót treści (np. po git checkout)
+    const idOf=(f)=>f.sha?'g'+f.sha:(f.mtime>0?'t'+f.mtime:'');
+    const res=new Map(), ids=new Map(); let todo=withContent;
+    if(cache){ todo=[];
+      for(const f of withContent){ const p=norm(f.path), c=p&&cache.get(p), id=idOf(f); if(p) ids.set(p, id);
+        if(c && c.s===f.content.length && id && c.i===id){ res.set(p,{path:p, metrics:c.m, deps:c.d, symbols:c.y, hash:c.h, hit:1}); st.hits++; continue; }
+        todo.push(c && c.s===f.content.length ? {path:f.path, content:f.content, cached:c} : f); } }
+    else for(const f of withContent){ const p=norm(f.path); if(p) ids.set(p, idOf(f)); }
+    if(todo.length){
+      const base=st.hits, prog=onProgress?(d)=>onProgress(base+d, withContent.length):null;
+      let r=null;
+      if(_workerOK) r=await analyzeInWorkers(todo.map(f=>({path:f.path, content:f.content, cached:f.cached})), gen, prog, st);
+      if(!r) r=await analyzeInline(todo, gen, prog);
+      for(const [p,x] of r){ res.set(p,x); if(x.hit) st.hits++; }
+    }
+    st.ms=Math.round(performance.now()-t0);
+    // zapis pamięci w tle (nie blokuje budowania mapy); tylko gdy coś przeanalizowano od nowa
+    if(AC && meta && gen===A._ingestGen && todo.length){
+      const sizes=new Map(); for(const f of withContent){ const p=norm(f.path); if(p) sizes.set(p, f.content.length); }
+      const go=()=>AC.save(meta, ASSET_V, res, sizes, ids).catch(()=>{});
+      if(window.requestIdleCallback) requestIdleCallback(go, {timeout:1500}); else setTimeout(go, 500);
+    }
+    return res;
   }
-  async function analyzeInline(files, gen, onProgress){
+  function analyzeInWorkers(jobs, gen, onProgress, st){
+    const cores=Math.max(1, (navigator.hardwareConcurrency||2)-1);
+    const bytes=jobs.reduce((a,j)=>a+j.content.length, 0);
+    // pomiar (1000 plików, 64 MB): 1 worker 5,3 s, 4 — 2,4 s, 8 — 2,6 s (start i przepustowość pamięci) → najwyżej 4
+    const K=Math.max(1, Math.min(cores, 4, Math.ceil(jobs.length/120), Math.ceil(bytes/400000)));
+    // najpierw największe, każdy do najmniej obciążonego workera (LPT) — równy czas pracy
+    const buckets=Array.from({length:K}, ()=>({load:0, files:[]}));
+    for(const j of jobs.slice().sort((a,b)=>b.content.length-a.content.length)){
+      let b=buckets[0]; for(const x of buckets) if(x.load<b.load) b=x;
+      b.files.push(j); b.load+=j.content.length; }
+    st.workers=K;
+    return new Promise((resolve)=>{
+      const ws=[], done=new Array(K).fill(0), out=new Map(); let left=K, settled=false;
+      const finish=(v)=>{ if(settled) return; settled=true; for(const w of ws){ try{ w.terminate(); }catch(e){} } resolve(v); };
+      for(let i=0;i<K;i++){
+        let w; try{ w=new Worker(ANALYSIS_WORKER_URL); }catch(e){ finish(null); return; }
+        ws.push(w);
+        w.onerror=(e)=>{ console.warn('analysis worker failed — falling back to main thread', e&&e.message); finish(null); };
+        w.onmessage=(ev)=>{ const d=ev.data||{}; if(d.gen!==gen) return;
+          if(gen!==A._ingestGen){ finish(new Map()); return; }          // anulowane w trakcie
+          if(d.type==='progress'){ done[i]=d.done; if(onProgress) onProgress(done.reduce((a,b)=>a+b,0), jobs.length); }
+          else if(d.type==='done'){ for(const r of (d.results||[])) if(r&&!r.error) out.set(r.path, r);
+            if(--left===0) finish(out); } };
+        w.postMessage({type:'analyze', gen, files:buckets[i].files});
+      }
+    });
+  }
+  async function analyzeInline(files, gen, onProgress){   // pliki z `cached` — jak w workerze: ten sam skrót = bez parsowania
     const An=CM.Analysis, L=CM.languages; const m=new Map(); const CHUNK=40;
     for(let i=0;i<files.length;i+=CHUNK){
       if(gen!==A._ingestGen) return m;
       for(const f of files.slice(i,i+CHUNK)){
         const path=An.normPath(f.path); if(!path) continue; const info=L.lookup(An.basename(path)); if(!info.text) continue;
-        const r=An.analyzeFile(f.content, info.key); m.set(path,{path, metrics:r.metrics, deps:r.deps, symbols:r.symbols, hash:U.hashString(f.content)});
+        const hash=U.hashString(f.content), c=f.cached;
+        if(c && c.s===f.content.length && c.h===hash){ m.set(path,{path, metrics:c.m, deps:c.d, symbols:c.y, hash, hit:1}); continue; }
+        const r=An.analyzeFile(f.content, info.key); m.set(path,{path, metrics:r.metrics, deps:r.deps, symbols:r.symbols, hash});
       }
       if(onProgress) onProgress(Math.min(i+CHUNK,files.length), files.length);
       await tick();
@@ -414,7 +463,7 @@
       if(!files || !files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return; }
       setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
       if(gen!==A._ingestGen) return;
-      const pre=await analyzeFiles(files, gen, (done,total)=>{ setLoadingText(I.t('ca.analyzingPre','Analiza plików ')+done+' / '+total+'…'); });
+      const pre=await analyzeFiles(files, gen, (done,total)=>{ setLoadingText(I.t('ca.analyzingPre','Analiza plików ')+done+' / '+total+'…'); }, meta);
       if(gen!==A._ingestGen) return;
       setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
       if(gen!==A._ingestGen) return;
@@ -432,7 +481,8 @@
       select(null);
       apply({refit:true});
       if(meta.html && /^(github|gitlab|bitbucket)$/.test(meta.kind||'')) A.pushRecentRepo(meta);
-      U.toast(I.t('ca.loadedPre','Wczytano <b>')+U.fmtNum(files.length)+I.t('ca.loadedMid','</b> plików — „')+meta.name+I.t('ca.loadedPost','".'),'success');
+      const la=A._lastAnalysis, cached=la&&la.hits?I.t('ca.fromCache',' Z pamięci analizy: ')+U.fmtNum(la.hits)+'.':'';
+      U.toast(I.t('ca.loadedPre','Wczytano <b>')+U.fmtNum(files.length)+I.t('ca.loadedMid','</b> plików — „')+meta.name+I.t('ca.loadedPost','".')+cached,'success');
       // (AI no longer runs automatically on load — view tuning is purely the local heuristic autoTuneView())
       if(filters.symbols) ensureSymbols();   // graf symboli był włączony → policz dla nowego projektu (w tle)
       runProjectHooks('ingest');

@@ -79,6 +79,11 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   nad nią. 20 000 plików i 60 000 krawędzi: ~1–2 ms na klatkę zamiast 30–150 ms w canvas 2D; gęste krawędzie są
   wygaszane według gęstości na ekranie zamiast pomijane. Lewy panel → Mapa → *Rysowanie mapy* (automatycznie / Canvas 2D /
   WebGL); bez WebGL2 zostaje canvas. `npm run bench` mierzy oba na syntetycznych projektach (także w CI).
+- **Szybkie ponowne wczytanie:** pliki są analizowane równolegle w maks. 4 Web Workerach, a wyniki zapamiętane
+  w przeglądarce (OPFS, gzip, per projekt). Ponowne wczytanie tego samego folderu albo repozytorium pomija niezmienione
+  pliki — ten sam rozmiar i data modyfikacji (albo sha bloba git), w razie wątpliwości decyduje skrót treści: 2800 plików
+  w ~0,2 s zamiast ~2,6 s. Zapisywane są tylko metryki, importy i nazwy symboli; Ustawienia → Instalacja →
+  *Wyczyść pamięć analizy*.
 - Pan, zoom do kursora, **obrót**, pseudo-3D, minimapa, radar okolicy, tryb lotu `WASD`, widok wpływu,
   podgląd kodu po najechaniu, menu kontekstowe, paleta poleceń `Ctrl+K`, wyszukiwarka `/`.
 - Eksport **PNG** (2×/4×) i **SVG**, link do bieżącego widoku (`#v=`).
@@ -239,7 +244,8 @@ js/util.js                 # kamera (pan/zoom/obrót/tilt), narzędzia, CM.VERSI
 js/icons.js  js/i18n.js    # ikony SVG, tłumaczenia PL/EN
 js/languages.js            # rejestr 150+ formatów
 js/analysis.js             # metryki, parsowanie importów, rozwiązywanie zależności
-js/analysis-worker.js      # analiza plików (metryki, importy, symbole) w Web Workerze
+js/analysis-worker.js      # analiza plików (metryki, importy, symbole) w maks. 4 Web Workerach
+js/analysis-cache.js       # pamięć analizy w OPFS: niezmienione pliki (rozmiar + data / sha bloba, inaczej skrót treści) bez ponownej analizy
 js/symbols-core.js  js/symbols.js  js/symbols-worker.js   # graf symboli: tree-sitter w workerze
 js/graph.js                # model: hierarchia, agregaty, zwijanie, cykle, wpływ, (de)serializacja, diff
 js/layouts.js              # 13 układów (+ fizyka), js/sim-worker.js — Web Worker

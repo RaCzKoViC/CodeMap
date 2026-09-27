@@ -107,7 +107,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   wygaszanie gęstych krawędzi zamiast LOD; 20 tys. plików / 60 tys. krawędzi ~1–2 ms na klatkę. Szybsza kamera
   (`cam.xf`) przyspieszyła też canvas 2D ~2×. POZOSTAŁO: etykiety na GPU (atlas glifów) i hit-test z siatką
   przestrzenną dla 100 tys.+ węzłów; łagodniejsze auto-odchudzanie widoku (>1200 węzłów) przy aktywnym GPU.
-- Cache analizy w OPFS (szybkie ponowne wczytanie tego samego projektu).
+- [x] Pamięć analizy w OPFS (`js/analysis-cache.js`) + analiza w maks. 4 workerach: ponowne wczytanie 2800 plików
+  0,2 s zamiast 2,6 s, pierwsze ~2,3× szybsze. POZOSTAŁO: pamięć także dla wyników tree-sittera (graf symboli).
 - [x] Benchmarki w CI (`tools/bench.mjs`: wczytanie + klatka canvas/WebGL na syntetycznych 5k/20k plików, tabela
   w podsumowaniu, JSON jako artefakt). POZOSTAŁO: prawdziwe repozytoria i próg regresji porównywany z bazą.
 
