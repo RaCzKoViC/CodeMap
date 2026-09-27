@@ -1,5 +1,6 @@
-# CI: składnia, testy jednostkowe czystych modułów, ESLint, smoke w headless Chrome
-# oraz audyt zależności backendu. Bez kroku budowania — aplikacja jest statyczna.
+# CI: składnia, testy jednostkowe czystych modułów, ESLint, smoke w headless Chrome,
+# audyt zależności backendu oraz analiza CodeMap samego repozytorium (akcja z tego repo).
+# Bez kroku budowania — aplikacja jest statyczna.
 name: CI
 
 on:
@@ -52,3 +53,28 @@ jobs:
           cat server.log
           test "$ok" = "1"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/server/.env)" = "404"
+
+  # CodeMap na własnym kodzie przez akcję z tego repozytorium (action.yml): raport w podsumowaniu kroku,
+  # SARIF i Markdown jako artefakt. BEZ progów — repozytorium ma dziś niski health score (duplikaty,
+  # złożone pliki), więc job niczego nie blokuje; SARIF nie jest wysyłany do code scanning.
+  codemap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # pełna historia git → hotspoty zmian, bus factor
+      - id: codemap
+        uses: ./
+        with:
+          sarif: codemap.sarif
+          markdown: codemap.md
+      - name: Wynik
+        run: echo "CodeMap health score ${{ steps.codemap.outputs.score }}/100, znalezisk ${{ steps.codemap.outputs.findings }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codemap-report
+          path: |
+            codemap.sarif
+            codemap.md
+          if-no-files-found: warn

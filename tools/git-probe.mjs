@@ -5,10 +5,14 @@
 //   node tools/git-probe.mjs [ścieżka-repo] [max] [ref]  (domyślnie: repozytorium CodeMap, 2000, HEAD)
 // Eksportuje też pomocników dla test/git-local.test.mjs.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync, statSync, openAsBlob } from 'node:fs';
-import { join, resolve, isAbsolute, relative, sep } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
+import { findGitDir, readGitFiles } from '../cli/gitdir.mjs';
+
+// odczyt katalogu .git z dysku jest wspólny z CLI (cli/gitdir.mjs); tu tylko re-eksport dla testów
+export { findGitDir, readGitFiles };
 
 export const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 
@@ -25,43 +29,6 @@ export function git(cwd, args, { env = {}, input } = {}) {
 const devNull = () => (process.platform === 'win32' ? 'NUL' : '/dev/null');
 export function gitAvailable() {
   try { return spawnSync('git', ['--version']).status === 0; } catch { return false; }
-}
-
-/** Katalog .git repozytorium: zwykły katalog albo plik `gitdir:` (worktree/submoduł) + `commondir`. */
-export function findGitDir(repo) {
-  const dotgit = join(repo, '.git');
-  if (!existsSync(dotgit)) return null;
-  if (statSync(dotgit).isDirectory()) return { gitDir: dotgit, commonDir: dotgit };
-  const m = /^gitdir:\s*(.+?)\s*$/m.exec(readFileSync(dotgit, 'utf8'));
-  if (!m) return null;
-  const gitDir = isAbsolute(m[1]) ? m[1] : resolve(repo, m[1]);
-  const cd = join(gitDir, 'commondir');
-  const commonDir = existsSync(cd) ? resolve(gitDir, readFileSync(cd, 'utf8').trim()) : gitDir;
-  return { gitDir, commonDir };
-}
-
-function* walk(dir, base = dir) {
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) yield* walk(p, base);
-    else if (e.isFile()) yield relative(base, p).split(sep).join('/');
-  }
-}
-// katalogi, których czytnik nie potrzebuje (drzewa robocze, submoduły, logi, hooki)
-const SKIP_TOP = new Set(['worktrees', 'modules', 'logs', 'hooks', 'lfs']);
-
-/** Pliki katalogu .git jako [{path, file}] — jak loader przeglądarki. lazy: Blob z pliku (fs.openAsBlob). */
-export async function readGitFiles(repo, { lazy = false } = {}) {
-  const loc = findGitDir(repo);
-  if (!loc) return null;
-  const blob = async (p) => (lazy ? openAsBlob(p) : new Blob([readFileSync(p)]));
-  const out = new Map();
-  for (const rel of walk(loc.commonDir)) {
-    if (SKIP_TOP.has(rel.split('/')[0])) continue;
-    out.set(rel, join(loc.commonDir, rel));
-  }
-  if (loc.gitDir !== loc.commonDir) out.set('HEAD', join(loc.gitDir, 'HEAD'));   // worktree: własny HEAD, reszta wspólna
-  return Promise.all([...out].map(async ([path, p]) => ({ path, file: await blob(p) })));
 }
 
 /** js/git-local.js w świeżym kontekście vm (jak w workerze: self.CM, bez DOM). */

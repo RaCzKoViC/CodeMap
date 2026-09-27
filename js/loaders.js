@@ -644,5 +644,5 @@ CM.Loaders = (function(){
     const j=await r.json(); return {url:j.html_url, id:j.id};
   }
 
-  return {resolveSide, RE_COVERAGE, fromFileList, fromDrop, fromDataTransfer, fromGitHub, fromGitLab, fromBitbucket, fromRepoURL, repoHost, parseSource, isTextFile, shouldSkip, fetchRefs, fetchTreeSig, ghRateLimit, createGist, mistralChat, mistralStream};
+  return {TEXT_SIZE_LIMIT, MAX_CONTENT_FILES, resolveSide, RE_COVERAGE, fromFileList, fromDrop, fromDataTransfer, fromGitHub, fromGitLab, fromBitbucket, fromRepoURL, repoHost, parseSource, isTextFile, shouldSkip, fetchRefs, fetchTreeSig, ghRateLimit, createGist, mistralChat, mistralStream};
 })();

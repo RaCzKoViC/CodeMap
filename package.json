@@ -12,14 +12,19 @@
   "engines": {
     "node": ">=20.6"
   },
+  "bin": {
+    "codemap": "cli/codemap.mjs"
+  },
   "scripts": {
+    "cli": "node cli/codemap.mjs",
+    "cli-smoke": "node cli/codemap.mjs analyze . --quiet --exclude .claude",
     "check": "node tools/check.mjs",
     "test": "node --test \"test/**/*.test.mjs\"",
     "lint": "eslint .",
     "smoke": "node tools/smoke.mjs",
     "bump": "node tools/bump.mjs",
     "serve": "python serve.py",
-    "verify": "npm run check && npm test && npm run lint && npm run symbols-probe && npm run git-probe",
+    "verify": "npm run check && npm test && npm run lint && npm run symbols-probe && npm run git-probe && npm run cli-smoke",
     "symbols-probe": "node tools/symbols-probe.mjs",
     "git-probe": "node tools/git-probe.mjs"
   },
