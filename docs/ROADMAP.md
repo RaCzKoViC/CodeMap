@@ -125,7 +125,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] Trasy po kodzie (`js/tour.js`): automatyczne albo z modelu (tylko struktura), odtwarzacz na mapie, zapis w mapie,
   link `#tour=`, eksport / import VS Code CodeTour.
 
-## Faza 8 — jakość własna i społeczność
+## Faza 8 — jakość własna i społeczność — WYKONANA 2026-09-27 (v1.4.0; zostało: publikacja w npm — konto właściciela)
 
 - Własny health score CodeMap (29/100 na kopii z GitHuba: duplikaty, złożone pliki bez testów, bardzo długie
   pliki): podział [x] `chatbot.js` / [x] `settings.js` / [x] `mindmap.js`, [x] testy renderera i ChatBota, [x] usunięcie

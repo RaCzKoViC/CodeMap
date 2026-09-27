@@ -5,6 +5,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-09-27
+
+Jakość własna i bezpieczeństwo (faza 8): egzekwowane CSP, SRI, podział trzech największych plików, testy renderera
+i ChatBota, dług z faz 1–3; galeria przykładów, paczka npm CLI; wybór PR z listy (faza 5) — [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ### Dodane — Faza 5 (dokończenie)
 - **Wybór PR z listy**: okno „Przegląd PR…" pokazuje otwarte pull / merge requesty repozytorium (`GitRemote.listPRs` — GitHub,
   GitLab, Bitbucket, jedno zapytanie, najświeższe pierwsze) z autorem, czasem i oznaczeniem szkicu; kliknięcie uruchamia
