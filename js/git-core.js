@@ -60,6 +60,22 @@ CM.GitCore = (function(){
     });
   }
 
+  // ścieżki git są względem korzenia repozytorium, a mapa bywa zbudowana z folderem korzenia na początku
+  // (przeciągnięty folder: „Projekt/src/x.js"). Zwraca prefiks „Projekt/", jeśli z nim dopasowuje się więcej
+  // ścieżek z historii niż bez niego; inaczej ''.
+  function detectPrefix(commits, mapPaths){
+    const paths=[...mapPaths]; if(!paths.length) return '';
+    const first=paths[0].split('/')[0]; if(!first || paths[0]===first) return '';
+    const pre=first+'/'; if(!paths.every(p=>p.startsWith(pre))) return '';
+    const set=new Set(paths); let plain=0, pref=0, k=0;
+    outer: for(const c of commits||[]) for(const f of (c.files||[])){ if(set.has(f.path)) plain++; if(set.has(pre+f.path)) pref++; if(++k>=4000) break outer; }
+    return pref>plain?pre:'';
+  }
+  function prefixPaths(commits, pre){
+    if(!pre) return commits;
+    return commits.map(c=>Object.assign({}, c, {files:(c.files||[]).map(f=>{ const g=Object.assign({}, f, {path:pre+f.path}); if(f.from!=null) g.from=pre+f.from; return g; })}));
+  }
+
   // ---------------- analiza ----------------
   // currentPaths: ścieżki plików na mapie (względem jej korzenia). opts: {maxTimeline=3000, maxEventsPerCommit=300}
   function analyze(commits, currentPaths, opts){
@@ -237,6 +253,6 @@ CM.GitCore = (function(){
 
   function initials(name){ const p=normName(name).split(' ').filter(Boolean); return ((p[0]||'?')[0]+(p.length>1?p[p.length-1][0]:(p[0]||'')[1]||'')).toUpperCase(); }
 
-  return {analyze, identities, rebase, busFactor, busFactorFor, hotspotScore, births, timelineFromSnapshots, applyToGraph, folderStats,
+  return {analyze, identities, rebase, detectPrefix, prefixPaths, busFactor, busFactorFor, hotspotScore, births, timelineFromSnapshots, applyToGraph, folderStats,
     initials, normName, loginFromEmail, isBot, ST_CODE, ST_CHAR, RECENT_DAYS};
 })();

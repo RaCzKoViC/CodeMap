@@ -63,7 +63,7 @@ Publikacja:
 - [x] Wyszukiwanie w treści plików z wynikami na mapie (narzędzie ChatBota `/findText`; POZOSTAŁO: pole w UI i regex); parsery Swift/Dart/Elixir/Lua/Zig/Haskell/Shell (Kotlin/Scala już w rodzinie Java).
 - [x] Eksport DOT / GraphML / Mermaid (`js/export.js`, menu Projekt, paleta Ctrl+K, akcja ChatBota `exportGraph`).
 
-## Faza 3 — inteligencja git — W TOKU 2026-09-27
+## Faza 3 — inteligencja git — WYKONANA 2026-09-27 (zostały drobne: rename z edycją — podobieństwo treści, reftable / SHA-256, Go `coverage.out`)
 
 - [x] Hotspoty churn × złożoność — z lokalnego `.git` (czytnik obiektów i paczek w przeglądarce) albo z API
   GitHub/GitLab/Bitbucket (lista commitów + zmienione pliki per commit w budżecie limitu, zamiast
@@ -71,7 +71,10 @@ Publikacja:
 - [x] Ownership per plik i bus factor (projekt i folder); awatary / inicjały właścicieli na węzłach.
 - [x] Suwak czasu: animowana ewolucja z historii git albo z migawek (Gource-lite: pojawianie się plików,
   poświata zmian w kolorze autora, etykiety autorów).
-- [ ] Mapowanie testów do kodu (`*.test`/`*.spec` → podmiot) i nakładka pokrycia z lcov.
+- [x] Mapowanie testów do kodu (nazwa, ścieżki lustrzane, importy; kilkanaście języków) i nakładka pokrycia
+  z lcov / Istanbul / Cobertura / JaCoCo / Clover (`js/testmap.js`, `js/tests-ui.js`).
+- [x] Dodatkowo: czytnik lokalnego `.git` w przeglądarce (`js/git-local.js`, sonda zgodności z `git log`),
+  kolorowanie węzłów wg danych (`js/overlays.js`), reguły Inspect „hotspoty zmian" i „wiedza w jednej głowie".
 
 ## Faza 4 — ekosystem
 

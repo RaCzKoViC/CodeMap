@@ -7,7 +7,13 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 Fazy 2 i 3 planu rozwoju — głębsza analiza i inteligencja git ([docs/ROADMAP.md](docs/ROADMAP.md)).
 
-### Dodane — Faza 3 (historia git)
+### Dodane — Faza 3 (historia git, testy i pokrycie)
+- **Czytnik lokalnego `.git` w przeglądarce** (`js/git-local.js` + `js/git-worker.js`, bez zależności): HEAD i refy
+  (luźne, `packed-refs`, tagi adnotowane), obiekty luźne i paczki (`.idx` v1/v2 z offsetami 64-bit, OFS_DELTA,
+  REF_DELTA), czytanie wycinkami `Blob.slice` (paczki nie są ładowane w całości), LRU zdekodowanych obiektów,
+  historia w kolejności `git log` z diffem drzew i dokładnym wykrywaniem zmian nazw, płytkie klony,
+  anulowanie; w Web Workerze z przejściem na wątek główny. Zgodność z `git log` sprawdza `tools/git-probe.mjs`
+  (w `npm run verify`); 2000 commitów dużego repozytorium ≈ 1 s.
 - **Historia git** (`js/git-core.js`, `js/git-remote.js`, `js/git.js`): folder wczytany razem z katalogiem
   `.git` jest analizowany sam, lokalnie i bez sieci; repozytorium z GitHub / GitLab / Bitbucket — na żądanie
   (Projekt → Historia git) przez API hostingu, z oszczędzaniem limitu zapytań (pliki dla najnowszych commitów,
@@ -25,6 +31,15 @@ Fazy 2 i 3 planu rozwoju — głębsza analiza i inteligencja git ([docs/ROADMAP
   zmienione świecą kolorem autora, nad nimi etykiety autorów z promieniami; odtwarzanie 0,5×–40×, suwak;
   bez historii git — oś czasu z migawek projektu.
 - ChatBot: `gitHistory`, `owners {query?}`, `busFactor {query?}`, `churn {n?}`, `timeline {action}`, `colorBy`.
+- Inspect: reguły „hotspoty zmian" (zmiany × złożoność, górne 10 %) i „wiedza w jednej głowie" (≥ 90 % zmian
+  złożonego, często zmienianego pliku od jednej osoby; projekty z ≥ 2 autorami).
+- **Testy ↔ kod i pokrycie** (`js/testmap.js`, `js/tests-ui.js`): mapowanie testów do kodu po nazwie (także
+  ścieżki lustrzane `test/` ↔ `src/`, `src/test/java` ↔ `src/main/java`) i po importach, dla kilkunastu języków;
+  krawędzie „Testy (test → kod)". Pokrycie z lcov, Istanbul (`coverage-final.json` i `coverage-summary.json`),
+  Cobertura, JaCoCo i Clover — automatycznie z `coverage/`, z menu „Projekt → Wczytaj pokrycie testów" albo przez
+  upuszczenie raportu na mapę. Nakładki „Testy" i „Pokrycie", sekcja „Testy i pokrycie" w panelu szczegółów,
+  niepokryte linie w podglądzie pliku, reguły Inspect „złożone pliki bez testów" i „niskie pokrycie testami",
+  akcje ChatBota `tests`, `coverage`, `loadCoverage`; dwa pliki testowe w demo.
 - Loader przekazuje „pliki boczne" (uchwyty katalogu `.git` i raportów pokrycia, także z pomijanego
   `coverage/`) bez ich czytania; historia i dane git zapisują się w pliku mapy.
 

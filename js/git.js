@@ -25,7 +25,7 @@
     'ov.others':'others','ov.noHistory':'no history','ov.churnNote':'Commits that changed the file (renames followed).',
     'ov.hotspotNote':'Frequently changed AND complex files — refactoring pays off most here.','ov.ageNote':'Date of the last commit touching the file.',
     'ov.ownerNote':'Author with the most changes in the file (bots skipped). Click a name to highlight their files.',
-    'git.section':'Git history','git.changes':'changes','git.recent':'last 90 days','git.last':'last change','git.born':'created',
+    'git.section':'Git history','git.srcLocal':'local .git','git.changes':'changes','git.recent':'last 90 days','git.last':'last change','git.born':'created',
     'git.owner':'Owner','git.authors':'Authors','git.busFactor':'Bus factor','git.busHint':'How many people would have to leave before more than half of the files lose everyone who knows them.',
     'git.noFileHistory':'No changes to this file in the analysed history.','git.commits':'commits','git.files':'files','git.run':'Analyse git history',
     'git.runLocal':'Reads the local .git directory — nothing leaves your device.','git.runRemote':'Uses the repository host API (commit lists + changed files).',
@@ -88,6 +88,7 @@
       if(my!==gen || g!==A.graph) return null;
       let commits=r.commits||[]; if(meta.sub && src!=='local') commits=GC.rebase(commits, meta.sub);
       const paths=[...fileMap(g).keys()];
+      const pre=GC.detectPrefix(commits, paths); if(pre) commits=GC.prefixPaths(commits, pre);   // „Projekt/…" na mapie
       const res=GC.analyze(commits, paths);
       const st=r.stats||{};
       const hit=GC.applyToGraph(g, res, {source:src, head:r.head||null, truncated:!!st.truncated, listed:st.listed||commits.length,
@@ -368,7 +369,8 @@
       return sec;
     }
     const cols=authorColors(gi), au=gi.authors;
-    const sec=el('div',{class:'det-section git-card'}, el('h5',{}, T('git.section','Historia git'), el('span',{class:'muted',text:gi.source})));
+    const SRC={local:T('git.srcLocal','lokalny .git'), github:'GitHub API', gitlab:'GitLab API', bitbucket:'Bitbucket API'};
+    const sec=el('div',{class:'det-section git-card'}, el('h5',{}, T('git.section','Historia git'), el('span',{class:'muted git-src',text:SRC[gi.source]||gi.source})));
     const tags=el('div',{});
     tags.appendChild(el('span',{class:'tag',text:U.fmtNum(gi.commits)+' '+T('git.commits','commitów')}));
     tags.appendChild(el('span',{class:'tag',text:U.fmtNum(au.filter(a=>!a.bot).length)+' '+T('git.authors','autorów').toLowerCase()}));

@@ -39,6 +39,9 @@ CM.Inspect = (function(){
     'r.untested':'Złożone pliki bez testów','r.untested.d':'Pliki kodu o złożoności ≥ 15 albo ≥ 200 liniach, do których nie prowadzi żaden test (ani po nazwie, ani po importach). Reguła działa tylko w projektach z plikami testowymi.',
     'r.lowcov':'Niskie pokrycie testami','r.lowcov.d':'Pliki o złożoności ≥ 10 z pokryciem linii poniżej 50 % według wczytanego raportu (lcov / Istanbul / Cobertura / JaCoCo / Clover).',
     'covPct':'pokrycie {p} % ({lh}/{lf} linii)',
+    'r.gitHotspot':'Hotspoty zmian (historia git)','r.gitHotspot.d':'Pliki jednocześnie często zmieniane i złożone (zmiany × złożoność, górne 10 %) — tu kumulują się błędy i koszt każdej zmiany; najlepsi kandydaci do refaktoryzacji.',
+    'r.silo':'Wiedza w jednej głowie (historia git)','r.silo.d':'Złożone, często zmieniane pliki, w których ≥ 90 % zmian pochodzi od jednej osoby — jej nieobecność zatrzymuje pracę nad nimi. Reguła działa w projektach z co najmniej dwoma autorami.',
+    'gitHot':'{c} zmian × złożoność {cx}','silo':'{who}: {s} % z {c} zmian',
   },
   en:{
     'title':'Static analysis',
@@ -70,6 +73,9 @@ CM.Inspect = (function(){
     'r.untested':'Complex files without tests','r.untested.d':'Code files with complexity ≥ 15 or ≥ 200 lines that no test reaches (neither by name nor by imports). Only checked in projects that have test files.',
     'r.lowcov':'Low test coverage','r.lowcov.d':'Files with complexity ≥ 10 and line coverage below 50 % according to the loaded report (lcov / Istanbul / Cobertura / JaCoCo / Clover).',
     'covPct':'coverage {p} % ({lh}/{lf} lines)',
+    'r.gitHotspot':'Change hotspots (git history)','r.gitHotspot.d':'Files that are both changed often and complex (changes × complexity, top 10 %) — bugs and the cost of every change pile up here; the best refactoring candidates.',
+    'r.silo':'Knowledge in one head (git history)','r.silo.d':'Complex, frequently changed files where ≥ 90 % of changes come from one person — their absence stalls work on them. Checked in projects with at least two authors.',
+    'gitHot':'{c} changes × complexity {cx}','silo':'{who}: {s} % of {c} changes',
   }};
   function t(k,sub){ const l=I.getLang(); const d=STR[l]||STR.pl; let s=(d&&k in d)?d[k]:(STR.pl[k]||k); if(sub) for(const p in sub) s=s.replace('{'+p+'}',sub[p]); return s; }
 
@@ -156,6 +162,21 @@ CM.Inspect = (function(){
     for(const f of lowcov){ const c=f.coverage;
       add(F,'lowcov', c.pct<20?'med':'low', f, t('covPct',{p:String(c.pct).replace('.', I.getLang()==='en'?'.':','), lh:c.lh, lf:c.lf})+' · CC≈'+(f.metrics.complexity||0)); }
 
+    // ---- historia git (CM.GitCore): hotspoty zmian i „wiedza w jednej głowie" ----
+    const gi=graph.gitInfo;
+    if(gi && CM.GitCore){ try{
+      const withGit=files.filter(f=>f.git&&f.git.c&&f.metrics);
+      const scored=withGit.map(f=>[f, CM.GitCore.hotspotScore(f)]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+      const cut=scored.length?scored[Math.min(scored.length-1, Math.floor(scored.length*0.1))][1]:Infinity;
+      for(const [f,s] of scored){ if(s<cut || f.git.c<5 || (f.metrics.complexity||0)<15) continue;
+        add(F,'gitHotspot', s>=cut*3?'med':'low', f, t('gitHot',{c:f.git.c, cx:f.metrics.complexity||0})); }
+      const humans=(gi.authors||[]).filter(a=>!a.bot).length;
+      if(humans>=2) for(const f of withGit){ const g=f.git, cx=f.metrics.complexity||0;
+        if(g.own==null || g.share<0.9 || g.c<5 || (cx<20 && (f.metrics.lines||0)<300)) continue;
+        const who=(gi.authors[g.own]||{}).name||'?';
+        add(F,'silo','low',f, t('silo',{who, s:Math.round(g.share*100), c:g.c})); }
+    }catch(e){} }
+
     // ---- folder rules ----
     for(const fd of folders){
       const depth=(fd.path||'').split('/').filter(Boolean).length;
@@ -210,7 +231,7 @@ CM.Inspect = (function(){
     // ---- health score: 100 minus severity-weighted density ----
     let penalty=0; for(const f of F.values()) penalty+=SEV_W[f.sev]*f.count;
     const score=Math.max(0, Math.round(100 - 100*penalty/(penalty + 3*N)));
-    const order=['archviolation','cycles','god','unstable','fanout','huge','complex','lowcov','untested','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+    const order=['archviolation','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
     const findings=[...F.values()].sort((a,b)=>order.indexOf(a.rule)-order.indexOf(b.rule));
     return {findings, score, files:files.length, ms:Math.round(performance.now()-t0)};
   }

@@ -367,6 +367,7 @@ body.light .code-preview,body.light .fv-codewrap{background:#0d1320;color:#aebac
 .git-pill .gp-x{background:none;border:0;color:inherit;font-size:16px;line-height:1;cursor:pointer;opacity:.7;padding:0 2px}
 .git-pill .gp-x:hover{opacity:1}
 .git-card .tag{margin:0 4px 4px 0}
+.git-card h5 .git-src{text-transform:none;letter-spacing:0;font-weight:500}
 .git-authors{margin-top:6px}
 .git-authors .bar-row .bl{display:flex;align-items:center;gap:6px;min-width:0}
 .git-an span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

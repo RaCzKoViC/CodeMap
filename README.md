@@ -19,6 +19,10 @@
 |:---:|:---:|
 | [![Graf symboli: funkcje pliku symbols-core.js i ich wywołania, panel szczegółów symbolu](docs/screenshot-symbols.png)](docs/screenshot-symbols.png) | [![ChatBot: wyniki /stats i /topFiles oraz lista narzędzi po wpisaniu /](docs/screenshot-chatbot.png)](docs/screenshot-chatbot.png) |
 
+| Historia git z lokalnego `.git`: częstość zmian, oś czasu, autorzy, testy ↔ kod |
+|:---:|
+| [![Oś czasu historii git: pliki zmienione w ostatnich commitach świecą, etykieta autora z promieniami do plików, kolorowanie wg częstości zmian, zielone krawędzie test → kod](docs/screenshot-git.png)](docs/screenshot-git.png) |
+
 <sub>Zrzuty przedstawiają samo repozytorium CodeMap wczytane jako projekt; odtwarza je `node tools/screenshots.mjs`.</sub>
 
 ---
@@ -83,6 +87,15 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   języka, złożoności i daty modyfikacji; legenda z licznikami, klik podświetla pliki.
 - **Oś czasu** — animowana ewolucja projektu (Gource-lite): pliki pojawiają się w kolejności powstania,
   zmiany świecą kolorem autora; bez historii git — oś czasu z migawek.
+- Inspect: reguły **hotspoty zmian** i **wiedza w jednej głowie** (≥ 90 % zmian złożonego pliku od jednej osoby).
+
+### Testy i pokrycie
+- CodeMap sam wiąże **testy z testowanym kodem** — po nazwie (także ścieżki lustrzane `test/` ↔ `src/`,
+  `src/test/java` ↔ `src/main/java`) i po importach, dla kilkunastu języków; krawędzie „Testy (test → kod)".
+- **Pokrycie** z lcov, Istanbul (`coverage-final.json`, `coverage-summary.json`), Cobertura, JaCoCo i Clover —
+  wczytywane samo z `coverage/` wczytanego folderu, z menu Projekt → „Wczytaj pokrycie testów" albo przez
+  przeciągnięcie raportu na mapę. Kolorowanie „Pokrycie testami" i „Testy", sekcja „Testy i pokrycie"
+  w panelu, niepokryte linie w podglądzie pliku, reguły Inspect „złożone pliki bez testów" i „niskie pokrycie".
 
 ### Inspect — analiza statyczna
 16 reguł antywzorców (cykle, god-file, huby, sieroty, złożoność, ryzykowne API, puste `catch`, kod debug,
@@ -181,6 +194,8 @@ js/export.js               # eksport widocznego grafu: DOT (Graphviz), Mermaid, 
 js/metrics.js              # sprzężenia Ca/Ce/I per plik i folder, duplikaty kodu (winnowing)
 js/rules.js                # reguły architektury z .codemap.rules.json (warstwy, forbid, noCycles)
 js/git-core.js             # historia git bez DOM: autorzy, własność, bus factor, hotspoty, oś czasu
+js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, delty, packed-refs) w Web Workerze
+js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
 js/overlays.js             # kolorowanie węzłów wg danych (język, złożoność, git, pokrycie) + legenda
 js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral; pliki boczne (.git, lcov)
@@ -201,6 +216,7 @@ js/compare.js              # porównywanie schematów, cykle, historia migawek i
 js/navigation.js           # radar okolicy, minimapa, tarcza obrotu, nawigacja WASD, menu kontekstowe, eksport obrazu
 js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec, registerAction), paleta Ctrl+K, dane demo
 js/git.js                  # historia git na mapie: uruchamianie, nakładki, panel, awatary, oś czasu, akcje ChatBota
+js/tests-ui.js             # testy i pokrycie w aplikacji: nakładki, panel, Inspect, ChatBot, wczytywanie raportów
 js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)
 sw.js  manifest.webmanifest  serve.py                       # PWA i lokalny serwer
 ```
@@ -240,7 +256,7 @@ Zasady, które utrzymują projekt prostym:
 - każdy tekst w UI przez `CM.i18n.t()` z tłumaczeniem PL **i** EN;
 - zmiana plików `js/` lub `css/` = bump `?v=` w `index.html` i `CACHE` w `sw.js`;
 - `index.html` edytuj narzędziem zachowującym UTF-8;
-- przed commitem `npm run verify` (testy, lint, sonda gramatyk) i `node tools/smoke.mjs` (headless Chrome);
+- przed commitem `npm run verify` (testy, lint, sonda gramatyk, sonda `.git` zgodna z `git log`) i `node tools/smoke.mjs` (headless Chrome);
   po zmianach w wyglądzie `node tools/screenshots.mjs` odświeża zrzuty w `docs/`.
 
 Historia zmian: [CHANGELOG.md](CHANGELOG.md).

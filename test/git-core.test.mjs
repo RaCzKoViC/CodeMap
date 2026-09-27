@@ -101,6 +101,19 @@ describe('analyze — statystyki plików', () => {
   });
 });
 
+describe('prefiks folderu korzenia', () => {
+  test('mapa „Projekt/…" (przeciągnięty folder) vs ścieżki git względem repo → wykryty prefiks', () => {
+    const cs = history([{ author: ala, files: [{ path: 'src/a.js', status: 'A' }, { path: 'README.md', status: 'A' }] },
+      { author: ala, files: [{ path: 'src/b.js', status: 'R', from: 'src/old.js' }] }]);
+    const map = ['Projekt/src/a.js', 'Projekt/src/b.js', 'Projekt/README.md'];
+    assert.equal(G.detectPrefix(cs, map), 'Projekt/');
+    assert.equal(G.detectPrefix(cs, ['src/a.js', 'src/b.js', 'README.md']), '');
+    const r = G.analyze(G.prefixPaths(cs, 'Projekt/'), map);
+    assert.equal(r.files.get('Projekt/src/b.js').c, 1);
+    assert.equal(r.tracked, 3);
+  });
+});
+
 describe('bus factor', () => {
   const two = (split) => history(split.map(([p, who]) => ({ author: who, files: [{ path: p, status: 'A' }] })));
   test('jeden autor → 1', () => {
