@@ -25,7 +25,7 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Podział `settings.js`** (946 → 392 linie): `settings-strings.js`, `settings-ai.js` (zakładka AI z RAG), `settings-docs.js`
   (Specyfikacja, Instrukcja); rejestr zakładek `CM.Settings.addTab(key, icon, render)` ze stałą kolejnością, wspólne
   helpery w `CM.Settings.kit`; HTML wszystkich 23 widoków zakładek identyczny jak przed podziałem; 10 testów.
-- Poprawka: „pokaż hotspoty" / „zmień motyw…" wykonują się od razu (bez modelu) — `` w wyrażeniu JS nie widział granicy
+- Poprawka: „pokaż hotspoty" / „zmień motyw…" wykonują się od razu (bez modelu) — `\b` w wyrażeniu JS nie widział granicy
   słowa po „ż" / „ń"; teraz granice z klasami Unicode (`\p{L}`).
 - Analiza: **`package.json#imports`** (subpath imports Node, `import x from '#utils/log'`) — najbliższy `package.json`
   nad plikiem z polem `imports`, dokładny klucz albo wzorzec `#x/*`, warunki jak w `exports`; cel spoza projektu
