@@ -36,7 +36,7 @@ CM.Draw = (function(){
   function snap(){ _undo.push(JSON.stringify(els)); if(_undo.length>60)_undo.shift(); _redo.length=0; }
   function undo(){ if(!_undo.length) return; _redo.push(JSON.stringify(els)); els=JSON.parse(_undo.pop()); sel=null; renderAll(); dirty(); }
   function redo(){ if(!_redo.length) return; _undo.push(JSON.stringify(els)); els=JSON.parse(_redo.pop()); sel=null; renderAll(); dirty(); }
-  const dirty=()=>{ if(env&&env.onDirty) try{ env.onDirty(); }catch(e){} };
+  const dirty=()=>{ if(env&&env.onDirty) try{ env.onDirty(); }catch(e){ /* błąd odbiorcy (autozapis) nie psuje rysowania */ } };
 
   /* ---------------- rough.js (hand-drawn) — on demand, z fallbackiem ---------------- */
   async function ensureRough(){
@@ -101,7 +101,7 @@ CM.Draw = (function(){
         String(e.text||'').split('\n').forEach((ln,i)=>{ const ts=document.createElementNS(NS,'tspan');
           ts.setAttribute('x',e.x); ts.setAttribute('dy',i?1.25*(e.font||18):0); ts.textContent=ln; n.appendChild(ts); });
         g.appendChild(n); }
-    }catch(err){}
+    }catch(err){ /* uszkodzony element (np. z importu) — pomijamy, reszta rysunku zostaje */ }
     return g;
   }
   function renderAll(){
@@ -391,7 +391,7 @@ CM.Draw = (function(){
     env.world.appendChild(svg);
     // MindMap render() przebudowuje world.innerHTML — warstwa rysunków musi wracać sama
     try{ new MutationObserver(()=>{ if(svg&&!svg.isConnected){ env.world.appendChild(svg); } })
-      .observe(env.world,{childList:true}); }catch(e){}
+      .observe(env.world,{childList:true}); }catch(e){ /* brak MutationObserver — bez auto-przypięcia warstwy */ }
     // INPUT layer: a screen-space surface that covers the canvas ONLY while the draw bar is open.
     // It is the topmost element (below the toolbar at z7), so it is the natural pointer target — no
     // capture-phase races with the map's own pan handlers. Closed → display:none, map works normally.

@@ -224,13 +224,12 @@
       availableLayouts: CB_LAYOUTS,
       mindmap: (CM.MindMap&&CM.MindMap.isActive&&CM.MindMap.isActive())?{nodes:(CM.MindMap.nodeCount?CM.MindMap.nodeCount():0), name:_pn(CM.MindMap.mapName?CM.MindMap.mapName():'')}:null,
     };
-    if(state.counts.nodes>0){ try{ out.structure=aiStructureSummary(); }catch(e){} }
+    if(state.counts.nodes>0){ try{ out.structure=aiStructureSummary(); }catch(e){ console.warn('[CodeMap] AI: podsumowanie struktury', e); } }
     return out;
   }
   function _cb(id,val){ const e=$('#'+id); if(!e) return false; if(typeof val==='boolean') e.checked=val;
     e.dispatchEvent(new Event('change',{bubbles:true})); e.dispatchEvent(new Event('input',{bubbles:true})); return true; }
-  function _needProject(){ if(state.counts.nodes===0) throw new Error(I.t('cb.noProject','Najpierw wczytaj projekt (CodeMap).')); }
-  // execute a named action against the app; returns a short human result string (throws on error)
+  function _needProject(){ if(state.counts.nodes===0) throw new Error(I.t('cb.noProject','Najpierw wczytaj projekt (CodeMap).')); }  // execute a named action against the app; returns a short human result string (throws on error)
   function exec(action, args){
     args=args||{};
     switch(action){
@@ -242,8 +241,7 @@
         return I.t('cb.execLayout','Układ: ')+ly; }
       case 'search': { const q=(args.query||'').trim(); const inp=$('#search-input'); inp.value=q; inp.dispatchEvent(new Event('input',{bubbles:true})); return I.t('cb.execSearch','Szukam: ')+q; }
       case 'focusNode': { _needProject(); const q=(args.query||args.name||'').toLowerCase().trim(); if(!q) throw new Error(I.t('cb.needName','Podaj nazwę elementu.'));
-        let best=null,bs=-1; for(const n of A.graph.nodes.values()){ if(n.id==='__root__'||n.id==='__ext__')continue; const nm=(n.name||'').toLowerCase(),pt=(n.path||'').toLowerCase();
-          let s=nm===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1))); if(s>bs){bs=s;best=n;} }
+        const best=U.matchNode(A.graph.nodes.values(), q);
         if(!best) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+q); A.focusNode(best.id); return I.t('cb.execFocus','Skupiono na: ')+best.name; }
       case 'fit': if(A.renderer&&A.renderer.fit) A.renderer.fit(); return I.t('cb.execFit','Dopasowano widok.');
       case 'toggleImpact': _needProject(); A.toggleImpact(); return I.t('cb.execImpact','Przełączono widok wpływu zależności.');
@@ -344,8 +342,7 @@
         if(A.renderer){ A.renderer.highlight=new Set(list.map(x=>x.id)); A.renderer.kick(); }
         return k+': '+list.length+' — '+list.slice(0,30).map(x=>x.name).join(', ')+(list.length>30?' …':''); }
       case 'dependsOn': case 'dependencies': { _needProject(); const q=String(args.query||args.name||'').toLowerCase().trim(); if(!q) throw new Error(I.t('cb.needName','Podaj nazwę elementu.'));
-        let best=null,bs=-1; for(const x of A.graph.nodes.values()){ if(x.id==='__root__'||x.id==='__ext__') continue; const nm=(x.name||'').toLowerCase(), pt=(x.path||'').toLowerCase();
-          const sc=nm===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1))); if(sc>bs){bs=sc;best=x;} }
+        const best=U.matchNode(A.graph.nodes.values(), q);
         if(!best) throw new Error(I.t('cb.notFound','Nie znaleziono: ')+q);
         const imp=A.graph.impactSet(best.id); const set=action==='dependsOn'?imp.up:imp.down;
         const names=[...set].map(id=>(A.graph.nodes.get(id)||{}).name||id);

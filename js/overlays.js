@@ -50,7 +50,7 @@ CM.Overlays = (function(){
     try{ res=o.compute(A.graph)||null; }catch(e){ console.warn('overlay '+mode, e); res=null; }
     R.colorFn=res&&res.colorOf ? res.colorOf : null;
     fillSelect(); renderLegend(); R.kick&&R.kick();
-    if(R.drawMinimap){ try{ R.drawMinimap(document.getElementById('minimap')); }catch(e){} }
+    if(R.drawMinimap){ try{ R.drawMinimap(document.getElementById('minimap')); }catch(e){ /* minimapa niegotowa — odrysuje ją renderer */ } }
   }
 
   // ---- UI: <select id="sel-overlay"> + legenda pod nim ----

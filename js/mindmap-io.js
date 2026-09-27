@@ -7,7 +7,7 @@
    oraz create(ctx) — akcje edytora na tej serializacji: zapis / odczyt w pamięci urządzenia (okno),
    eksport / import pliku, PNG / SVG, menu Markdown, oś czasu migawek. Kontekst ctx dostarcza mindmap.js. */
 CM.MindMapIO = (function(){
-  const U = CM.util, I = CM.i18n, S = CM.MindMapStrings, T = CM.MindMapTemplates;
+  const U = CM.util, I = CM.i18n, S = CM.MindMapStrings, T = CM.MindMapTemplates, L = CM.MindMapLayout;
   const FORMAT='codemap-mindmap', LS_KEY='codemap_mindmaps', SNAP_PREFIX='codemap_mm_snaps_';
   // największy numer z id 'n<liczba>' — seq musi go wyprzedzać (inaczej duplikaty id po usunięciach)
   const maxSeq=(nodes)=>(nodes||[]).reduce((mx,n)=>Math.max(mx, parseInt(String(n.id).slice(1))||0), 0);
@@ -100,12 +100,10 @@ CM.MindMapIO = (function(){
   // mapa → samodzielny SVG; opts: {pad, heightOf(n) (wysokość karty w px), hidden(n) (zwinięty), bg, drawBounds, drawSvg}
   function buildSvg(st, opts){
     opts=opts||{}; const pad=opts.pad||60, hidden=opts.hidden||(()=>false);
-    const byId=(id)=>st.nodes.find(n=>n.id===id);
     const heights=new Map();
     for(const n of st.nodes) heights.set(n.id, opts.heightOf?opts.heightOf(n):60);
     const H=(n)=>heights.get(n.id)||60;
-    let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
-    for(const n of st.nodes){ if(hidden(n))continue; minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+n.w);maxY=Math.max(maxY,n.y+H(n)); }
+    let {minX, minY, maxX, maxY}=L.cardBounds(st.nodes, H, hidden);
     // rysunki też poszerzają eksportowany obszar
     const db=opts.drawBounds||null;
     if(db){ minX=Math.min(minX,db.minX); minY=Math.min(minY,db.minY); maxX=Math.max(maxX,db.maxX); maxY=Math.max(maxY,db.maxY); }
@@ -113,19 +111,8 @@ CM.MindMapIO = (function(){
     const W=Math.ceil(maxX-minX+pad*2), Ht=Math.ceil(maxY-minY+pad*2), vx=minX-pad, vy=minY-pad;
     const esc=U.escapeHtml;
     const curved=st.line==='curved';
-    const ept=(a,dir)=>{ const h=H(a),cx=a.x+a.w/2,cy=a.y+h/2; if(dir==='r')return{x:a.x+a.w,y:cy}; if(dir==='l')return{x:a.x,y:cy}; if(dir==='t')return{x:cx,y:a.y}; if(dir==='b')return{x:cx,y:a.y+h}; return{x:cx,y:cy}; };
     let edges='';
-    const link=(from,to,col,wide)=>{ let d; if(curved){ const dx=Math.abs(to.x-from.x)*0.5; const horiz=Math.abs(to.x-from.x)>Math.abs(to.y-from.y);
-        d=horiz?`M${from.x} ${from.y} C ${from.x+dx} ${from.y}, ${to.x-dx} ${to.y}, ${to.x} ${to.y}`:`M${from.x} ${from.y} C ${from.x} ${(from.y+to.y)/2}, ${to.x} ${(from.y+to.y)/2}, ${to.x} ${to.y}`; }
-      else { const mx=(from.x+to.x)/2; d=`M${from.x} ${from.y} H ${mx} V ${to.y} H ${to.x}`; }
-      edges+=`<path d="${d}" stroke="${col}" stroke-width="${wide?2.6:2}" fill="none" opacity="0.8" stroke-linecap="round" stroke-linejoin="round"/>`; };
-    for(const n of st.nodes){ if(n.parent==null||hidden(n))continue; const p=byId(n.parent); if(!p||hidden(p))continue;
-      const dir=st.layout; let pd='r',cd='l';
-      if(dir==='radial'){pd='c';cd='c';} else if(dir==='left'){pd='l';cd='r';} else if(dir==='down'){pd='b';cd='t';} else if(dir==='up'){pd='t';cd='b';}
-      else if(dir==='leftright'){const left=(n.x+n.w/2)<(p.x+p.w/2);pd=left?'l':'r';cd=left?'r':'l';}
-      else if(dir==='free'){const horiz=Math.abs((n.x+n.w/2)-(p.x+p.w/2))>=Math.abs(n.y-p.y);pd=horiz?((n.x>p.x)?'r':'l'):((n.y>p.y)?'b':'t');cd=horiz?((n.x>p.x)?'l':'r'):((n.y>p.y)?'t':'b');}
-      link(ept(p,pd),ept(n,cd), n.color||p.color, true); }
-    for(const e of st.edges){ const a=byId(e.from),b=byId(e.to); if(!a||!b||hidden(a)||hidden(b))continue; link(ept(a,'c'),ept(b,'c'),'#94a3b8',false); }
+    L.eachConnector(st, H, hidden, (from,to,col,wide)=>{ edges+=L.connectorSvg(from, to, curved, col, wide); });
     let body='';
     for(const n of st.nodes){ if(hidden(n))continue; const h=H(n), col=n.color||'#22d3ee', tpl=n.template||'card';
       let fill='#f3f6fb', tcol='#0a1018', stroke=col, sw=2, rx=12, center=false;
@@ -234,7 +221,7 @@ CM.MindMapIO = (function(){
           const del=U.el('button',{class:'mm-sl-item-del',title:I.t('cm.slDelete','Usuń'),html:CM.icons.svg('trash',{size:13})});
           del.onclick=(e)=>{ e.stopPropagation();
             // razem z mapą znika jej historia migawek — inaczej każde usunięcie zostawiało do 40 kopii stanu
-            try{ if(m.mapId) localStorage.removeItem(snapKey(m.mapId)); }catch(_){}
+            if(m.mapId) U.lsDel(snapKey(m.mapId));
             delete store[name]; localStorage.setItem(LS_KEY,JSON.stringify(store)); showSlModal(slMode); };
           item.appendChild(del);
           item.addEventListener('click',(e)=>{ if(del.contains(e.target)) return;
@@ -324,7 +311,7 @@ CM.MindMapIO = (function(){
     // ---- migawki + oś czasu ----
     function ensureMapId(){ if(!st.mapId) st.mapId='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); return st.mapId; }
     const snapLS=()=>snapKey(ensureMapId());
-    function saveSnaps(){ try{ localStorage.setItem(snapLS(),JSON.stringify(snaps.slice(-40))); }catch(e){} }
+    function saveSnaps(){ U.lsSet(snapLS(),JSON.stringify(snaps.slice(-40))); }
     function loadSnaps(){ try{ const raw=localStorage.getItem(snapLS()); snaps=raw?JSON.parse(raw):[]; }catch(e){ snaps=[]; } updateTimeline(); }
     function clearSnaps(){ snaps=[]; }
     function takeSnap(reason){

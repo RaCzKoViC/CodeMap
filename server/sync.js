@@ -1,6 +1,6 @@
 /* Synchronizacja danych: manifest, ustawienia, bieżąca sesja, mapy, migawki. */
 import { db, now } from './db.js';
-import { handleUpload, deleteBlob, sendBlob, bumpUsage } from './blobs.js';
+import { handleUpload, sendBlob, sendRowBlob, deleteRowBlob } from './blobs.js';
 
 const ID_RE = /^[A-Za-z0-9._-]{1,100}$/;
 const S = (v, max = 300) => String(v ?? '').slice(0, max);
@@ -93,8 +93,7 @@ export async function registerSync(app) {
 
   app.get('/api/maps/:id', auth, async (req, reply) => {
     const row = ID_RE.test(req.params.id) ? q.getMap.get(req.user.id, req.params.id) : null;
-    if (!row) return reply.code(404).send({ error: 'notfound' });
-    return sendBlob(reply, row.blob_path, { 'x-cm-ts': row.updated_at });
+    return sendRowBlob(reply, row, (r) => ({ 'x-cm-ts': r.updated_at }));
   });
 
   app.put('/api/maps/:id', auth, async (req, reply) => {
@@ -113,11 +112,7 @@ export async function registerSync(app) {
 
   app.delete('/api/maps/:id', auth, async (req, reply) => {
     const row = ID_RE.test(req.params.id) ? q.getMap.get(req.user.id, req.params.id) : null;
-    if (!row) return reply.code(404).send({ error: 'notfound' });
-    q.delMap.run(req.user.id, row.id);
-    bumpUsage(req.user.id, -row.size_bytes);
-    await deleteBlob(row.blob_path);
-    return { ok: true };
+    return deleteRowBlob(reply, req.user.id, row, () => q.delMap.run(req.user.id, row.id));
   });
 
   // --- migawki (niemutowalne: ponowny PUT tego samego id jest idempotentny) ---
@@ -129,8 +124,7 @@ export async function registerSync(app) {
 
   app.get('/api/snapshots/:id', auth, async (req, reply) => {
     const row = ID_RE.test(req.params.id) ? q.getSnap.get(req.user.id, req.params.id) : null;
-    if (!row) return reply.code(404).send({ error: 'notfound' });
-    return sendBlob(reply, row.blob_path, { 'x-cm-ts': row.ts });
+    return sendRowBlob(reply, row, (r) => ({ 'x-cm-ts': r.ts }));
   });
 
   app.put('/api/snapshots/:id', auth, async (req, reply) => {
@@ -159,10 +153,6 @@ export async function registerSync(app) {
 
   app.delete('/api/snapshots/:id', auth, async (req, reply) => {
     const row = ID_RE.test(req.params.id) ? q.getSnap.get(req.user.id, req.params.id) : null;
-    if (!row) return reply.code(404).send({ error: 'notfound' });
-    q.delSnap.run(req.user.id, row.id);
-    bumpUsage(req.user.id, -row.size_bytes);
-    await deleteBlob(row.blob_path);
-    return { ok: true };
+    return deleteRowBlob(reply, req.user.id, row, () => q.delSnap.run(req.user.id, row.id));
   });
 }

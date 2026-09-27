@@ -75,7 +75,7 @@ CM.Auth = (function(){
     catch(e){ const err=new Error('net'); err.code='net'; throw err; }
     if(res.status===401 && user){ setUser(null); }
     if(!res.ok){
-      let data=null; try{ data=await res.json(); }catch(e){}
+      let data=null; try{ data=await res.json(); }catch(e){ /* błąd bez JSON → komunikat z kodu HTTP */ }
       const err=new Error(data?.error||('http'+res.status));
       err.code=data?.error||''; err.status=res.status; err.data=data;
       throw err;
@@ -88,7 +88,7 @@ CM.Auth = (function(){
     const changed=(user?.email||null)!==(u?.email||null);   // odświeżenie quoty nie jest zmianą stanu
     user=u;
     const b=$('#btn-account'); if(b) b.classList.toggle('logged-in', !!u);
-    if(changed){ try{ document.dispatchEvent(new CustomEvent('cm-auth-change',{detail:{user:u}})); }catch(e){} }
+    if(changed){ try{ document.dispatchEvent(new CustomEvent('cm-auth-change',{detail:{user:u}})); }catch(e){ /* brak CustomEvent (bez DOM) — bez powiadomienia */ } }
   }
 
   function errMsg(e){
@@ -241,7 +241,7 @@ CM.Auth = (function(){
     }
 
     // publiczne linki do map (links.js): lista z „Kopiuj link" i „Unieważnij"
-    if(CM.Links && CM.Links.renderAccountSection){ try{ CM.Links.renderAccountSection(c); }catch(e){} }
+    if(CM.Links && CM.Links.renderAccountSection){ try{ CM.Links.renderAccountSection(c); }catch(e){ console.warn('[CodeMap] Konto: sekcja linków', e); } }
 
     // zmiana hasła
     c.appendChild(el('div',{class:'set-label',text:t('acct.changePass')}));
@@ -261,7 +261,7 @@ CM.Auth = (function(){
     // wyloguj + usuń konto
     const brow=el('div',{class:'set-btn-row'});
     brow.appendChild(el('button',{class:'tb-btn',text:t('logout'),onclick:async ()=>{
-      try{ await api('/api/auth/logout',{method:'POST',json:{}}); }catch(e){}
+      try{ await api('/api/auth/logout',{method:'POST',json:{}}); }catch(e){ /* serwer niedostępny — wylogowanie lokalne i tak */ }
       setUser(null); U.toast(t('loggedOut'));
       if(CM.Settings&&CM.Settings.open) CM.Settings.open('account');
     }}));
@@ -301,7 +301,7 @@ CM.Auth = (function(){
         history.replaceState(null,'',location.pathname+location.hash);
         setTimeout(()=>{ renderView('reset-confirm',{token}); modal().classList.remove('hidden'); },200);
       }
-    }catch(e){}
+    }catch(e){ /* replaceState bywa zablokowane (file://, sandbox) */ }
     refresh();
   }
 

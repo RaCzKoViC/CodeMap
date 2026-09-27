@@ -99,7 +99,7 @@
   A._applyThemePreset=null;   // bound in wireAppearance (chrome.js; needs renderer + root)
 
   // ---------------- auto-saved session (reopen last map) ----------------
-  const saveSessionDebounced=U.debounce(()=>{ if(A.graph && state.counts.nodes>0){ try{ Storage.saveSession(A.graph.toJSON()); }catch(e){} } }, 1500);
+  const saveSessionDebounced=U.debounce(()=>{ if(A.graph && state.counts.nodes>0){ try{ Storage.saveSession(A.graph.toJSON()); }catch(e){ console.warn('[CodeMap] autozapis sesji', e); } } }, 1500);
   function restoreSessionPrompt(){
     if(!Storage.loadSession) return;
     Storage.loadSession().then(s=>{
@@ -184,7 +184,7 @@
     for(const e of edges){ const s=idx.get(e.source), t=idx.get(e.target); if(s==null||t==null) continue;
       initEdges.push({s, t, c:e.type==='contains'?1:0, w:e.weight||1}); }
     let dead=false;
-    const cleanup=()=>{ if(dead) return; dead=true; try{ worker.terminate(); }catch(e){} };
+    const cleanup=()=>{ if(dead) return; dead=true; try{ worker.terminate(); }catch(e){ /* worker już zakończony */ } };
     const writeBack=(p)=>{ for(let i=0;i<N;i++){ nodes[i].x=p[i*2]; nodes[i].y=p[i*2+1]; } };
     worker.onmessage=(ev)=>{ const d=ev.data;
       if(d.type==='pos'){ if(!dead){ writeBack(d.pos); A.renderer.kick(); } }
@@ -365,7 +365,7 @@
     if(CM.Overlays) CM.Overlays.reset();
     state.linkSrc=null;   // mapa z Gista / publicznego linku (links.js) — ustawiane ponownie po udanym wczytaniu
     // a shared-view / deep-link hash describes the PREVIOUS project — drop it (but not while restoring from it)
-    if(!A._restoring && /^#(v|repo|gist|share)=/.test(location.hash)){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
+    if(!A._restoring && /^#(v|repo|gist|share)=/.test(location.hash)){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){ /* replaceState bywa zablokowane (file://, sandbox) */ } }
   }
 
   // generation token: a newer load (or Cancel) invalidates every still-running older ingest,
@@ -423,7 +423,7 @@
     st.workers=K;
     return new Promise((resolve)=>{
       const ws=[], done=new Array(K).fill(0), out=new Map(); let left=K, settled=false;
-      const finish=(v)=>{ if(settled) return; settled=true; for(const w of ws){ try{ w.terminate(); }catch(e){} } resolve(v); };
+      const finish=(v)=>{ if(settled) return; settled=true; for(const w of ws){ try{ w.terminate(); }catch(e){ /* worker już zakończony */ } } resolve(v); };
       for(let i=0;i<K;i++){
         let w; try{ w=new Worker(ANALYSIS_WORKER_URL); }catch(e){ finish(null); return; }
         ws.push(w);
@@ -453,6 +453,11 @@
     return m;
   }
   A._ingestGen=0;
+  // wspólne dla wczytań z pokoleniem A._ingestGen (ingest, schemat porównawczy — compare.js, gałęzie — repo-hosts.js)
+  function noFiles(files){ if(files && files.length) return false; U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return true; }
+  function loadError(e, ms){ console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',ms); }
+  // akcja wymaga wczytanego projektu: false + komunikat, gdy mapa jest pusta
+  function needProject(){ if(state.counts.nodes!==0) return true; U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return false; }
   async function ingest(factory, statusText){
     const gen=++A._ingestGen;
     showLoading(statusText);
@@ -460,7 +465,7 @@
       await tick();
       const {files, meta, side}=await factory(setProgress, setLoadingText);
       if(gen!==A._ingestGen) return;   // superseded / cancelled — discard silently
-      if(!files || !files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return; }
+      if(noFiles(files)) return;
       setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
       if(gen!==A._ingestGen) return;
       const pre=await analyzeFiles(files, gen, (done,total)=>{ setLoadingText(I.t('ca.analyzingPre','Analiza plików ')+done+' / '+total+'…'); }, meta);
@@ -489,7 +494,7 @@
       if(meta.warnings && meta.warnings.length) U.toast(I.t('ca.skippedArchivesPre','Pominięto nieobsługiwane archiwa (RAR/7z itp.): ')+meta.warnings.join(', ')+I.t('ca.skippedArchivesPost','. Rozpakuj je lub użyj ZIP / TAR.'),'',6500);
       if(gen===A._ingestGen) hideLoading();
       return true;   // wczytano (deep-linki pokazują wtedy źródło); wszystkie inne ścieżki zwracają undefined
-    }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
+    }catch(e){ if(gen!==A._ingestGen) return; loadError(e, 6500); }
     if(gen===A._ingestGen) hideLoading();
   }
 
@@ -557,9 +562,11 @@
 
   const MAP_FORMAT_VERSION=2;   // = Graph.toJSON().version; starsze wczytujemy (format zgodny wstecz), nowsze odrzucamy
   // opts.toast=false — bez komunikatu „wczytana z pliku" (links.js pokazuje własny, ze źródłem). Zwraca true po wczytaniu.
+  // plik mapy CodeMap? inaczej komunikat (wczytanie tutaj, dołączenie schematu w compare.js)
+  function isMapFile(obj){ if(obj && obj.format==='codemap') return true; U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return false; }
   function loadFromJSON(obj, opts){
     opts=opts||{};
-    if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return false; }
+    if(!isMapFile(obj)) return false;
     if((Number(obj.version)||1)>MAP_FORMAT_VERSION){ U.toast(I.t('ca.mapTooNew','Ten plik pochodzi z nowszej wersji CodeMap — zaktualizuj aplikację.'),'error',6000); return false; }
     // mapa bywa niezaufana (plik od kogoś, Gist, publiczny link): adresy repo / profilu / awatarów trafiają do href,
     // window.open i <img src> — zostają tylko https z github.com / gitlab.com / bitbucket.org i hostów awatarów
@@ -604,18 +611,18 @@
   // First launch of the INSTALLED app (also after a re-install) → start the tutorial automatically.
   // 'appinstalled' sets a flag consumed on the next standalone launch; the legacy no-flag case
   // (installed before this feature) runs once via codemap_tut_auto.
-  window.addEventListener('appinstalled',()=>{ try{ localStorage.setItem('codemap_fresh_install','1'); }catch(e){} });
+  window.addEventListener('appinstalled',()=>{ U.lsSet('codemap_fresh_install','1'); });
   function autoTutorial(){
     let standalone=false;
-    try{ standalone=matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){}
+    try{ standalone=matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }catch(e){ /* brak matchMedia — jak karta */ }
     if(!standalone) return;
     let go=false;
     try{
       if(localStorage.getItem('codemap_fresh_install')==='1'){ localStorage.removeItem('codemap_fresh_install'); go=true; }
       else if(!localStorage.getItem('codemap_tut_auto')) go=true;
       if(go) localStorage.setItem('codemap_tut_auto','1');
-    }catch(e){}
-    if(go) setTimeout(()=>{ try{ if(CM.Settings&&CM.Settings.startTutorial) CM.Settings.startTutorial('codemap'); }catch(e){} }, 1100);
+    }catch(e){ /* brak localStorage — bez automatycznego samouczka */ }
+    if(go) setTimeout(()=>{ try{ if(CM.Settings&&CM.Settings.startTutorial) CM.Settings.startTutorial('codemap'); }catch(e){ console.warn('[CodeMap] samouczek', e); } }, 1100);
   }
 
   // ---------------- graf symboli (tree-sitter, opt-in) ----------------
@@ -646,7 +653,7 @@
     wireModes, selectEdge, handlers, useWorker, startWorkerSim, apply, seedUnplaced, select,
     applyImpact, toggleImpact, toggleCollapse, toggleLang, revealNode, focusNode, biggestInFolder, tick,
     showLoading, setLoadingText, setProgress, hideLoading, hideEmpty, resetProjectState, ingest, autoTuneView,
-    countsInit, updateStatus, refreshProjectLabel, clearAll, loadFromJSON, boot, autoTutorial,
+    countsInit, updateStatus, refreshProjectLabel, clearAll, loadFromJSON, isMapFile, noFiles, loadError, needProject, boot, autoTutorial,
     onProjectLoaded, runProjectHooks, refreshView,
   });
 })();

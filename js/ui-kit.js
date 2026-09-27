@@ -3,7 +3,8 @@
 //  • pill(cancelTitle, onCancel)  — pigułka postępu w #toast-wrap z przyciskiem × (anulowanie),
 //  • modal(id)                    — okno dialogowe .modal-backdrop z nagłówkiem, treścią i stopką (Esc / klik w tło zamyka),
 //  • repoToken()                  — token z okna „Wczytaj…" (albo zapamiętany w karcie) dla API hostingu,
-//  • fileIndex(graph)             — mapa ścieżka → węzeł pliku projektu bazowego (bez schematów porównawczych).
+//  • fileIndex(graph)             — mapa ścieżka → węzeł pliku projektu bazowego (bez schematów porównawczych),
+//  • barRow(label, pct, col, value, attrs) — wiersz wykresu słupkowego .bar-row (git: autorzy, PR: ryzyko, testy: pokrycie).
 CM.UIKit = (function(){
   const U=CM.util, el=U.el, $=U.$;
 
@@ -49,6 +50,14 @@ CM.UIKit = (function(){
 
   function repoToken(){ const inp=$('#gh-token'); return ((inp&&inp.value.trim())||(CM.App&&CM.App.state&&CM.App.state._ghToken)||'')||undefined; }
   function fileIndex(graph){ const m=new Map(); if(graph&&graph.nodes) for(const n of graph.nodes.values()) if(n.type==='file'&&n.path&&(!n.gid||n.gid==='base')) m.set(n.path,n); return m; }
+  // label: tekst (→ span.bl) albo gotowy element etykiety; pct = szerokość paska w %, col = jego kolor, value = tekst z prawej;
+  // attrs = atrybuty wiersza (title, onclick, class — domyślnie 'bar-row')
+  function barRow(label, pct, col, value, attrs){
+    return el('div', Object.assign({class:'bar-row'}, attrs),
+      label && typeof label==='object' ? label : el('span',{class:'bl',text:label}),
+      el('div',{class:'bar-track'}, el('div',{class:'bar-fill',style:'width:'+pct+'%;background:'+col})),
+      el('span',{class:'bv',text:value}));
+  }
 
-  return {pill, modal, repoToken, fileIndex};
+  return {pill, modal, repoToken, fileIndex, barRow};
 })();

@@ -20,21 +20,25 @@ CM.Storage = (function(){
   function tx(mode){ return openDB().then(db=> db ? db.transaction(STORE,mode).objectStore(STORE) : null); }
   function sessTx(mode){ return openDB().then(db=> db ? db.transaction(SESSION,mode).objectStore(SESSION) : null); }
 
+  // powiadomienie kolejki synchronizacji (opcjonalnej): jej błąd nie może zablokować zapisu lokalnego
+  const toSync=(f)=>{ try{ if(CM.Sync) f(CM.Sync); }catch(e){ console.warn('[CodeMap] kolejka synchronizacji', e); } };
+
   // ---- auto-saved "current session" (one slot, restored on next visit) ----
   const SESS_LS='codemap-session';
   async function saveSession(mapJSON){
     const rec={id:'current', ts:Date.now(), map:mapJSON};
-    try{ if(CM.Sync) CM.Sync.onSessionSaved(); }catch(e){}
-    try{ const os=await sessTx('readwrite'); if(os){ os.put(rec); return; } }catch(e){}
-    try{ localStorage.setItem(SESS_LS, JSON.stringify(rec)); }catch(e){}   // fallback (may overflow on big maps)
+    toSync(S=>S.onSessionSaved());
+    try{ const os=await sessTx('readwrite'); if(os){ os.put(rec); return; } }catch(e){ /* IndexedDB niedostępne → zapas niżej */ }
+    try{ localStorage.setItem(SESS_LS, JSON.stringify(rec)); }   // fallback (may overflow on big maps)
+    catch(e){ console.warn('[CodeMap] sesja nie zmieściła się w localStorage', e); }
   }
   async function loadSession(){
-    try{ const os=await sessTx('readonly'); if(os){ return await new Promise(res=>{ const r=os.get('current'); r.onsuccess=()=>res(r.result||null); r.onerror=()=>res(null); }); } }catch(e){}
+    try{ const os=await sessTx('readonly'); if(os){ return await new Promise(res=>{ const r=os.get('current'); r.onsuccess=()=>res(r.result||null); r.onerror=()=>res(null); }); } }catch(e){ /* IndexedDB niedostępne → zapas niżej */ }
     try{ return JSON.parse(localStorage.getItem(SESS_LS)||'null'); }catch(e){ return null; }
   }
   async function clearSession(){
-    try{ const os=await sessTx('readwrite'); if(os) os.delete('current'); }catch(e){}
-    try{ localStorage.removeItem(SESS_LS); }catch(e){}
+    try{ const os=await sessTx('readwrite'); if(os) os.delete('current'); }catch(e){ /* brak IndexedDB — sesja tylko w localStorage */ }
+    U.lsDel(SESS_LS);
   }
 
   // localStorage fallback ------------------------------------------------
@@ -54,7 +58,7 @@ CM.Storage = (function(){
     };
     const os=await tx('readwrite');
     if(os){ os.put(snap); } else { const arr=lsAll(); arr.push(snap); lsSave(arr); }
-    try{ if(CM.Sync) CM.Sync.onSnapshot(snap, JSON.stringify(graph.toJSON())); }catch(e){}
+    toSync(S=>S.onSnapshot(snap, JSON.stringify(graph.toJSON())));
     return snap;
   }
 
@@ -77,7 +81,7 @@ CM.Storage = (function(){
   async function deleteSnapshot(id){
     const os=await tx('readwrite');
     if(os){ os.delete(id); } else { lsSave(lsAll().filter(s=>s.id!==id)); }
-    try{ if(CM.Sync) CM.Sync.onSnapshotDeleted(id); }catch(e){}
+    toSync(S=>S.onSnapshotDeleted(id));
   }
   async function importSnapshots(arr){
     for(const s of arr){ if(!s.id) s.id=Date.now()+'-'+Math.floor(Math.random()*1e6);

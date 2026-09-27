@@ -67,7 +67,7 @@
   const appUrl=()=>location.origin+location.pathname;
   const shareUrl=(id)=>appUrl()+'#share='+id;
   async function copyText(s){
-    try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(s); return true; } }catch(e){}
+    try{ if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(s); return true; } }catch(e){ /* brak zgody na schowek → false */ }
     return false;
   }
   function errText(e){
@@ -87,7 +87,7 @@
     if(!ok) return false;
     state.linkSrc=src;
     // kamera z #v= po fit() z loadFromJSON — ta sama kolejka requestAnimationFrame, więc zawsze po nim
-    if(onLoaded) requestAnimationFrame(()=>{ try{ onLoaded(); }catch(e){} });
+    if(onLoaded) requestAnimationFrame(()=>{ try{ onLoaded(); }catch(e){ console.warn('[CodeMap] widok z linku', e); } });
     return true;
   }
   async function openMapFrom(kind, id, opts){
@@ -210,12 +210,12 @@
         const url=shareUrl(r.id), copied=await copyText(url);
         showResult(url, r.expiresAt);
         U.toast(copied ? T('share.done','🔗 Utworzono publiczny link (skopiowany do schowka).') : T('share.doneNoClip','🔗 Utworzono publiczny link.'),'success',5000);
-        try{ CM.Auth.refresh(); }catch(e){}
+        try{ CM.Auth.refresh(); }catch(e){ /* licznik konta — refresh() sam łapie błędy sieci */ }
       }catch(e){ showErr(shareErr(e)); }
       finally{ go.disabled=false; go.classList.remove('busy'); }
     };
     m.classList.remove('hidden');
-    setTimeout(()=>{ try{ name.focus(); name.select(); }catch(e){} }, 30);
+    setTimeout(()=>{ try{ name.focus(); name.select(); }catch(e){ /* okno zamknięte przed fokusem */ } }, 30);
   }
   function showResult(url, expiresAt){
     const body=$('#share-body'), foot=$('#share-foot'); if(!body || !foot) return;
@@ -227,7 +227,7 @@
     foot.appendChild(el('button',{class:'tb-btn',type:'button',text:T('share.copy','Kopiuj link'),
       onclick:()=>copyText(url).then(ok=>{ if(ok) U.toast(T('share.copied','Skopiowano link.'),'success',2500); else { inp.focus(); inp.select(); } })}));
     foot.appendChild(el('button',{class:'tb-btn primary',type:'button',text:T('share.close','Zamknij'),onclick:closeModal}));
-    setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){} }, 30);
+    setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){ /* okno zamknięte przed fokusem */ } }, 30);
   }
 
   // ---------------- Ustawienia → Konto: moje publiczne linki ----------------
@@ -262,7 +262,7 @@
         catch(e){ if(e.status!==404){ revoke.disabled=false; U.toast(shareErr(e),'error'); return; } }   // 404 = już wygasł / usunięty
         row.remove(); U.toast(T('share.revoked','Link unieważniony.'),'success');
         if(!box.querySelector('.share-row')) fillList(box, []);
-        try{ CM.Auth.refresh(); }catch(e){}
+        try{ CM.Auth.refresh(); }catch(e){ /* licznik konta — refresh() sam łapie błędy sieci */ }
       };
       box.appendChild(row);
     }

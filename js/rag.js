@@ -162,7 +162,8 @@ CM.RAG = (function(){
     await loadVectors();
     return S;
   }
-  function reset(){ if(building){ try{ building.ctrl.abort(); }catch(e){} building=null; } S=null; }
+  const abortBuild=()=>{ if(building){ try{ building.ctrl.abort(); }catch(e){ /* budowanie już przerwane */ } } };
+  function reset(){ if(building){ abortBuild(); building=null; } S=null; }
   function stats(){ return S?{chunks:S.chunks.length, files:new Set(S.chunks.map(c=>c.path)).size, model:S.model, vectors:!!S.vecs, dim:S.dim, building:!!building}:{chunks:0, files:0, vectors:false, building:!!building}; }
 
   // ---- IndexedDB: wektory per projekt + model, klucz fragmentu = hash treści ----
@@ -170,9 +171,9 @@ CM.RAG = (function(){
   function db(){ return new Promise(res=>{ try{ const r=indexedDB.open(DB,1); r.onupgradeneeded=()=>r.result.createObjectStore(STORE); r.onsuccess=()=>res(r.result); r.onerror=()=>res(null); }catch(e){ res(null); } }); }
   async function idbGet(k){ const d=await db(); if(!d) return null; return new Promise(res=>{ try{ const q=d.transaction(STORE,'readonly').objectStore(STORE).get(k); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }catch(e){ res(null); } }); }
   async function idbPut(k,v){ const d=await db(); if(!d) return false; return new Promise(res=>{ try{ const tx=d.transaction(STORE,'readwrite'); tx.objectStore(STORE).put(v,k); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false); }catch(e){ res(false); } }); }
-  async function idbDel(k){ const d=await db(); if(!d) return; try{ d.transaction(STORE,'readwrite').objectStore(STORE).delete(k); }catch(e){} }
+  async function idbDel(k){ const d=await db(); if(!d) return; try{ d.transaction(STORE,'readwrite').objectStore(STORE).delete(k); }catch(e){ /* wpis zostaje — nadpisze go kolejne budowanie */ } }
   function modelPref(){ try{ return localStorage.getItem('codemap_rag_model')||''; }catch(e){ return ''; } }
-  function setModelPref(m){ try{ localStorage.setItem('codemap_rag_model', m||''); }catch(e){} }
+  function setModelPref(m){ U.lsSet('codemap_rag_model', m||''); }
   // wektory zapisane wcześniej dla tego projektu i modelu → dopasowanie po hashu fragmentu
   async function loadVectors(){
     const model=modelPref(); if(!S||!model) return false;
@@ -187,7 +188,7 @@ CM.RAG = (function(){
   // modele embeddingów: Ollama (bge-m3, nomic…) + WebLLM w przeglądarce ('webllm:…', gdy jest WebGPU)
   async function embeddingModels(){
     let out=[]; try{ if(CM.Ollama&&CM.Ollama.embeddingModels) out=await CM.Ollama.embeddingModels(); }catch(e){ out=[]; }
-    try{ if(CM.LocalAI&&CM.LocalAI.embeddingModels) out=out.concat((await CM.LocalAI.embeddingModels()).map(m=>({name:m.name, web:true, vramMB:m.vramMB}))); }catch(e){}
+    try{ if(CM.LocalAI&&CM.LocalAI.embeddingModels) out=out.concat((await CM.LocalAI.embeddingModels()).map(m=>({name:m.name, web:true, vramMB:m.vramMB}))); }catch(e){ /* bez WebGPU — tylko modele Ollamy */ }
     return out; }
   const isWeb=(model)=>/^webllm:/.test(String(model||''));
   async function embedTexts(model, texts, o){
@@ -207,7 +208,7 @@ CM.RAG = (function(){
     const s=await ensure(); if(!s) throw new Error(T('rag.noProject','Najpierw wczytaj projekt.'));
     const model=opts.model||await pickModel();
     if(!model) throw new Error(T('rag.noEmbed','Brak modelu embeddingów — pobierz w Ollamie bge-m3 albo nomic-embed-text, albo użyj modelu WebLLM w przeglądarce z WebGPU (Ustawienia → AI).'));
-    if(building){ try{ building.ctrl.abort(); }catch(e){} }
+    abortBuild();
     const ctrl=new AbortController(); building={ctrl, model};
     try{
       if(s.model!==model){ setModelPref(model); s.model=null; s.vecs=null; s.dim=0; await loadVectors(); }
@@ -267,5 +268,5 @@ CM.RAG = (function(){
 
   return {mentionedFiles, tokenize, queryTokens, chunkFile, buildLexical, bm25, rank, diversify, contextBlock, prefixes, normalize,
     ensure, reset, stats, search, context, buildVectors, clearVectors, embeddingModels, pickModel, modelPref, setModelPref,
-    isBuilding:()=>!!building, cancelBuild:()=>{ if(building){ try{ building.ctrl.abort(); }catch(e){} } }};
+    isBuilding:()=>!!building, cancelBuild:()=>{ abortBuild(); }};
 })();

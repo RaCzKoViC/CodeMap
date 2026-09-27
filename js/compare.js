@@ -54,7 +54,7 @@
     state.groups.push({gid:'base', name:A.graph.meta.name||I.t('ca.schema1','schemat 1'), color:GROUP_COLORS[0], owner:A.graph.meta&&A.graph.meta.owner});
   }
   function mergeGraph(obj){
-    if(!obj || obj.format!=='codemap'){ U.toast(I.t('ca.notCodemapFile','To nie jest plik mapy CodeMap.'),'error'); return; }
+    if(!A.isMapFile(obj)) return;
     if(state.counts.nodes===0){ A.loadFromJSON(obj); return; }
     mergeGraphInstance(Graph.fromJSON(obj), obj.meta&&obj.meta.name);
   }
@@ -102,7 +102,7 @@
     try{
       const {files, meta}=await factory(A.setProgress, A.setLoadingText);
       if(gen!==A._ingestGen) return;
-      if(!files||!files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); A.hideLoading(); return; }
+      if(A.noFiles(files)) return;
       A.setLoadingText(I.t('ca.buildingCompareSchema','Budowanie schematu porównawczego…')); await A.tick();
       if(gen!==A._ingestGen) return;
       const g2=new Graph(); g2.build(files, meta);
@@ -110,7 +110,7 @@
       const vis2=g2.getVisible(f2);
       Layouts.apply('force', g2, vis2, {spacing:state.spacing});
       mergeGraphInstance(g2, meta.name);
-    }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6000); }
+    }catch(e){ if(gen!==A._ingestGen) return; A.loadError(e, 6000); }
     if(gen===A._ingestGen) A.hideLoading();
   }
   function clearCompare(){
@@ -139,13 +139,13 @@
       try{ const obj=await Storage.openMap(f); mergeGraph(obj); }catch(err){ U.toast(err.message,'error'); } e.target.value=''; };
     $('#btn-compare-clear').onclick=clearCompare;
     $('#btn-cycles').onclick=toggleCycles;
-    $('#btn-hotspots').onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; } UI.renderHotspots(A.graph, handlers); A.openModal('modal-hotspots'); };
-    const bi=$('#btn-inspect'); if(bi) bi.onclick=()=>{ if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; } if(CM.Inspect) CM.Inspect.open(); };
+    $('#btn-hotspots').onclick=()=>{ if(!A.needProject()) return; UI.renderHotspots(A.graph, handlers); A.openModal('modal-hotspots'); };
+    const bi=$('#btn-inspect'); if(bi) bi.onclick=()=>{ if(!A.needProject()) return; if(CM.Inspect) CM.Inspect.open(); };
   }
   // detect & highlight import dependency cycles (toggle)
   function toggleCycles(){
     if(state.cyclesOn){ state.cyclesOn=false; A.renderer.setCycles(null); U.toast(I.t('ca.cyclesOff','Wyłączono podświetlenie cykli.'),'',1600); return; }
-    if(state.counts.nodes===0){ U.toast(I.t('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; }
+    if(!A.needProject()) return;
     const res=A.graph.importCycles();
     if(!res.components.length){ U.toast(I.t('ca.noCycles','Nie wykryto cykli zależności. 🎉'),'success',3000); A.renderer.setCycles(null); return; }
     state.cyclesOn=true; A.renderer.setCycles(res.edges);

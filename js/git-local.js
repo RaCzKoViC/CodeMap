@@ -717,10 +717,10 @@
       const finish = (fn, v)=>{
         if(finished) return; finished = true;
         if(signal) signal.removeEventListener('abort', onAbort);
-        try{ w.terminate(); }catch(e){}
+        try{ w.terminate(); }catch(e){ /* worker już zakończony */ }
         fn(v);
       };
-      const onAbort = ()=>{ try{ w.postMessage({type:'cancel', id}); }catch(e){} finish(reject, new GitError('cancelled', 'Przerwano czytanie historii git.')); };
+      const onAbort = ()=>{ try{ w.postMessage({type:'cancel', id}); }catch(e){ /* worker już zakończony */ } finish(reject, new GitError('cancelled', 'Przerwano czytanie historii git.')); };
       w.onerror = (e)=>{ if(e && e.preventDefault) e.preventDefault(); if(!started) finish(resolve, null); else finish(reject, new GitError('error', 'git-worker: ' + ((e && e.message) || 'błąd'))); };
       w.onmessage = (ev)=>{
         const d = ev.data || {}; if(d.id !== id) return; started = true;

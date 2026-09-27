@@ -34,7 +34,7 @@ CM.ChatBot = (function(){
   function saveConvs(){
     if(convs.length>60) convs.length=60;   // keep memory and storage in sync (was: sliced only on write)
     try{ localStorage.setItem(LS, JSON.stringify(convs)); localStorage.setItem(LS_ACTIVE, activeId||''); return; }
-    catch(e){}
+    catch(e){ /* pełny limit → niżej ponowienie z przyciętą historią */ }
     // quota exceeded → retry with trimmed history (keep the last 40 messages of each conversation)
     try{
       const trimmed=convs.map(c=>Object.assign({}, c, {messages:(c.messages||[]).slice(-40)}));
@@ -59,7 +59,7 @@ CM.ChatBot = (function(){
   /* ---------------- feedback tally (👍/👎, persistent, aggregated across ALL conversations, never reset) ---------------- */
   const LS_VOTES='codemap_chatbot_votes';
   function getVotes(){ try{ const v=JSON.parse(localStorage.getItem(LS_VOTES)||'{}'); return {up:Math.max(0,+v.up||0), down:Math.max(0,+v.down||0)}; }catch(e){ return {up:0,down:0}; } }
-  function setVotes(v){ try{ localStorage.setItem(LS_VOTES, JSON.stringify({up:Math.max(0,v.up||0), down:Math.max(0,v.down||0)})); }catch(e){} }
+  function setVotes(v){ U.lsSet(LS_VOTES, JSON.stringify({up:Math.max(0,v.up||0), down:Math.max(0,v.down||0)})); }
   // toggle a thumb on message m; adjusts the global tally by the delta (deleting a conversation never removes already-collected votes)
   function thumb(m, val){
     const prev=m.rating||0, next=(prev===val?0:val);
@@ -118,11 +118,11 @@ CM.ChatBot = (function(){
       try{ await CM.LocalAI.ensureEngine(); }catch(e){ if(!e||e.name!=='AbortError') updateSub((e&&e.message)||String(e)); return; } updateSub(); };
     head.appendChild(modelSel);
     quickBtn=el('button',{class:'cb-hbtn cb-quick'+(quick?' on':''),title:quick?t('quickOn'):t('quickOff'),html:'⚡',onclick:()=>{
-      quick=!quick; try{ localStorage.setItem('codemap_chatbot_quick',quick?'1':'0'); }catch(e){}
+      quick=!quick; U.lsSet('codemap_chatbot_quick',quick?'1':'0');
       quickBtn.classList.toggle('on',quick); quickBtn.title=quick?t('quickOn'):t('quickOff'); U.toast(quick?t('quickOn'):t('quickOff')); }});
     head.appendChild(quickBtn);
     ragBtn=el('button',{class:'cb-hbtn cb-rag'+(rag?' on':''),title:rag?t('ragOn'):t('ragOff'),html:'📚',onclick:()=>{
-      rag=!rag; try{ localStorage.setItem('codemap_chatbot_rag',rag?'1':'0'); }catch(e){}
+      rag=!rag; U.lsSet('codemap_chatbot_rag',rag?'1':'0');
       ragBtn.classList.toggle('on',rag); ragBtn.title=rag?t('ragOn'):t('ragOff'); U.toast(rag?t('ragOn'):t('ragOff'),'',5200); }});
     head.appendChild(ragBtn);
     head.appendChild(el('button',{class:'cb-hbtn',title:t('newchat'),html:ic.svg('plus',{size:16}),onclick:()=>newConversation()}));
@@ -167,7 +167,7 @@ CM.ChatBot = (function(){
     const sbHandle=el('div',{class:'cb-sb-handle',title:t('sbResize')});
     sbHandle.addEventListener('pointerdown',(e)=>{
       if(e.button!==0) return; e.preventDefault();
-      try{ sbHandle.setPointerCapture(e.pointerId); }catch(err){}
+      try{ sbHandle.setPointerCapture(e.pointerId); }catch(err){ /* wskaźnik już zwolniony — działa i bez przechwycenia */ }
       const x0=e.clientX, w0=sbOpen?(parseInt(getComputedStyle(sidebarEl).width)||162):0;
       panel.classList.add('cb-resizing');
       const move=(ev)=>{ const w=Math.max(0, Math.min(360, w0+(ev.clientX-x0)));
@@ -175,13 +175,13 @@ CM.ChatBot = (function(){
         else { if(!sbOpen){ sbOpen=true; panel.classList.add('cb-sb-open'); } panel.style.setProperty('--cb-sb-w', w+'px'); } };
       const up=()=>{ sbHandle.removeEventListener('pointermove',move); sbHandle.removeEventListener('pointerup',up); sbHandle.removeEventListener('pointercancel',up);
         panel.classList.remove('cb-resizing');
-        try{ localStorage.setItem('codemap_chatbot_sbw', sbOpen?String(parseInt(panel.style.getPropertyValue('--cb-sb-w'))||162):'0'); }catch(err){} };
+        U.lsSet('codemap_chatbot_sbw', sbOpen?String(parseInt(panel.style.getPropertyValue('--cb-sb-w'))||162):'0'); };
       sbHandle.addEventListener('pointermove',move); sbHandle.addEventListener('pointerup',up); sbHandle.addEventListener('pointercancel',up);
     });
     sbHandle.addEventListener('dblclick',toggleSidebar);
     body.appendChild(sidebarEl); body.appendChild(sbHandle); body.appendChild(main);
     panel.appendChild(body);
-    try{ const w=parseInt(localStorage.getItem('codemap_chatbot_sbw')||''); if(!isNaN(w)){ if(w===0){ sbOpen=false; panel.classList.remove('cb-sb-open'); } else panel.style.setProperty('--cb-sb-w', Math.max(56,Math.min(360,w))+'px'); } }catch(e){}
+    try{ const w=parseInt(localStorage.getItem('codemap_chatbot_sbw')||''); if(!isNaN(w)){ if(w===0){ sbOpen=false; panel.classList.remove('cb-sb-open'); } else panel.style.setProperty('--cb-sb-w', Math.max(56,Math.min(360,w))+'px'); } }catch(e){ /* brak localStorage — domyślna szerokość */ }
     V.resizeHandles(panel);   // 4 krawędzie + 4 rogi, rozmiar i pozycja zapamiętane
 
     renderSidebar(); renderMessages(); refreshModelUI(); renderAttachments();
@@ -284,7 +284,7 @@ CM.ChatBot = (function(){
         modelSel.appendChild(o);
       }
       modelSel.title=anyDl?t('modelSel'):t('noModelsDl');
-    }catch(e){}
+    }catch(e){ console.warn('[CodeMap] ChatBot: lista modeli lokalnych', e); }
     updateSub();
   }
 
@@ -413,7 +413,7 @@ CM.ChatBot = (function(){
     // once the command is DONE, generating more tokens is pure cost on an iGPU — soft-stop ends the
     // stream cleanly (no "aborted" note); also fires when the model re-states an already-executed action
     let _softStop=false;
-    const softStop=()=>{ if(_softStop) return; _softStop=true; try{ if(abortCtl) abortCtl.abort(); }catch(e){} };
+    const softStop=()=>{ if(_softStop) return; _softStop=true; try{ if(abortCtl) abortCtl.abort(); }catch(e){ /* strumień już zamknięty */ } };
     const chipsBox=()=>{
       if(!chipsEl) chipsEl=el('div',{class:'cb-chips'});
       const host=liveRow?liveRow.querySelector('.cb-bwrap'):typing;
@@ -669,7 +669,7 @@ CM.ChatBot = (function(){
       try{
         const r=await CM.AI.chat(C.titleMessages(users[0].content, asst.content), {entry, temperature:0.3, maxTokens:40});
         title=C.cleanTitle(r);
-      }catch(e){}
+      }catch(e){ /* tytuł z chmury opcjonalny — niżej z pierwszego pytania */ }
     }
     if(!title) title=users[0].content.trim().replace(/\s+/g,' ').slice(0,40)||t('untitled');
     conv.title=title; conv.titled=true; saveConvs(); renderSidebar();

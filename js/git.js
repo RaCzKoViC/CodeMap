@@ -53,7 +53,7 @@
   const pill=(t)=>PILL.show(t), hidePill=()=>PILL.hide();
 
   let job=null, gen=0;
-  function cancel(user){ const had=!!job; if(job){ try{ job.ctrl.abort(); }catch(e){} job=null; } gen++; hidePill(); if(user&&had) U.toast(T('git.cancelled','Anulowano analizę historii git.')); }
+  function cancel(user){ const had=!!job; if(job){ try{ job.ctrl.abort(); }catch(e){ /* analiza już przerwana */ } job=null; } gen++; hidePill(); if(user&&had) U.toast(T('git.cancelled','Anulowano analizę historii git.')); }
   function errText(e){ const c=e&&e.code; const k='git.e.'+c; const t=c?I.t(k,''):''; if(t&&t!==k) return t;
     const PL={'no-head':'Nie znaleziono HEAD w katalogu .git.','sha256':'Repozytoria SHA-256 nie są jeszcze obsługiwane.','missing-object':'W .git brakuje obiektu (niekompletne repozytorium?).','bad-pack':'Nieczytelny plik paczki w .git.'};
     return (c&&PL[c]&&I.getLang()!=='en')?PL[c]:((e&&e.message)||String(e)); }
@@ -89,7 +89,7 @@
       job=null; hidePill();
       invalidate();
       A.refreshView();
-      try{ document.dispatchEvent(new CustomEvent('codemap:git')); }catch(e){}   // np. pr.js przelicza ryzyko PR
+      try{ document.dispatchEvent(new CustomEvent('codemap:git')); }catch(e){ /* bez DOM — bez powiadomienia */ }   // np. pr.js przelicza ryzyko PR
       const bf=g.gitInfo.busFactor, au=g.gitInfo.authors;
       let msg=T('git.doneA','Historia git: ')+U.fmtNum(res.commits)+T('git.doneCommits',' commitów · ')+U.fmtNum(au.filter(a=>!a.bot).length)
         +T('git.doneAuthors',' autorów · bus factor ')+bf.value+(bf.authors.length?' ('+bf.authors.slice(0,3).map(i=>au[i].name).join(', ')+')':'')
@@ -97,7 +97,7 @@
       if(st.detailed!=null && st.listed && st.detailed<st.listed-res.merges) msg+=T('git.partial',' Listy plików tylko dla ')+st.detailed+T('git.partialB',' najnowszych commitów (limit API — dodaj token, aby pobrać pełną historię).');
       else if(st.truncated) msg+=T('git.truncated',' (historia ucięta do najnowszych commitów)');
       U.toast(msg,'success',9000);
-      if(!opts.auto && OV.current()==='lang'){ try{ OV.set('churn'); }catch(e){} }
+      if(!opts.auto && OV.current()==='lang'){ try{ OV.set('churn'); }catch(e){ /* nakładka niedostępna — zostaje bieżąca */ } }
       return g.gitInfo;
     }catch(e){
       if(my!==gen) return null;
@@ -235,7 +235,7 @@
     if(!A.graph || !state.counts.nodes){ U.toast(T('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return false; }
     let data=A.graph.gitInfo&&A.graph.gitInfo.timeline;
     if(!data || !data.commits || !data.commits.length){
-      let snaps=[]; try{ snaps=await CM.Storage.listSnapshots(A.graph.meta.source||A.graph.meta.name); }catch(e){}
+      let snaps=[]; try{ snaps=await CM.Storage.listSnapshots(A.graph.meta.source||A.graph.meta.name); }catch(e){ /* brak migawek → komunikat niżej */ }
       if(!snaps.length){ U.toast(T('git.tlNeed','Oś czasu potrzebuje historii git (Projekt → Historia git) albo co najmniej jednej migawki projektu.'),'',7000); return false; }
       data=GC.timelineFromSnapshots(snaps, A.graph.signature(), T('git.tlNow','stan bieżący'));
     }
@@ -340,11 +340,9 @@
   function authorBars(gi, list, total, cols){
     const box=el('div',{class:'git-authors'});
     const max=list.length?list[0][1]:1;
-    for(const [ai,c] of list.slice(0,6)){ const au=gi.authors[ai]; if(!au) continue;
-      box.appendChild(el('div',{class:'bar-row',title:au.name+(au.email?' <'+au.email+'>':'')},
-        el('span',{class:'bl git-an'}, el('span',{class:'tl-dot',style:'background:'+(cols[ai]||'#94a3b8')}), el('span',{text:au.name})),
-        el('div',{class:'bar-track'}, el('div',{class:'bar-fill',style:'width:'+Math.max(4,c/max*100)+'%;background:'+(cols[ai]||'#94a3b8')})),
-        el('span',{class:'bv',text:total?Math.round(c/total*100)+'%':String(c)}))); }
+    for(const [ai,c] of list.slice(0,6)){ const au=gi.authors[ai]; if(!au) continue; const col=cols[ai]||'#94a3b8';
+      box.appendChild(CM.UIKit.barRow(el('span',{class:'bl git-an'}, el('span',{class:'tl-dot',style:'background:'+col}), el('span',{text:au.name})),
+        Math.max(4,c/max*100), col, total?Math.round(c/total*100)+'%':String(c), {title:au.name+(au.email?' <'+au.email+'>':'')})); }
     return box;
   }
   function busLine(gi, bf, cols){
@@ -435,10 +433,7 @@
   });
 
   const need=()=>{ if(!A.graph||!state.counts.nodes) throw new Error(T('cb.noProject','Najpierw wczytaj projekt (CodeMap).')); if(!A.graph.gitInfo) throw new Error(T('cb.gitNoData','Brak historii git — uruchom gitHistory (lokalny folder z .git albo repozytorium GitHub/GitLab/Bitbucket).')); return A.graph.gitInfo; };
-  function findNode(q){ q=String(q||'').toLowerCase().trim(); if(!q) return null; let best=null,bs=-1;
-    for(const n of A.graph.nodes.values()){ if(n.id==='__root__'||n.id==='__ext__'||(n.type!=='file'&&n.type!=='folder')) continue; const nm=(n.name||'').toLowerCase(), pt=(n.path||'').toLowerCase();
-      const s=nm===q||pt===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1))); if(s>bs){ bs=s; best=n; } }
-    return best; }
+  function findNode(q){ return U.matchNode(A.graph.nodes.values(), q, {only:n=>n.type==='file'||n.type==='folder', exactPath:100}); }
   function reg(o){ if(A.registerAction) A.registerAction(o); }
   reg({name:'gitHistory', sig:'', desc:'analyse git history (local .git of a loaded folder, or the GitHub/GitLab/Bitbucket API): authors, owners, change frequency, bus factor, timeline',
     descPl:'analizuj historię git (lokalny .git albo API GitHub/GitLab/Bitbucket)', auto:false,
@@ -453,7 +448,7 @@
         const tot=fs.authors.reduce((s,x)=>s+x[1],0)||1;
         return n.name+' — '+fs.authors.slice(0,8).map(x=>au[x[0]].name+' '+Math.round(x[1]/tot*100)+'%').join(', ')+' · '+T('cb.bus','Bus factor: ')+fs.busFactor.value; }
       const top=au.map((x,i)=>i).filter(i=>!au[i].bot).sort((x,y)=>au[y].commits-au[x].commits).slice(0,10);
-      try{ OV.set('owner'); }catch(e){}
+      try{ OV.set('owner'); }catch(e){ /* nakładka niedostępna — zostaje bieżąca */ }
       return T('cb.owners','Autorzy (commity · posiadane pliki): ')+top.map(i=>au[i].name+' '+au[i].commits+' · '+au[i].owned).join(', ')+'\n'+T('cb.bus','Bus factor: ')+gi.busFactor.value+' ('+gi.busFactor.authors.map(i=>au[i].name).join(', ')+')'; }});
   reg({name:'busFactor', sig:'{query?}', desc:'bus (truck) factor of the project or of a folder from git history', descPl:'bus factor projektu albo folderu', auto:true, info:true,
     run:(a)=>{ const gi=need(), au=gi.authors;

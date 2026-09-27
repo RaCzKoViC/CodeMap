@@ -68,7 +68,7 @@ CM.AnalysisCache = (function(){
       // limity: najstarsze projekty wypadają (liczba i łączny rozmiar)
       const keys = Object.keys(idx).sort((a, b) => idx[b].at - idx[a].at); let total = 0;
       for(let i = 0; i < keys.length; i++){ total += idx[keys[i]].bytes || 0;
-        if(i >= MAX_PROJECTS || total > MAX_BYTES){ try{ await d.removeEntry(fileName(keys[i])); }catch(e){} delete idx[keys[i]]; } }
+        if(i >= MAX_PROJECTS || total > MAX_BYTES){ try{ await d.removeEntry(fileName(keys[i])); }catch(e){ /* pliku już nie ma — wypada z indeksu */ } delete idx[keys[i]]; } }
       await writeText(d, INDEX, JSON.stringify(idx));
       return true;
     }catch(e){ return false; }
@@ -81,7 +81,7 @@ CM.AnalysisCache = (function(){
   }
   async function clear(){
     epoch++;
-    try{ const root = await navigator.storage.getDirectory(); await root.removeEntry(DIR, {recursive:true}); }catch(e){}
+    try{ const root = await navigator.storage.getDirectory(); await root.removeEntry(DIR, {recursive:true}); }catch(e){ /* bez OPFS albo katalogu jeszcze nie ma */ }
     last = null; return true;
   }
 

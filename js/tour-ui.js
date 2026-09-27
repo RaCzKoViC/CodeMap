@@ -100,7 +100,7 @@
   }
   function importFile(file){
     const r=new FileReader();
-    r.onload=()=>{ let j=null; try{ j=JSON.parse(String(r.result||'')); }catch(e){}
+    r.onload=()=>{ let j=null; try{ j=JSON.parse(String(r.result||'')); }catch(e){ /* nie JSON → komunikat niżej */ }
       const tr=j && (Array.isArray(j.steps) && j.steps.length && j.steps[0].file ? TR.fromCodeTour(j) : j);
       if(!tr || !Array.isArray(tr.steps)){ U.toast(t('tour.badFile'),'error'); return; }
       setTour(tr, {start:true}); };

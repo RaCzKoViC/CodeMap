@@ -169,7 +169,9 @@ CM.Drive = (function(){
   const albTxnChecked={vault:false, fav:false};
   async function readRootJSON(name){ const root=await opfsRoot(); const fh=await root.getFileHandle(name); return JSON.parse(await (await fh.getFile()).text()); }
   async function writeRootFile(name, text){ const root=await opfsRoot(); const fh=await root.getFileHandle(name,{create:true}); const w=await fh.createWritable(); await w.write(new Blob([text])); await w.close(); }
-  async function removeRootFile(name){ try{ const root=await opfsRoot(); await root.removeEntry(name); }catch(e){} }
+  // brak pliku to norma (dziennik/.bak już usunięte); każdy inny błąd zostawia nieaktualny plik — do konsoli
+  async function removeRootFile(name){ try{ const root=await opfsRoot(); await root.removeEntry(name); }
+    catch(e){ if(!e || e.name!=='NotFoundError') console.warn('[CodeMap] Sejf: nie usunięto '+name, e); } }
   const validMeta=(m)=>!!m && typeof m==='object' && typeof m.enc==='boolean' && (!m.enc || (typeof m.salt==='string' && typeof m.verifier==='string'));
   async function albLoadMeta(a){
     if(albMeta[a]) return albMeta[a];
@@ -180,12 +182,12 @@ CM.Drive = (function(){
     if(main && validMeta(main)){ albMeta[a]=main; return main; }
     if(missing){
       // no meta at all = fresh album (plain); honour a leftover backup from an interrupted flip
-      try{ const bak=await readRootJSON(ALB[a].metaFile+'.bak'); if(validMeta(bak)){ albMeta[a]=bak; return bak; } }catch(e){}
+      try{ const bak=await readRootJSON(ALB[a].metaFile+'.bak'); if(validMeta(bak)){ albMeta[a]=bak; return bak; } }catch(e){ /* brak .bak = świeży album */ }
       albMeta[a]={enc:false}; return albMeta[a];
     }
     // meta EXISTS but is unreadable/invalid → try the backup; NEVER pretend the album is plain
     // (that would overwrite ciphertext as if it were plaintext and destroy the files)
-    try{ const bak=await readRootJSON(ALB[a].metaFile+'.bak'); if(validMeta(bak)){ albMeta[a]=bak; return bak; } }catch(e){}
+    try{ const bak=await readRootJSON(ALB[a].metaFile+'.bak'); if(validMeta(bak)){ albMeta[a]=bak; return bak; } }catch(e){ /* brak/zły .bak → metaCorrupt niżej */ }
     throw new Error(t('vault.metaCorrupt'));
   }
   async function albSaveMeta(a,m){ albMeta[a]=m; await writeRootFile(ALB[a].metaFile, JSON.stringify(m)); }
@@ -245,21 +247,22 @@ CM.Drive = (function(){
   }
   async function albRecoverTxn(a){
     if(albTxnChecked[a]) return; albTxnChecked[a]=true;
-    let txn=null; try{ txn=await readRootJSON(txnName(a)); }catch(e){}
+    let txn=null; try{ txn=await readRootJSON(txnName(a)); }catch(e){ /* brak dziennika = nic nie przerwano (norma) */ }
     const dir=await albDir(a);
     if(!txn || !Array.isArray(txn.files)){
       // no (or unreadable) journal → drop any orphan temps from an even earlier interruption
       const orphans=[]; for await(const [name,h] of dir.entries()){ if(h.kind==='file' && name.endsWith(TMPSUF)) orphans.push(name); }
-      for(const n of orphans){ try{ await dir.removeEntry(n); }catch(e){} }
+      for(const n of orphans){ try{ await dir.removeEntry(n); }catch(e){ /* sierota ukryta (TMPSUF) — ponowimy przy otwarciu */ } }
       if(txn!==null || orphans.length) await removeRootFile(txnName(a));
       return;
     }
-    let cur=null; try{ cur=await readRootJSON(ALB[a].metaFile); }catch(e){}
+    let cur=null; try{ cur=await readRootJSON(ALB[a].metaFile); }catch(e){ /* brak/złe meta = bez przełączenia → wycofanie */ }
     const flipped=!!cur && JSON.stringify(cur)===JSON.stringify(txn.target);
     for(const name of txn.files){
       let has=true; try{ await dir.getFileHandle(name+TMPSUF); }catch(e){ has=false; }
       if(!has) continue;
-      try{ if(flipped) await promoteTmp(dir, name); else await dir.removeEntry(name+TMPSUF); }catch(e){}
+      try{ if(flipped) await promoteTmp(dir, name); else await dir.removeEntry(name+TMPSUF); }
+      catch(e){ console.warn('[CodeMap] Sejf: odzyskiwanie transakcji nie objęło pliku '+name, e); }
     }
     await removeRootFile(txnName(a));
   }
@@ -331,7 +334,7 @@ CM.Drive = (function(){
     const bytes=await albRead(album, name);
     await diskWrite([], name, bytes);
     await albDelete(album, name);
-    if(album!=='fav'){ try{ await albDelete('fav', name); }catch(e){} }   // tidy any favorite copy too
+    if(album!=='fav'){ try{ await albDelete('fav', name); }catch(e){ /* brak kopii w Ulubionych */ } }   // tidy any favorite copy too
     U.toast(t('move.done')+name,'success');
     return true;
   }
@@ -356,7 +359,7 @@ CM.Drive = (function(){
     const d=await diskNavigate(pathArr); const dirs=[], files=[];
     for await(const [name,h] of d.entries()){
       if(h.kind==='directory') dirs.push({name, kind:'dir'});
-      else { let size=0; try{ size=(await h.getFile()).size; }catch(e){} files.push({name, kind:'file', size}); }
+      else { let size=0; try{ size=(await h.getFile()).size; }catch(e){ /* plik zablokowany/zniknął — rozmiar 0 */ } files.push({name, kind:'file', size}); }
     }
     dirs.sort((a,b)=>a.name.localeCompare(b.name)); files.sort((a,b)=>a.name.localeCompare(b.name));
     return dirs.concat(files);
@@ -408,37 +411,17 @@ CM.Drive = (function(){
   function open(tab){ build(); if(tab) curTab=tab; showTab(curTab); overlay.classList.remove('hidden'); document.body.classList.add('drive-open'); }
   function close(){ if(overlay) overlay.classList.add('hidden'); document.body.classList.remove('drive-open'); closePhoto(); revokeThumbs(); }
 
+  // powłoka okna jak w Ustawieniach (nakładka, nagłówek, zakładki) — CM.Settings.kit, ten sam wygląd .set-*
   function build(){
-    const lang=I.getLang();
-    if(!overlay){
-      overlay=el('div',{id:'drive-overlay',class:'hidden'});
-      document.body.appendChild(overlay);
-      overlay.addEventListener('mousedown',(e)=>{ if(e.target===overlay) close(); });
-      window.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && overlay && !overlay.classList.contains('hidden')) close(); });
-    }
-    builtLang=lang; overlay.innerHTML='';
-    const panel=el('div',{class:'set-panel drv-panel'});
-    panel.appendChild(el('div',{class:'set-head'},
-      el('span',{class:'set-ic',html:ic.svg('package',{size:18})}),
-      el('h2',{text:t('title')}),
-      el('span',{class:'tb-spacer'}),
-      el('button',{class:'set-x',title:I.t('common.close','Zamknij'),html:ic.svg('x',{size:18}),onclick:close})));
-    const bodyWrap=el('div',{class:'set-wrap'});
-    const nav=el('div',{class:'set-nav drv-nav'});
-    [['vault','lock'],['fav','heart'],['disk','folder']].forEach(([key,icon])=>{
-      const iconHtml = icon==='heart' ? heartIcon(true,16) : ic.svg(icon,{size:16});
-      nav.appendChild(el('button',{class:'set-tab'+(key===curTab?' active':'')+(key==='fav'?' drv-tab-fav':''),'data-tab':key,
-        html:iconHtml+'<span>'+t('tab.'+key)+'</span>',onclick:()=>showTab(key)}));
-    });
-    const content=el('div',{class:'set-content drv-content'});
-    bodyWrap.appendChild(nav); bodyWrap.appendChild(content);
-    panel.appendChild(bodyWrap); overlay.appendChild(panel); overlay._content=content;
+    const SK=CM.Settings.kit, lang=I.getLang();
+    if(!overlay) overlay=SK.overlayShell('drive-overlay', close);
+    builtLang=lang;
+    SK.tabbedPanel(overlay, {variant:'drv', icon:'package', title:t('title'), closeTitle:I.t('common.close','Zamknij'), onClose:close, active:curTab, onTab:showTab,
+      tabs:[['vault','lock'],['fav','heart'],['disk','folder']].map(([key,icon])=>({key, cls:key==='fav'?'drv-tab-fav':'',
+        html:(icon==='heart' ? heartIcon(true,16) : ic.svg(icon,{size:16}))+'<span>'+t('tab.'+key)+'</span>'}))});
   }
   function showTab(key){ curTab=key; if(!overlay) return;
-    overlay.querySelectorAll('.set-tab').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===key));
-    const c=overlay._content; if(!c) return; c.innerHTML='';
-    const fn = key==='disk'?renderDisk : key==='fav'?renderFav : renderVault;
-    fn(c); c.scrollTop=0;
+    CM.Settings.kit.selectTab(overlay, key, key==='disk'?renderDisk : key==='fav'?renderFav : renderVault);
   }
   function head(c, h, descKey){ c.appendChild(el('h3',{class:'set-h3',text:h})); if(descKey) c.appendChild(el('p',{class:'set-desc',text:t(descKey)})); }
 
@@ -517,7 +500,7 @@ CM.Drive = (function(){
 
   async function fillAlbum(wrap, album){
     revokeThumbs(); wrap.innerHTML='';
-    let files=[]; try{ files=await albList(album); }catch(e){}
+    let files=[]; try{ files=await albList(album); }catch(e){ U.toast(String(e.message||e),'error'); }
     const reload=()=>fillAlbum(wrap, album);
     wrap.appendChild(el('div',{class:'drv-galbar'}, el('span',{class:'tb-spacer'}),
       el('button',{class:'drv-btn drv-btn-sm',html:ic.svg('refresh',{size:13})+' '+t('common.refresh'),onclick:reload})));
@@ -541,7 +524,7 @@ CM.Drive = (function(){
   async function thumbCell(album, photos, i, reload){
     const f=photos[i];
     const cell=el('div',{class:'drv-thumb',title:f.name});
-    let url=''; try{ const bytes=await albRead(album, f.name); url=URL.createObjectURL(new Blob([bytes])); _thumbUrls.push(url); }catch(e){}
+    let url=''; try{ const bytes=await albRead(album, f.name); url=URL.createObjectURL(new Blob([bytes])); _thumbUrls.push(url); }catch(e){ /* nieczytelny plik → pusta miniatura */ }
     cell.appendChild(el('img',{class:'drv-thumb-img',src:url,alt:f.name,loading:'lazy'}));
     cell.onclick=()=>openPhoto(album, photos, i, reload);
     const favd=await albHas('fav', f.name);
@@ -734,7 +717,7 @@ CM.Drive = (function(){
 
   /* ---------------- photo gallery: thumbnails, heart, fullscreen viewer ---------------- */
   let _thumbUrls=[];
-  function revokeThumbs(){ for(const u of _thumbUrls){ try{ URL.revokeObjectURL(u); }catch(e){} } _thumbUrls=[]; }
+  function revokeThumbs(){ for(const u of _thumbUrls){ try{ URL.revokeObjectURL(u); }catch(e){ /* już zwolniony */ } } _thumbUrls=[]; }
   function heartIcon(filled, size){ size=size||16;
     return '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'" '+(filled?'fill="currentColor" stroke="none"':'fill="none" stroke="currentColor" stroke-width="2"')
       +'><path d="M12 20.3l-1.45-1.32C5.4 14.24 2 11.16 2 7.5 2 4.92 4.02 3 6.5 3c1.74 0 3.41.81 4.5 2.09C12.09 3.81 13.76 3 15.5 3 17.98 3 20 4.92 20 7.5c0 3.66-3.4 6.74-8.55 11.49L12 20.3z"/></svg>'; }
@@ -770,7 +753,7 @@ CM.Drive = (function(){
       ov.innerHTML=''; if(!photos.length){ closePhoto(); return; }
       if(i>=photos.length) i=photos.length-1; if(i<0) i=0;
       const f=photos[i];
-      let url=''; try{ const bytes=await albRead(album, f.name); url=URL.createObjectURL(new Blob([bytes])); _photoUrl=url; }catch(e){}
+      let url=''; try{ const bytes=await albRead(album, f.name); url=URL.createObjectURL(new Blob([bytes])); _photoUrl=url; }catch(e){ U.toast(t('common.openFail'),'error'); }
       const top=el('div',{class:'drv-photo-top'});
       top.appendChild(el('span',{class:'drv-photo-name',text:f.name+'  ·  '+(i+1)+'/'+photos.length}));
       top.appendChild(el('span',{class:'tb-spacer'}));
@@ -786,7 +769,7 @@ CM.Drive = (function(){
       top.appendChild(el('button',{class:'drv-photo-btn',title:t('photo.move'),html:ic.svg('upload',{size:18}),
         onclick:async()=>{ if(await moveToDisk(album, f.name)){ photos.splice(i,1); if(reloadGrid) reloadGrid(); show(); } }}));
       top.appendChild(el('button',{class:'drv-photo-btn drv-photo-del',title:t('photo.del'),html:ic.svg('trash',{size:18}),
-        onclick:async()=>{ if(!confirm(t('common.delConfirm',{n:f.name}))) return; await albDelete(album,f.name); if(album!=='fav'){ try{ await albDelete('fav',f.name); }catch(e){} } U.toast(t('common.deleted')+f.name); photos.splice(i,1); if(reloadGrid) reloadGrid(); show(); }}));
+        onclick:async()=>{ if(!confirm(t('common.delConfirm',{n:f.name}))) return; await albDelete(album,f.name); if(album!=='fav'){ try{ await albDelete('fav',f.name); }catch(e){ /* brak kopii w Ulubionych */ } } U.toast(t('common.deleted')+f.name); photos.splice(i,1); if(reloadGrid) reloadGrid(); show(); }}));
       top.appendChild(el('button',{class:'drv-photo-btn',title:t('pv.close'),html:ic.svg('x',{size:18}),onclick:closePhoto}));
       ov.appendChild(top);
       const stage=el('div',{class:'drv-photo-stage'});
@@ -828,7 +811,7 @@ CM.Drive = (function(){
       getMeta:albLoadMeta,
       writeMeta:async(a,m)=>{ if(!validMeta(m)||m.enc!==true) throw new Error('meta'); albKey[a]=null; await albSaveMeta(a,m); },
     },
-    refreshAlbum:(a)=>{ try{ if(overlay && !overlay.classList.contains('hidden') && curTab===a) showTab(a); }catch(e){} },
+    refreshAlbum:(a)=>{ try{ if(overlay && !overlay.classList.contains('hidden') && curTab===a) showTab(a); }catch(e){ console.warn('[CodeMap] Dysk: odświeżenie albumu', e); } },
     _fav:{ is:isFav, toggle:toggleFav, move:moveToDisk },
     _disk:{ mount:mountDisk, reconnect:reconnectDisk, list:diskList, read:diskRead, write:diskWrite },
     _has:{ fsa:hasFSA, opfs:hasOPFS, crypto:hasCrypto } };

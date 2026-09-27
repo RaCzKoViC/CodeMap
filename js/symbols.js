@@ -35,7 +35,7 @@ CM.Symbols = (function(){
   }
   function hidePill(){ if(pill){ const p = pill; pill = null; p.style.transition = 'opacity .3s'; p.style.opacity = '0'; setTimeout(()=>p.remove(), 300); } }
 
-  function stopWorker(){ if(worker){ try{ worker.terminate(); }catch(e){} worker = null; } }
+  function stopWorker(){ if(worker){ try{ worker.terminate(); }catch(e){ /* worker już zakończony */ } worker = null; } }
   function cancel(){ gen++; stopWorker(); state = {status:'idle', error:null, done:0, total:0}; hidePill(); }
 
   // Analiza w workerze → Promise<results>; null = worker niedostępny (fallback na główny wątek)

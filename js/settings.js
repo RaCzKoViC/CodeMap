@@ -30,45 +30,59 @@ CM.Settings = (function(){
   }
   function close(){ if(overlay) overlay.classList.add('hidden'); document.body.classList.remove('settings-open'); }
 
+  // ---------------- powłoka okna z zakładkami (.set-*): Ustawienia i Dysk (drive.js przez kit) ----------------
+  // nakładka: klik w tło i Esc zamykają (escOk() może Esc wstrzymać, np. w trakcie samouczka)
+  function overlayShell(id, onClose, escOk){
+    const ov=el('div',{id, class:'hidden'});
+    document.body.appendChild(ov);
+    ov.addEventListener('mousedown',(e)=>{ if(e.target===ov) onClose(); });
+    window.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !ov.classList.contains('hidden') && (!escOk || escOk())) onClose(); });
+    return ov;
+  }
+  // panel: nagłówek (ikona, tytuł, ×), nawigacja zakładek [{key, html, cls}] i treść (ov._content);
+  // o.variant = dodatkowy prefiks klas (np. 'drv' → set-panel drv-panel / set-nav drv-nav / set-content drv-content)
+  function tabbedPanel(ov, o){
+    const v=(s)=>'set-'+s+(o.variant?' '+o.variant+'-'+s:'');
+    ov.innerHTML='';
+    const panel=el('div',{class:v('panel')});
+    panel.appendChild(el('div',{class:'set-head'},
+      el('span',{class:'set-ic',html:ic.svg(o.icon,{size:18})}),
+      el('h2',{text:o.title}),
+      el('span',{class:'tb-spacer'}),
+      el('button',{class:'set-x',title:o.closeTitle,html:ic.svg('x',{size:18}),onclick:o.onClose})));
+    const bodyWrap=el('div',{class:'set-wrap'});
+    const nav=el('div',{class:v('nav')});
+    const content=el('div',{class:v('content')});
+    for(const tb of o.tabs) nav.appendChild(el('button',{class:'set-tab'+(tb.key===o.active?' active':'')+(tb.cls?' '+tb.cls:''),'data-tab':tb.key,
+      html:tb.html,onclick:()=>o.onTab(tb.key)}));
+    bodyWrap.appendChild(nav); bodyWrap.appendChild(content);
+    panel.appendChild(bodyWrap);
+    ov.appendChild(panel);
+    ov._content=content;
+    return content;
+  }
+  // przełączenie zakładki: podświetlenie w nawigacji i świeża treść z render(c)
+  function selectTab(ov, key, render){
+    ov.querySelectorAll('.set-tab').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===key));
+    const c=ov._content; if(!c) return; c.innerHTML='';
+    render(c);
+    c.scrollTop=0;
+  }
+
   function build(){
     const lang=I.getLang();
     if(overlay && builtLang===lang) return;
-    if(!overlay){
-      overlay=el('div',{id:'settings-overlay',class:'hidden'});
-      document.body.appendChild(overlay);
-      overlay.addEventListener('mousedown',(e)=>{ if(e.target===overlay) close(); });
-      window.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !overlay.classList.contains('hidden') && !tourActive) close(); });
-    }
+    if(!overlay) overlay=overlayShell('settings-overlay', close, ()=>!tourActive);
     builtLang=lang;
-    overlay.innerHTML='';
-    const panel=el('div',{class:'set-panel'});
-    panel.appendChild(el('div',{class:'set-head'},
-      el('span',{class:'set-ic',html:ic.svg('settings',{size:18})}),
-      el('h2',{text:t('title')}),
-      el('span',{class:'tb-spacer'}),
-      el('button',{class:'set-x',title:I.t('common.close'),html:ic.svg('x',{size:18}),onclick:close})));
-    const bodyWrap=el('div',{class:'set-wrap'});
-    const nav=el('div',{class:'set-nav'});
-    const content=el('div',{class:'set-content'});
-    tabKeys().forEach(key=>{
-      const b=el('button',{class:'set-tab'+(key===curTab?' active':''),'data-tab':key,
-        html:ic.svg(TABS.get(key).icon,{size:16})+'<span>'+t('tab.'+key)+'</span>',onclick:()=>showTab(key)});
-      nav.appendChild(b);
-    });
-    bodyWrap.appendChild(nav); bodyWrap.appendChild(content);
-    panel.appendChild(bodyWrap);
-    overlay.appendChild(panel);
-    overlay._content=content;
+    tabbedPanel(overlay, {icon:'settings', title:t('title'), closeTitle:I.t('common.close'), onClose:close, active:curTab, onTab:showTab,
+      tabs:tabKeys().map(key=>({key, html:ic.svg(TABS.get(key).icon,{size:16})+'<span>'+t('tab.'+key)+'</span>'}))});
     showTab(curTab);
   }
 
   function showTab(key){
     curTab=key;
     if(!overlay) return;
-    overlay.querySelectorAll('.set-tab').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===key));
-    const c=overlay._content; if(!c) return; c.innerHTML='';
-    const tab=TABS.get(key)||TABS.get('lang'); if(tab) tab.render(c);   // nieznany klucz → „Język” (jak dotąd)
-    c.scrollTop=0;
+    selectTab(overlay, key, (c)=>{ const tab=TABS.get(key)||TABS.get('lang'); if(tab) tab.render(c); });   // nieznany klucz → „Język” (jak dotąd)
   }
 
   function section(c, head, descKey){
@@ -92,7 +106,7 @@ CM.Settings = (function(){
 
   function tabAccount(c){
     section(c, t('acct.head'), 'acct.desc');
-    try{ CM.Auth.renderAccount(c); }catch(e){}
+    if(CM.Auth){ try{ CM.Auth.renderAccount(c); }catch(e){ console.warn('[CodeMap] Ustawienia: konto', e); } }
   }
 
   function tabAppearance(c){
@@ -306,8 +320,10 @@ CM.Settings = (function(){
       setTimeout(begin, 240);   // let the target mode's UI render before spotlighting it
     } else begin();
   }
+  // before/after kroku (otwarcie panelu itp.): błąd nie przerywa samouczka, ale trafia do konsoli
+  const stepHook=(f)=>{ if(f) try{ f(); }catch(e){ console.warn('[CodeMap] samouczek: krok', e); } };
   function tourStep(d){
-    const cur=steps[tourIdx]; if(cur&&cur.after) try{cur.after();}catch(e){}
+    const cur=steps[tourIdx]; if(cur) stepHook(cur.after);
     tourIdx+=d;
     if(tourIdx<0) tourIdx=0;
     if(tourIdx>=steps.length){ endTour(); return; }
@@ -315,7 +331,7 @@ CM.Settings = (function(){
   }
   function showTourStep(){
     const step=steps[tourIdx];
-    if(step.before) try{ step.before(); }catch(e){}
+    stepHook(step.before);
     // resolve element; skip missing/hidden ones in current direction
     let tries=0;
     while(tries<steps.length){
@@ -323,7 +339,7 @@ CM.Settings = (function(){
       // present if rendered (has a box) — tolerant of elements still animating in (e.g. the radar)
       if(e && (e.getClientRects().length>0 || e.getBoundingClientRect().width>1)){ break; }
       tourIdx++; if(tourIdx>=steps.length){ endTour(); return; }
-      const ns=steps[tourIdx]; if(ns.before) try{ns.before();}catch(e){}
+      stepHook(steps[tourIdx].before);
       tries++;
     }
     renderTourPop();
@@ -347,7 +363,7 @@ CM.Settings = (function(){
   function positionTour(){
     if(!tourActive||!tourEls) return;
     const el2=step2el(steps[tourIdx]); if(!el2) return;
-    try{ el2.scrollIntoView({block:'nearest',inline:'nearest'}); }catch(e){}
+    try{ el2.scrollIntoView({block:'nearest',inline:'nearest'}); }catch(e){ /* element odpięty w trakcie animacji */ }
     let r=el2.getBoundingClientRect();
     // if an open dropdown panel hangs off this element, include it in the spotlight
     const mp=el2.querySelector&&el2.querySelector('.menu-panel');
@@ -372,7 +388,7 @@ CM.Settings = (function(){
   }
   function endTour(){
     if(!tourActive) return;
-    const cur=steps[tourIdx]; if(cur&&cur.after) try{cur.after();}catch(e){}
+    const cur=steps[tourIdx]; if(cur) stepHook(cur.after);
     tourActive=false;
     window.removeEventListener('keydown', tourKey);
     window.removeEventListener('resize', positionTour);
@@ -383,7 +399,7 @@ CM.Settings = (function(){
   addTab('lang','settings',tabLang); addTab('account','user',tabAccount); addTab('appearance','palette',tabAppearance);
   addTab('install','download',tabInstall); addTab('shortcuts','keyboard',tabShortcuts); addTab('tutorial','play',tabTutorial);
   addTab('about','layers',tabAbout);
-  const kit={ U, I, ic, el, t, section, bigBtn, close, get handlers(){ return handlers; } };
+  const kit={ U, I, ic, el, t, section, bigBtn, close, overlayShell, tabbedPanel, selectTab, get handlers(){ return handlers; } };
 
   // rebuild on language change so settings & tour pop are translated
   I.onChange(()=>{ if(overlay){ build(); } if(tourActive){ renderTourPop(); positionTour(); } });

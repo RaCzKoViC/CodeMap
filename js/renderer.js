@@ -91,7 +91,7 @@ CM.Renderer = (function(){
     backends(){ return ['canvas'].concat(CM.GLLayer && CM.GLLayer.supported() && !this._glFailed ? ['webgl'] : []); }
     setBackend(b){
       this.backend = (b==='canvas'||b==='webgl') ? b : 'auto';
-      try{ if(this.backend==='auto') localStorage.removeItem('codemap_renderer'); else localStorage.setItem('codemap_renderer', this.backend); }catch(e){}
+      if(this.backend==='auto') U.lsDel('codemap_renderer'); else U.lsSet('codemap_renderer', this.backend);
       this.kick(); return this.backend;
     }
     // czy ta klatka idzie przez GPU; eksport PNG (inny canvas) i brak / utrata WebGL → canvas 2D
@@ -270,23 +270,30 @@ CM.Renderer = (function(){
       ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
       this._drawNodes(ctx, vb, gl);
       if(this.opts.showLabels) this._drawLabels(ctx);
-      for(const d of this.decorators){ try{ d(ctx, this); }catch(e){} ctx.globalAlpha=1; ctx.setLineDash([]); }
+      for(const d of this.decorators){ try{ d(ctx, this); }catch(e){ /* błąd nakładki nie zatrzymuje klatki */ } ctx.globalAlpha=1; ctx.setLineDash([]); }
 
       // fps
       const now=performance.now(); if(this._lt){ this._fps=Math.round(1000/(now-this._lt)); } this._lt=now;
     }
 
+    // ---- wspólne dla canvas 2D i warstwy WebGL (gl-layer.js): widoczność krawędzi, kolor i jasność węzła ----
+    // krawędź widoczna: w widoku wpływu oba końce w jego zbiorze, przy podświetleniu oba końce podświetlone
+    edgeVisible(e){ const imp=this.impact;
+      return imp ? (imp.all.has(e.source)&&imp.all.has(e.target)) : (!this.highlight || (this.highlight.has(e.source)&&this.highlight.has(e.target))); }
+    // kolory widoku wpływu z motywu (raz na klatkę) albo null bez widoku wpływu
+    impactPalette(){ return this.impact ? {up:getCss('--cm-impact-up')||'#ff9d4d', down:getCss('--cm-impact-down')||'#36d0e0',
+      focus:getCss('--cm-impact-focus')||'#ffffff'} : null; }
+    // kolor węzła: nakładka → paleta kosmiczna → kolor języka; widok wpływu przemalowuje fokus / w dół / w górę
+    nodeColor(n, cosmic, pal){
+      const col=(this.colorFn&&this.colorFn(n))||(cosmic?this.cosmicColor(n._cosmic):badgeColor(n)), imp=this.impact;
+      if(imp){ if(n.id===imp.focus) return pal.focus; if(imp.down.has(n.id)) return pal.down; if(imp.up.has(n.id)) return pal.up; }
+      return col;
+    }
+    nodeBright(n){ const imp=this.impact; return imp ? imp.all.has(n.id) : (!this.highlight||this.highlight.has(n.id)); }
+
     _drawGrid(ctx, vb){
-      const z=this.cam.zoom;
-      if(z<0.025) return;            // far zoom-out: grid is meaningless and risks runaway loops
-      let step=40, guard=0;
-      while(step*z<26 && guard++<40) step*=2;      // keep grid spacing readable at any zoom
-      guard=0; while(step*z>120 && guard++<40) step/=2;
-      if(!(step>0) || !isFinite(step)) return;
-      // hard caps on iteration counts (defensive against degenerate viewports)
-      const xN=Math.min(2000, Math.ceil((vb.maxX-vb.minX)/step)+2);
-      const yN=Math.min(2000, Math.ceil((vb.maxY-vb.minY)/step)+2);
-      const x0=Math.floor(vb.minX/step)*step, y0=Math.floor(vb.minY/step)*step;
+      const z=this.cam.zoom, g=gridSteps(vb, z); if(!g) return;
+      const {step, xN, yN, x0, y0}=g;
       ctx.strokeStyle = U.rgba(getCss('--grid-line')||'#5a6f88', 0.14); ctx.lineWidth = 1/z;
       ctx.beginPath();
       for(let i=0;i<=xN;i++){ const x=x0+i*step; ctx.moveTo(x,vb.minY); ctx.lineTo(x,vb.maxY); }
@@ -308,8 +315,7 @@ CM.Renderer = (function(){
                          Math.max(s.y,t.y)<vb.minY-margin||Math.min(s.y,t.y)>vb.maxY+margin;
       ctx.lineCap='round'; ctx.lineJoin='round'; ctx.setLineDash([]); ctx.lineDashOffset=0;
       const cosmic=!!this.opts.cosmic;
-      const vis=(e)=> impv ? (impv.all.has(e.source)&&impv.all.has(e.target))
-                          : (!this.highlight || (this.highlight.has(e.source)&&this.highlight.has(e.target)));
+      const vis=(e)=>this.edgeVisible(e);
       // gentle, consistent arc -> reads as soft organic strands instead of a straight-line hairball.
       // Falls back to straight lines on very dense graphs so cost never grows (one stroke per colour).
       const curved = this.opts.curvedImports!==false && this.edges.length<3500;
@@ -359,7 +365,7 @@ CM.Renderer = (function(){
 
       // dependency-IMPACT overlay — recolour the strands by direction (upstream warm, downstream cool)
       if(impv){
-        const upCol=getCss('--cm-impact-up')||'#ff9d4d', downCol=getCss('--cm-impact-down')||'#36d0e0';
+        const pal=this.impactPalette();
         const drawSet=(col, inSet)=>{ ctx.strokeStyle=U.rgba(col,0.85); ctx.lineWidth=1.6/z; ctx.beginPath(); let any=false;
           for(const e of this.edges){ if(e.type==='contains') continue;
             const s=byId.get(e.source), t=byId.get(e.target); if(!s||!t||cull(s,t)) continue;
@@ -367,8 +373,8 @@ CM.Renderer = (function(){
             if(!(inSet.has(e.source)||inSet.has(e.target))) continue;
             seg(s,t); any=true; }
           if(any) ctx.stroke(); };
-        drawSet(downCol, impv.down);
-        drawSet(upCol, impv.up);
+        drawSet(pal.down, impv.down);
+        drawSet(pal.up, impv.up);
       }
 
       // dependency CYCLES — overlay offending edges in hot red (same gentle arc)
@@ -406,8 +412,7 @@ CM.Renderer = (function(){
     _drawNodes(ctx, vb, gl){
       const imp=this.impact, dimMode=!!this.highlight||!!imp, scale=this.opts.nodeScale, z=this.cam.zoom, W=this.w, H=this.h;
       const cosmic=!!this.opts.cosmic; if(cosmic) this._buildCosmicLUT();
-      const upCol=imp?(getCss('--cm-impact-up')||'#ff9d4d'):null, downCol=imp?(getCss('--cm-impact-down')||'#36d0e0'):null,
-            focusCol=imp?(getCss('--cm-impact-focus')||'#ffffff'):null;
+      const pal=this.impactPalette();
       // LOD: at huge counts / far zoom, raise the sub-pixel skip floor (tiny dots cost more than
       // they reveal) and cap the per-node decoration list so it can never grow unbounded.
       const huge=this.nodes.length>(this.opts.lodHugeNodes||9000);
@@ -422,14 +427,7 @@ CM.Renderer = (function(){
         const sp={x:ma*n.x+mc*n.y+me, y:mb*n.x+md*n.y+mf};
         if(sp.x<-rPx-20||sp.x>W+rPx+20||sp.y<-rPx-20||sp.y>H+rPx+20) continue;
         if(!gl){   // w trybie WebGL wypełnienia rysuje GPU — tu zostają tylko obwódki zaznaczenia itp.
-          let col=(this.colorFn&&this.colorFn(n))||(cosmic?this.cosmicColor(n._cosmic):badgeColor(n));
-          let bright;
-          if(imp){
-            bright=imp.all.has(n.id);
-            if(n.id===imp.focus) col=focusCol;
-            else if(imp.down.has(n.id)) col=downCol;
-            else if(imp.up.has(n.id)) col=upCol;
-          } else bright=!this.highlight||this.highlight.has(n.id);
+          const col=this.nodeColor(n, cosmic, pal), bright=this.nodeBright(n);
           const isSym=n.type==='symbol';
           const m=bright?(isSym?fullD:full):(isSym?dimD:dim); let arr=m.get(col); if(!arr){ arr=[]; m.set(col,arr); } arr.push(sp.x,sp.y,rPx);
         }
@@ -467,7 +465,7 @@ CM.Renderer = (function(){
       // per-node decorations — only the handful of special nodes
       for(const sp of special){
         const {n,x,y,rPx,isSel,isHov,isFocus}=sp;
-        if(isFocus){ ctx.strokeStyle=focusCol||'#ffffff'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,rPx+4,0,7); ctx.stroke(); }
+        if(isFocus){ ctx.strokeStyle=(pal&&pal.focus)||'#ffffff'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,rPx+4,0,7); ctx.stroke(); }
         if(this.diffMode && n.diff){ const dc=n.diff==='added'?'#34d399':n.diff==='removed'?'#f87171':'#fbbf24';
           ctx.strokeStyle=U.rgba(dc,0.95); ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(x,y,rPx+5,0,7); ctx.stroke(); }
         if((n.type==='folder'||n.symbolCount)&&n.collapsed){ ctx.strokeStyle=U.rgba('#ffffff',0.9); ctx.lineWidth=1.6;
@@ -587,10 +585,7 @@ CM.Renderer = (function(){
       canvas.width=r.width*dpr; canvas.height=r.height*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.clearRect(0,0,r.width,r.height);
       if(!this.nodes.length) return;
-      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      for(const n of this.nodes){ minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x);maxY=Math.max(maxY,n.y); }
-      const bw=Math.max(1,maxX-minX), bh=Math.max(1,maxY-minY);
-      const pad=8; const sc=Math.min((r.width-pad*2)/bw,(r.height-pad*2)/bh);
+      const {minX, minY, bw, bh, sc}=fitPoints(this.nodes, r.width, r.height, 8);
       const ox=(r.width-bw*sc)/2-minX*sc, oy=(r.height-bh*sc)/2-minY*sc;
       this._mm={sc,ox,oy};
       // one batched path + one stroke (style is uniform); sample edges on huge maps
@@ -751,7 +746,7 @@ CM.Renderer = (function(){
       window.addEventListener('mouseup',(e)=>{
         // upuszczenie węzła poza mapą (np. w oknie ChatBota): odbiorca dostaje węzeł, a pozycja na mapie wraca
         if(mode==='dragNode' && dragNode && moved && this.onNodeDrop && dragStart){
-          let taken=false; try{ taken=!!this.onNodeDrop(dragNode, e.clientX, e.clientY); }catch(err){}
+          let taken=false; try{ taken=!!this.onNodeDrop(dragNode, e.clientX, e.clientY); }catch(err){ console.warn('[CodeMap] upuszczenie węzła', err); }
           if(taken){ dragNode.x=dragStart.x; dragNode.y=dragStart.y; dragNode.vx=0; dragNode.vy=0; this.kick(); }
         }
         dragStart=null;
@@ -881,6 +876,25 @@ CM.Renderer = (function(){
     ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
   let _cssCache={};
   function getCss(v){ if(v in _cssCache) return _cssCache[v]; const c=getComputedStyle(document.documentElement).getPropertyValue(v).trim(); _cssCache[v]=c; return c; }
+  // środki węzłów wpasowane w prostokąt W×H z marginesem pad (minimapa, podgląd okolicy w navigation.js):
+  // → {minX, minY, maxX, maxY, bw, bh, sc} — bw/bh ≥ 1, sc = skala świat → piksele
+  function fitPoints(nodes, W, H, pad){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    for(const n of nodes){ minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x);maxY=Math.max(maxY,n.y); }
+    const bw=Math.max(1,maxX-minX), bh=Math.max(1,maxY-minY);
+    return {minX, minY, maxX, maxY, bw, bh, sc:Math.min((W-pad*2)/bw,(H-pad*2)/bh)};
+  }
+  // siatka tła (canvas 2D i WebGL): krok czytelny przy każdym zoomie, twarde limity liczby linii; null = bez siatki
+  function gridSteps(vb, z){
+    if(z<0.025) return null;            // far zoom-out: grid is meaningless and risks runaway loops
+    let step=40, guard=0;
+    while(step*z<26 && guard++<40) step*=2;      // keep grid spacing readable at any zoom
+    guard=0; while(step*z>120 && guard++<40) step/=2;
+    if(!(step>0) || !isFinite(step)) return null;
+    // hard caps on iteration counts (defensive against degenerate viewports)
+    return {step, xN:Math.min(2000, Math.ceil((vb.maxX-vb.minX)/step)+2), yN:Math.min(2000, Math.ceil((vb.maxY-vb.minY)/step)+2),
+      x0:Math.floor(vb.minX/step)*step, y0:Math.floor(vb.minY/step)*step};
+  }
 
-  return {Renderer, badgeColor, getCss};
+  return {Renderer, badgeColor, getCss, gridSteps, fitPoints};
 })();

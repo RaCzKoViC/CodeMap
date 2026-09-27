@@ -46,7 +46,7 @@
     brow.appendChild(bBuild); brow.appendChild(bClear);
     ragBox.appendChild(el('div',{class:'set-desc',text:t('ai.ragModel')})); ragBox.appendChild(eSel); ragBox.appendChild(brow); ragBox.appendChild(rbar); ragBox.appendChild(rstat);
     const agentCb=el('input',{type:'checkbox'}); try{ agentCb.checked=localStorage.getItem('codemap_chatbot_agent')!=='0'; }catch(e){ agentCb.checked=true; }
-    agentCb.onchange=()=>{ try{ localStorage.setItem('codemap_chatbot_agent', agentCb.checked?'1':'0'); }catch(e){} };
+    agentCb.onchange=()=>{ U.lsSet('codemap_chatbot_agent', agentCb.checked?'1':'0'); };
     ragBox.appendChild(el('label',{class:'chk set-mt'}, agentCb, el('span',{text:t('ai.ragAgent')})));
     const showStat=async()=>{
       const g=window.CMApp&&CMApp.graph; if(!g||!g.nodes||g.nodes.size<2){ rstat.textContent=t('ai.ragNoProject'); return; }
@@ -54,7 +54,7 @@
       rstat.textContent=t('ai.ragStat').replace('{c}',s.chunks).replace('{f}',s.files).replace('{v}', s.vectors?t('ai.ragYes').replace('{m}',s.model).replace('{d}',s.dim):t('ai.ragNo'));
       rstat.className='set-localai-stat'+(s.vectors?' ok':'');
     };
-    let models=[]; try{ models=await CM.RAG.embeddingModels(); }catch(e){}
+    let models=[]; try{ models=await CM.RAG.embeddingModels(); }catch(e){ /* brak modeli → komunikat niżej */ }
     eSel.innerHTML='';
     if(!models.length){ eSel.appendChild(el('option',{value:'',text:'—'})); eSel.disabled=true; bBuild.disabled=true; rstat.textContent=t('ai.ragNoModel'); rstat.className='set-localai-stat err'; }
     else { const cur=await CM.RAG.pickModel();

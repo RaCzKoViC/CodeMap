@@ -18,13 +18,13 @@
         navigator.serviceWorker.register('sw.js').catch(()=>{});
         navigator.serviceWorker.addEventListener('controllerchange',()=>{
           if(!hadController) return;   // first install / claim — not an update
-          try{ U.toast(I.t('ca.swUpdated','✨ Dostępna nowa wersja — odśwież stronę (Ctrl+R).'),'',6000); }catch(e){}
+          try{ U.toast(I.t('ca.swUpdated','✨ Dostępna nowa wersja — odśwież stronę (Ctrl+R).'),'',6000); }catch(e){ /* tylko podpowiedź — nie psuje przełączenia SW */ }
         });
       });
     }
     const showInstall=(on)=>{ document.querySelectorAll('.pwa-install').forEach(b=>b.classList.toggle('hidden', !on)); };
     const doInstall=async()=>{ if(!_installPrompt) return; _installPrompt.prompt();
-      try{ await _installPrompt.userChoice; }catch(e){} _installPrompt=null; showInstall(false); };
+      try{ await _installPrompt.userChoice; }catch(e){ /* okno zamknięte bez wyboru — i tak chowamy przycisk */ } _installPrompt=null; showInstall(false); };
     window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); _installPrompt=e; showInstall(true); });
     window.addEventListener('appinstalled', ()=>{ _installPrompt=null; showInstall(false); U.toast(I.t('ca.pwaInstalled','✅ Zainstalowano CodeMap jako aplikację.'),'success',4000); });
     const btn=$('#btn-install'); if(btn){ btn.classList.add('pwa-install'); btn.onclick=doInstall; }
@@ -48,7 +48,7 @@
     if(CM.Prefs) s._v=CM.Prefs.VERSION;   // wersja formatu (prefs.js — migracja starszych bloby, także z synchronizacji)
     return s;
   }
-  function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(collectSettings())); }catch(e){} }
+  function saveSettings(){ U.lsSet(SETTINGS_KEY, JSON.stringify(collectSettings())); }
   // luminance (0..1) of a "#rrggbb" hex or an "r,g,b" string — used to keep bg/tint and theme consistent
   function _lum(v){ let r,g,b;
     if(/^#/.test(v)){ let h=v.replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); r=(n>>16)&255; g=(n>>8)&255; b=n&255; }
@@ -79,10 +79,10 @@
     }
   }
   function wireSettings(){
-    let saved=null; try{ saved=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null'); }catch(e){}
+    let saved=U.lsJSON(SETTINGS_KEY, null);
     if(saved && CM.Prefs){
       const sel=$('#sel-layout'), mig=CM.Prefs.migrate(saved, {ids:SETTINGS_INPUTS, layouts:sel?[...sel.options].map(o=>o.value):null, defaultLayout:'pack'});
-      if(mig && !CM.Prefs.same(mig, saved)){ saved=mig; try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(mig)); }catch(e){} }
+      if(mig && !CM.Prefs.same(mig, saved)){ saved=mig; U.lsSet(SETTINGS_KEY, JSON.stringify(mig)); }
     }
     applySettings(saved);
     const persist=U.debounce(saveSettings, 250);
@@ -155,6 +155,8 @@
     const ac=document.querySelector('#accent-row .acc[data-acc="#22d3ee"]'); if(ac) ac.click();
     if(A._applyThemePreset) A._applyThemePreset('depth');
   }
+  // odinstalowanie / czyszczenie danych: każdy krok osobno — błąd jednego nie blokuje reszty, ale zostaje w konsoli
+  const wipeStep=async(what, f)=>{ try{ await f(); }catch(e){ console.warn('[CodeMap] czyszczenie danych: '+what, e); } };
   function wireSettingsUI(){
     CM.Settings.wire({
       canInstall:()=>!!_installPrompt,
@@ -168,21 +170,19 @@
         const blk=$('#rng-trans'); if(blk&&blk.closest('.filter-block')) blk.closest('.filter-block').scrollIntoView({behavior:'smooth',block:'start'}); },
       resetAppearance:resetAppearance,
       uninstall:async()=>{
-        try{ if(navigator.serviceWorker && !window.acquireVsCodeApi){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.unregister(); } }catch(e){}
-        try{ const ks=await caches.keys(); for(const k of ks) await caches.delete(k); }catch(e){}
+        await wipeStep('service worker', async()=>{ if(navigator.serviceWorker && !window.acquireVsCodeApi){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.unregister(); } });
+        await wipeStep('Cache Storage', async()=>{ const ks=await caches.keys(); for(const k of ks) await caches.delete(k); });
       },
       clearAllData:async()=>{
-        try{ if(CM.Storage.clearSession) await CM.Storage.clearSession(); }catch(e){}
-        try{ indexedDB.deleteDatabase('codemap-db'); }catch(e){}
-        try{ indexedDB.deleteDatabase('codemap-drive'); }catch(e){}
-        try{ indexedDB.deleteDatabase('codemap-live'); }catch(e){}
-        try{ if(CM.AnalysisCache) await CM.AnalysisCache.clear(); }catch(e){}
+        await wipeStep('sesja', async()=>{ if(CM.Storage.clearSession) await CM.Storage.clearSession(); });
+        for(const db of ['codemap-db','codemap-drive','codemap-live']) await wipeStep(db, ()=>{ indexedDB.deleteDatabase(db); });
+        await wipeStep('pamięć analizy', async()=>{ if(CM.AnalysisCache) await CM.AnalysisCache.clear(); });
         // wipe EVERY app key (settings, mindmaps, snapshots, AI keys, chatbot convs, recents…),
         // not a hardcoded subset that drifts as features are added
-        try{
+        await wipeStep('localStorage', ()=>{
           const ks=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.toLowerCase().startsWith('codemap')) ks.push(k); }
-          ks.forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
-        }catch(e){}
+          ks.forEach(k=>U.lsDel(k));
+        });
         setTimeout(()=>location.reload(), 700);
       },
     });
@@ -327,8 +327,8 @@
   }
   // small collapse/expand chevrons on each left-panel section (Wygląd, Mapa, Figury, …); state persisted
   function wireCollapsibleSections(){
-    let collapsed={}; try{ collapsed=JSON.parse(localStorage.getItem('codemap_fb')||'{}'); }catch(e){}
-    const save=U.debounce(()=>{ try{ localStorage.setItem('codemap_fb', JSON.stringify(collapsed)); }catch(e){} }, 200);
+    let collapsed=U.lsJSON('codemap_fb', {});
+    const save=U.debounce(()=>{ U.lsSet('codemap_fb', JSON.stringify(collapsed)); }, 200);
     document.querySelectorAll('#left-panel .filter-block').forEach(block=>{
       const h4=block.querySelector('h4'); if(!h4 || h4.querySelector('.fb-toggle')) return;
       const key=(h4.querySelector('[data-i18n]')&&h4.querySelector('[data-i18n]').dataset.i18n) || h4.getAttribute('data-i18n') || h4.textContent.trim();

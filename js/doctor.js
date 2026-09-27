@@ -14,13 +14,7 @@ CM.Doctor = (function(){
   }
   function ranking(g, gitCore){ return files(g).filter(n=>n.preview!=null || n.metrics.lines).sort((a,b)=>score(g,b,gitCore)-score(g,a,gitCore)); }
   function top(g, gitCore){ return ranking(g, gitCore).find(n=>n.preview!=null) || null; }
-  function find(g, q){
-    q=String(q||'').replace(/\\/g,'/').replace(/^\.?\//,'').trim().toLowerCase(); if(!q) return null;
-    let best=null, bs=-1;
-    for(const n of files(g)){ const p=n.path.toLowerCase(), nm=(n.name||'').toLowerCase();
-      const s=p===q?100:p.endsWith('/'+q)?90:nm===q?80:p.includes(q)?50:-1; if(s>bs){ bs=s; best=n; } }
-    return best;
-  }
+  function find(g, q){ return CM.util.matchPath(files(g), q); }
 
   // najdłuższe funkcje / klasy: zakres symbolu = od jego linii do linii następnego symbolu (albo końca pliku)
   function spans(n, maxSpans, maxLines){

@@ -1,4 +1,4 @@
-// Smoke panelu mapy w headless Chrome (CDP, bez Playwrighta — jak tools/smoke.mjs), w warunkach webview VS Code:
+// Smoke panelu mapy w headless Chrome (CDP z tools/cdp.mjs, bez Playwrighta — jak tools/smoke.mjs), w warunkach webview VS Code:
 //  - HTML z src/webview.js (CSP z nonce, <base>, adresy przez „asWebviewUri"), dokument i zasoby na RÓŻNYCH
 //    originach (jak vscode-webview:// i https://file+.vscode-resource…) — Web Workery nie wystartują,
 //  - atrapa acquireVsCodeApi wstrzyknięta przed CSP (jak robi to VS Code), zbiera postMessage,
@@ -7,25 +7,18 @@
 // „Otwórz w edytorze" z menu kontekstowego → codemap:open, symbol → linia, keepView, język, brak SW,
 // ścieżki zapasowe bez Workerów (analiza, fizyka), CSP blokuje skrypt inline, 0 wyjątków i 0 błędów konsoli.
 //   node test/webview-smoke.mjs            (CHROME=ścieżka/do/chrome, gdy autodetekcja zawiedzie)
-import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { readFile, mkdtemp } from 'node:fs/promises';
 import fs from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { require, tmpBundle, tmpDir, rmDir, writeFiles, FIXTURE, REPO } from './helpers.mjs';
 
 const { buildWebviewHtml, makeNonce } = require('../src/webview.js');
 const { git, gitAvailable } = await import(pathToFileURL(path.join(REPO, 'tools', 'git-probe.mjs')).href);
+// serwer plików, Chrome i klient CDP wspólne z tools/smoke.mjs (test/** nie trafia do paczki .vsix — .vscodeignore)
+const { findChrome, launchChrome, serveDir, sleep, MIME } = await import(pathToFileURL(path.join(REPO, 'tools', 'cdp.mjs')).href);
 
-const CANDIDATES = [process.env.CHROME, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-  'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable',
-  '/usr/bin/chromium-browser', '/usr/bin/chromium', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].filter(Boolean);
-const CHROME = CANDIDATES.find((p) => fs.existsSync(p));
-if (!CHROME) { console.error('✖ Nie znaleziono Chrome/Chromium — ustaw CHROME=<ścieżka>'); process.exit(2); }
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+if (!findChrome()) { console.error('✖ Nie znaleziono Chrome/Chromium — ustaw CHROME=<ścieżka>'); process.exit(2); }
 
 // --- paczka i mapa z analizy ---
 const EXT = tmpBundle(), APP = path.join(EXT, 'app');
@@ -48,14 +41,7 @@ const map = res.graph;
 map.nodes.push({ id: 'src/a.js#a', type: 'symbol', name: 'a', path: 'src/a.js#a', parent: 'src/a.js', depth: 2, kind: 'function', line: 2, endLine: 2, x: 0, y: 0 });
 
 // --- dwa serwery: zasoby aplikacji (tylko app/) i dokument webview na innym originie ---
-const resSrv = createServer(async (req, res) => {
-  const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  const file = path.normalize(path.join(APP, p));
-  if (!file.startsWith(APP + path.sep)) { res.writeHead(404); return res.end(); }
-  try { const data = await readFile(file); res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' }); res.end(data); }
-  catch { res.writeHead(404); res.end(); }
-});
-await new Promise((r) => resSrv.listen(0, '127.0.0.1', r));
+const resSrv = await serveDir(APP);
 const RES = `http://localhost:${resSrv.address().port}`;
 const MOCK = `<script>(function(){ var posted=[], n=0; window.__vscodePosted=posted;
   window.acquireVsCodeApi=function(){ if(n++) throw new Error('acquireVsCodeApi: tylko raz'); return {
@@ -71,37 +57,11 @@ const docSrv = createServer((req, res) => {
 await new Promise((r) => docSrv.listen(0, '127.0.0.1', r));
 const DOC = `http://127.0.0.1:${docSrv.address().port}/index.html`;
 
-// --- headless Chrome + CDP ---
-const prof = await mkdtemp(path.join(tmpdir(), 'codemap-vsc-smoke-'));
-const dbg = 9222 + Math.floor(Math.random() * 500);
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${dbg}`, `--user-data-dir=${prof}`, '--window-size=1400,900',
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--no-sandbox', 'about:blank'], { stdio: 'ignore' });
-let targets = null;
-for (let i = 0; i < 60 && !targets; i++) { try { targets = await (await fetch(`http://127.0.0.1:${dbg}/json`)).json(); } catch { await sleep(250); } }
-if (!targets) { console.error('✖ Chrome nie odpowiada na CDP'); await cleanup(2); }
-const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
-await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-let id = 0; const pending = new Map(); const errors = [], exceptions = [], warnings = [], expected = [];
-ws.onmessage = (ev) => {
-  const m = JSON.parse(ev.data);
-  if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return; }
-  if (m.method === 'Runtime.exceptionThrown') exceptions.push(m.params.exceptionDetails?.exception?.description || m.params.exceptionDetails?.text);
-  if (m.method === 'Runtime.consoleAPICalled') {
-    const text = m.params.args.map((a) => a.value ?? a.description).join(' ');
-    if (m.params.type === 'error') errors.push(text); else if (m.params.type === 'warning') warnings.push(text);
-  }
-  if (m.method === 'Log.entryAdded') {
-    const e = m.params.entry, text = e.text + (e.url ? ' ' + e.url : '');
-    if (e.level === 'error') (/\/api\//.test(e.url || '') ? expected : errors).push(text);   // /api/auth/me — brak backendu (jak tools/smoke.mjs)
-    else if (e.level === 'warning') warnings.push(text);
-  }
-};
-const send = (method, params = {}) => new Promise((r) => { const i = ++id; pending.set(i, r); ws.send(JSON.stringify({ id: i, method, params })); });
-const evalJs = async (expr) => {
-  const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
-  if (r.result?.exceptionDetails) throw new Error(r.result.exceptionDetails.exception?.description || r.result.exceptionDetails.text);
-  return r.result?.result?.value;
-};
+// --- headless Chrome + CDP (tools/cdp.mjs); /api/auth/me bez backendu → oczekiwane błędy sieci (jak tools/smoke.mjs) ---
+let B;
+try { B = await launchChrome({ prefix: 'codemap-vsc-smoke-', hideScrollbars: false, onClose: () => { resSrv.close(); docSrv.close(); } }); }
+catch (e) { console.error('✖ ' + e.message); rmDir(EXT); rmDir(BASE); process.exit(2); }
+const { send, js: evalJs, errors, exceptions, warnings, apiErrors: expected } = B;   // js rzuca przy wyjątku w stronie
 const deliver = (msg) => evalJs(`window.dispatchEvent(new MessageEvent('message', {data: ${JSON.stringify(msg)}})), true`);
 const posted = () => evalJs('window.__vscodePosted');
 async function waitPost(pred, ms = 8000) {
@@ -113,7 +73,6 @@ async function mouse(type, x, y, button = 'left', clickCount = 1) { await send('
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 
-await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable');
 await send('Page.navigate', { url: DOC });
 
 // 1. start i wczytanie mapy
@@ -223,9 +182,7 @@ console.log(`– oczekiwane błędy sieci (/api/ — brak backendu): ${expected.
 await cleanup(failed ? 1 : 0);
 
 async function cleanup(code) {
-  try { ws.close(); } catch {}
-  chrome.kill(); resSrv.close(); docSrv.close();
-  await sleep(300);
-  rmDir(prof); rmDir(EXT); rmDir(BASE);
+  await B.close();   // CDP, Chrome, oba serwery, profil
+  rmDir(EXT); rmDir(BASE);
   process.exit(code);
 }

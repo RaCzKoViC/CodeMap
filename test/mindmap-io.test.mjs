@@ -189,6 +189,24 @@ describe('schematy układu', () => {
     assert.equal(L.fishbone(fresh()), false, 'fishbone na pustej mapie');
   });
 
+  test('łączniki (wspólne dla ekranu i eksportu SVG): kotwice wg układu, ścieżka, obrys kart', () => {
+    const p = { x: 0, y: 0, w: 100 }, n = { x: 300, y: 10, w: 100 };
+    assert.deepEqual(host(L.anchorDirs('right', n, p)), ['r', 'l']);
+    assert.deepEqual(host(L.anchorDirs('radial', n, p)), ['c', 'c']);
+    assert.deepEqual(host(L.anchorDirs('down', n, p)), ['b', 't']);
+    assert.deepEqual(host(L.anchorDirs('leftright', { x: -300, y: 0, w: 100 }, p)), ['l', 'r']);
+    assert.deepEqual(host(L.anchorDirs('free', { x: 0, y: 400, w: 100 }, p)), ['b', 't']);
+    assert.deepEqual(host(L.anchorPoint(p, 'r', 60)), { x: 100, y: 30 });
+    assert.deepEqual(host(L.anchorPoint(p, 'b', 50)), { x: 50, y: 50 });
+    assert.equal(L.connectorSvg({ x: 0, y: 0 }, { x: 10, y: 20 }, false, '#fff', false).includes('d="M0 0 H 5 V 20 H 10"'), true);
+    assert.match(L.connectorSvg({ x: 0, y: 0 }, { x: 100, y: 10 }, true, '#fff', true), /d="M0 0 C 50 0, 50 10, 100 10" stroke="#fff" stroke-width="2.6"/);
+    const st = { nodes: [{ id: 'a', x: 0, y: 0, w: 100 }, { id: 'b', x: 300, y: 0, w: 80, parent: 'a', color: '#f00' }, { id: 'c', x: 0, y: 200, w: 50, parent: 'b' }],
+      edges: [{ from: 'a', to: 'c' }], layout: 'right' };
+    const seen = []; L.eachConnector(st, () => 60, (x) => x.id === 'c', (from, to, col, wide) => seen.push([from.x, to.x, col, wide]));
+    assert.deepEqual(host(seen), [[100, 300, '#f00', true]], 'zwinięte węzły bez łączników, gruba linia drzewa w kolorze dziecka');
+    assert.deepEqual(host(L.cardBounds(st.nodes, () => 70, (x) => x.id === 'c')), { minX: 0, minY: 0, maxX: 380, maxY: 70 });
+  });
+
   test('schemat kolorów: korzeń = pierwszy kolor palety, gałęź dziedziczy kolor', () => {
     const st = importMd('# R\n- A\n  - A1\n- B\n');
     L.paintSchema(st, T.SCHEMA_PALETTES.sunset);
