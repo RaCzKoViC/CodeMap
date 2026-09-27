@@ -97,7 +97,7 @@ CM.Ollama = (function(){
       // flush: multi-byte tail + a final line that never got its trailing '\n' (was silently dropped)
       buf+=dec.decode();
       if(buf.trim()) take(buf);
-    } finally { try{ reader.cancel(); }catch(e){} }   // free the HTTP connection on early return/throw/abort
+    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){} }   // free the HTTP connection on early return/throw/abort
     return full;
   }
 
@@ -116,7 +116,7 @@ CM.Ollama = (function(){
           let j; try{ j=JSON.parse(line); }catch(e){ continue; }
           if(j.error) throw new Error('Ollama: '+j.error);
           last=j; if(onProgress) onProgress({status:j.status||'', pct:(j.total&&j.completed)?Math.round(j.completed/j.total*100):null, total:j.total||0, completed:j.completed||0}); } }
-    } finally { try{ reader.cancel(); }catch(e){} }
+    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){} }
     _models=null; try{ await models(true); }catch(e){}
     return last;
   }

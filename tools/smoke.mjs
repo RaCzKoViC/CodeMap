@@ -133,6 +133,25 @@ const symbolsRes = await evalJs(`(async()=>{ try{
   return {count:info.count, calls:info.calls, files:info.files, shown, details:details.length>0, exportOk:dot.nodes>0 && /digraph/.test(dot.text), hidden};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// ChatBot bez skonfigurowanego AI (profil smoke nie ma kluczy ani modeli): scenariusz ze zgłoszenia —
+// „wymień wszystkie dostępne komędy" → lista narzędzi bez modelu i bez akcji; akcje modelu bez wymaganych
+// argumentów / o pustej lub nieznanej nazwie są odrzucane zamiast kończyć się czerwonym chipem
+const chatbotRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const C=CM.ChatBot._check;
+  const bad=[{action:'setMode',args:{}},{action:'setLayout',args:{}},{action:'',args:{}},{action:'nope',args:{}}].filter(C.validAction).length;
+  const good=[{action:'setMode',args:{mode:'codemap'}},{action:'setLayout',args:{layout:'pack'}}].filter(C.validAction).length;
+  const q='wymie\u0144 wszystkie dost\u0119pne kom\u0119dy';
+  const help=C.isHelpRequest(q) && !C.looksLikeCommand(q) && C.looksLikeCommand('czy mo\u017cesz ustawi\u0107 uk\u0142ad treemap?');
+  CM.ChatBot.open(); await sleep(300); CM.ChatBot._newChat(); await sleep(200);
+  const ta=document.querySelector('#cb-panel .cb-input'); ta.value=q; ta.dispatchEvent(new Event('input',{bubbles:true}));
+  document.querySelector('#cb-panel .cb-send').click(); await sleep(500);
+  const conv=CM.ChatBot._convs()[0]; const last=[...conv.messages].reverse().find(m=>m.role==='assistant');
+  const lines=((last&&last.content)||'').split('\\n').filter(l=>l.indexOf('- \\u0060/')===0).length;
+  const err=document.querySelectorAll('#cb-panel .cb-chip-err').length, acts=((last&&last.actions)||[]).length;
+  CM.ChatBot.close();
+  return {bad, good, help, lines, err, acts};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -146,6 +165,8 @@ check(inspectOk === 'ok', `Inspect: reguły architektury (.codemap.rules.json) i
 if (symbolsRes && symbolsRes.skip) console.log(`– graf symboli (tree-sitter): pominięto — ${symbolsRes.why}`);
 else check(symbolsRes && !symbolsRes.error && symbolsRes.count > 0 && symbolsRes.shown > 0 && symbolsRes.details && symbolsRes.exportOk && symbolsRes.hidden,
   `graf symboli (tree-sitter): ${symbolsRes && symbolsRes.error ? symbolsRes.error : JSON.stringify(symbolsRes)}`);
+check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
+  `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
 check(exceptions.length === 0, `wyjątki JS: ${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

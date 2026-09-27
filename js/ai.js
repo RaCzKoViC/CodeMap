@@ -213,7 +213,7 @@ CM.AI = (function(){
           if(onData(j)===false) return;
         }
       }
-    } finally { try{ reader.cancel(); }catch(e){} }
+    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){} }
   }
 
   async function chatOpenAI(e, model, messages, opts){

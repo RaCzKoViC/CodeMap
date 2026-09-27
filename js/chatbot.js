@@ -25,6 +25,13 @@ CM.ChatBot = (function(){
     'untitled':'Nowa rozmowa','today':'dziś','empty':'Brak rozmów.','delConfirm':'Usunąć tę rozmowę?',
     'edit':'Edytuj wiadomość','save':'Zapisz i wyślij ponownie','cancel':'Anuluj','regen':'Wygeneruj odpowiedź ponownie','copy':'Kopiuj','copied':'Skopiowano',
     'del':'Usuń rozmowę','done':'✓ wykonano','failed':'nie udało się',
+    'helpHead':'Oto, co potrafię w CodeMap. Wpisz **/** w polu wiadomości, aby wybrać narzędzie z listy (Enter uruchamia), albo poproś zwykłym zdaniem, np. „ustaw układ treemap”.',
+    'noCommand':'Nie wykonałem żadnej akcji — to nie brzmiało jak polecenie. Wpisz **/**, aby zobaczyć listę narzędzi, albo napisz np. „włącz jasny motyw”.',
+    'argMissing':'Brakuje argumentu. Użycie: ','errNetwork':'Brak połączenia z dostawcą AI (sieć lub serwer nie odpowiada). Sprawdź połączenie albo wybierz inny model w Ustawieniach → AI.',
+    'errAuth':'Dostawca odrzucił klucz API — przetestuj go w Ustawieniach → AI.','errRate':'Przekroczono limit zapytań u dostawcy — spróbuj za chwilę.',
+    'errCtx':'Rozmowa jest za długa dla tego modelu — zacznij nową rozmowę (+) albo wybierz większy model.',
+    'errGpu':'Model lokalny nie zmieścił się w pamięci GPU albo sterownik przerwał pracę — wybierz mniejszy model w Ustawieniach → AI.',
+    'errDetails':'szczegóły: ','skipped':'pominięto nieprawidłowe akcje: ',
     'tools':'Narzędzia — wpisz / aby filtrować','toolRun':'Enter = uruchom / wstaw','toolNoMatch':'Brak narzędzi pasujących do zapytania',
     'attachHint':'Upuść element mapy tutaj','attachMax':'Maksymalnie 30 elementów w jednej wiadomości.','attachDup':'Ten element już jest dodany.',
     'attachRemove':'Usuń z wiadomości','attached':'Załączone elementy mapy','attachDrop':'Przeciągnij element mapy do tego okna, aby dodać go do wiadomości',
@@ -52,6 +59,13 @@ CM.ChatBot = (function(){
     'untitled':'New chat','today':'today','empty':'No conversations.','delConfirm':'Delete this conversation?',
     'edit':'Edit message','save':'Save & resend','cancel':'Cancel','regen':'Regenerate answer','copy':'Copy','copied':'Copied',
     'del':'Delete conversation','done':'✓ done','failed':'failed',
+    'helpHead':'Here is what I can do in CodeMap. Type **/** in the message box to pick a tool from the list (Enter runs it), or just ask in plain words, e.g. “set the treemap layout”.',
+    'noCommand':'I did not run any action — that did not sound like a command. Type **/** to see the tool list, or write e.g. “switch to the light theme”.',
+    'argMissing':'Missing argument. Usage: ','errNetwork':'Cannot reach the AI provider (network or server not responding). Check the connection or pick another model in Settings → AI.',
+    'errAuth':'The provider rejected the API key — test it in Settings → AI.','errRate':'The provider rate limit was exceeded — try again in a moment.',
+    'errCtx':'This conversation is too long for the model — start a new one (+) or pick a larger model.',
+    'errGpu':'The local model did not fit into GPU memory or the driver stopped it — pick a smaller model in Settings → AI.',
+    'errDetails':'details: ','skipped':'skipped invalid actions: ',
     'tools':'Tools — type / to filter','toolRun':'Enter = run / insert','toolNoMatch':'No tools match the query',
     'attachHint':'Drop a map element here','attachMax':'At most 30 elements per message.','attachDup':'This element is already attached.',
     'attachRemove':'Remove from message','attached':'Attached map elements','attachDrop':'Drag a map element into this window to attach it to the message',
@@ -93,6 +107,8 @@ CM.ChatBot = (function(){
   let convs=[], activeId=null;
   let _seq=0; function uid(){ _seq=(_seq+1); return 'm'+Date.now().toString(36)+_seq.toString(36); }
   function loadConvs(){ try{ convs=JSON.parse(localStorage.getItem(LS)||'[]'); }catch(e){ convs=[]; } if(!Array.isArray(convs)) convs=[];
+    // uszkodzone / stare wpisy (brak id, brak treści) nie mogą wysypać renderowania
+    convs=convs.filter(c=>c&&typeof c==='object'&&c.id).map(c=>Object.assign(c,{messages:(Array.isArray(c.messages)?c.messages:[]).filter(m=>m&&(m.role==='user'||m.role==='assistant'||m.role==='system')).map(m=>Object.assign(m,{content:typeof m.content==='string'?m.content:String(m.content==null?'':m.content)}))}));
     activeId=localStorage.getItem(LS_ACTIVE)||null;
     if(!convs.length){ newConversation(false); } else if(!convs.find(c=>c.id===activeId)){ activeId=convs[0].id; } }
   let _quotaWarned=false;
@@ -317,6 +333,56 @@ CM.ChatBot = (function(){
     if(vals.length===1) args[key]=vals[0][1];
     return args;
   }
+  // ---- walidacja akcji od modelu: nieznana nazwa albo brak wymaganego argumentu = akcja pominięta ----
+  // (zamiast czerwonego chipa „mode: codemap|mindmap" / „Nieznany układ" / pustego „▶")
+  const isHex=(v)=>typeof v==='string'&&/^#?[0-9a-f]{3,8}$/i.test(v.trim());
+  const nonEmpty=(v)=>typeof v==='string'?v.trim().length>0:(v!=null&&v!=='');
+  const oneOf=(v, list)=>typeof v==='string'&&list.includes(v.toLowerCase().trim());
+  const hasBool=(a, keys)=>keys.some(k=>typeof a[k]==='boolean');
+  const layoutsNow=()=>{ const st=(window.CMApp&&CMApp.appState)?CMApp.appState():{}; return st.availableLayouts||[]; };
+  const REQUIRED={
+    setMode:(a)=>oneOf(a.mode,['codemap','mindmap']), setLayout:(a)=>oneOf(a.layout, layoutsNow()),
+    search:(a)=>nonEmpty(a.query), focusNode:(a)=>nonEmpty(a.query||a.name), openNode:(a)=>nonEmpty(a.query||a.name),
+    findText:(a)=>nonEmpty(a.query), dependsOn:(a)=>nonEmpty(a.query||a.name), dependencies:(a)=>nonEmpty(a.query||a.name),
+    zoom:(a)=>oneOf(a.dir,['in','out']), rotate:(a)=>oneOf(a.dir,['left','right','reset']), setTheme:(a)=>oneOf(a.theme,['dark','light']),
+    setPreset:(a)=>nonEmpty(a.name||a.preset), setAccent:(a)=>isHex(a.color), setBackground:(a)=>isHex(a.color),
+    setSpacing:(a)=>isFinite(+a.percent)&&a.percent!=null, setNodeScale:(a)=>isFinite(+a.percent)&&a.percent!=null, setFontScale:(a)=>isFinite(+a.percent)&&a.percent!=null,
+    setLang:(a)=>oneOf(a.lang,['pl','en']), toggleLang:(a)=>nonEmpty(a.lang), listLang:(a)=>nonEmpty(a.lang),
+    togglePanel:(a)=>oneOf(a.side,['left','right']), loadRepo:(a)=>typeof a.url==='string'&&/[\w-]+\/[\w.-]+/.test(a.url),
+    mindmap:(a)=>oneOf(a.action,['arrange','layout','fit','save','markdown','undo']),
+    setFilter:(a)=>hasBool(a,['folders','files','externals','imports','import','references','reference','contains']),
+    renderOption:(a)=>hasBool(a,['grid','curved','lockall','hoverPreview']),
+    setGlass:(a)=>['transparency','menu','blur','tint'].some(k=>typeof a[k]==='number'),
+    setMetric:(a)=>nonEmpty(a.metric)||typeof a.min==='number',
+    exportGraph:(a)=>a.format==null||oneOf(a.format,['dot','mermaid','graphml']),
+  };
+  function knownAction(name){ return TOOLS.some(x=>x.name===name) || ['setNodeScale','setFontScale','runInspection','listActions'].includes(name); }
+  function validAction(a){
+    if(!a || typeof a.action!=='string' || !a.action.trim() || !knownAction(a.action)) return false;
+    const chk=REQUIRED[a.action]; return !chk || !!chk(a.args||{});
+  }
+  // czy wiadomość użytkownika jest POLECENIEM (rdzenie czasowników PL/EN, bez \b na końcu: „ustawić", „włączysz")
+  const CMD_VERB=/\b(w[lł][aą]cz|wy[lł][aą]cz|prze[lł][aą]cz|ustaw|zmie[nń]|uruchom|poka[zż]|otw[oó]rz|zamknij|zr[oó]b|za[lł]aduj|wczytaj|wykonaj|przybli[zż]|oddal|obr[oó][cć]|wyszukaj|szukaj|znajd[zź]|eksportuj|zapisz|ukryj|schowaj|rozwi[nń]|zwi[nń]|dopasuj|pod[sś]wietl|zaznacz|wyczy[sś][cć]|usu[nń]|wyr[oó]wnaj|posortuj|zastosuj|switch|turn|set|change|start|open|close|load|run|enable|disable|show|hide|make|zoom|rotate|search|find|export|save|expand|collapse|fit|highlight|clear|apply|toggle|focus)/i;
+  function looksLikeCommand(text){ return CMD_VERB.test(String(text||'')); }
+  // prośba o listę komend / narzędzi / możliwości → odpowiedź deterministyczna (bez modelu, bez akcji)
+  const HELP_RE=/(\b(jakie|wymie[nń]|lista|list[aę]?|poka[zż]|podaj|wypisz|show|what|which|all)[\s\S]{0,40}?\b(kom[eę]n?d|polece[nń]|akcj|narz[eę]dz|funkcj|mo[zż]liwo[sś]|command|action|tool|feature))|co potrafisz|co umiesz|w czym (mi )?pomo|what can you do|^\s*(help|pomoc|komendy|commands|\/help)\s*[?!.]*\s*$/i;
+  function isHelpRequest(text){ return HELP_RE.test(String(text||'')); }
+  function helpText(){
+    const lines=TOOLS.map(x=>'- `/'+x.name+(x.sig?' '+x.sig:'')+'` — '+x.desc);
+    return t('helpHead')+'\n\n'+lines.join('\n');
+  }
+  // przyjazny komunikat błędu dostawcy (oryginał w szczegółach, przycięty)
+  function friendlyError(e){
+    const msg=String((e&&e.message)||e||''); let head='';
+    if((e&&e.code==='net')||/failed to fetch|networkerror|net::|load failed|ECONNREFUSED|nie odpowiada/i.test(msg)) head=t('errNetwork');
+    else if((e&&(e.status===401||e.status===403))||/\b40[13]\b|invalid api key|unauthori[sz]ed|nieprawid[lł]owy.*klucz/i.test(msg)) head=t('errAuth');
+    else if((e&&e.status===429)||/\b429\b|rate limit|limit zapyta/i.test(msg)) head=t('errRate');
+    else if(/context ?window|contextwindow|maximum context|too long|prompt is too long|za d[lł]ug/i.test(msg)) head=t('errCtx');
+    else if(/webgpu|device (was )?lost|out of memory|oom|gpu/i.test(msg)) head=t('errGpu');
+    if(!head) return t('errPrefix')+msg;
+    return t('errPrefix')+head+(msg?('\n\n_'+t('errDetails')+msg.slice(0,220)+'_'):'');
+  }
+
   let localJsonOk=true;   // wyłączany na sesję, gdy silnik odrzuci gramatykę (starszy WebLLM/Ollama)
   // podgląd na żywo: wartość "reply" z NIEDOMKNIĘTEGO jeszcze JSON-a (strumień)
   function jsonReplyPrefix(s){ const m=/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/.exec(String(s)); if(!m) return '';
@@ -564,6 +630,12 @@ CM.ChatBot = (function(){
   }
   function runSlash(action, args){
     const conv=activeConv()||newConversation(false);
+    if(REQUIRED[action] && !REQUIRED[action](args||{})){   // np. samo „/setMode” — pokaż użycie, nie czerwony błąd
+      const tool=TOOLS.find(x=>x.name===action);
+      conv.messages.push({id:uid(), role:'user', content:'/'+action, ts:Date.now(), slash:true});
+      conv.messages.push({id:uid(), role:'assistant', content:t('argMissing')+'`/'+action+(tool&&tool.sig?' '+tool.sig:'')+'`', ts:Date.now(), slash:true});
+      conv.updatedAt=Date.now(); saveConvs(); renderMessages(); renderSidebar(); return;
+    }
     conv.messages.push({id:uid(), role:'user', content:'/'+action+(Object.keys(args||{}).length?(' '+JSON.stringify(args)):''), ts:Date.now(), slash:true});
     let result='', ok=true;
     try{ result=(window.CMApp&&CMApp.exec)?(CMApp.exec(action, args)||t('done')):''; }catch(e){ ok=false; result=(e&&e.message)||String(e); }
@@ -709,7 +781,7 @@ CM.ChatBot = (function(){
       const th=splitThink(m.content);
       thHtml=quick?'':thinkHTML({think:th.think, rest:'', open:false}, false);   // pełny tok rozumowania, zwijany kliknięciem; tryb szybki = bez myśli
       bodyTxt=stripActions(th.rest);
-      if(!String(bodyTxt).trim() && m.actions && m.actions.some(a=>!a.pending)) bodyTxt=t('didActions');
+      if(!String(bodyTxt).trim() && m.actions && m.actions.some(a=>!a.pending&&a.ok)) bodyTxt=t('didActions');
     }
     b.innerHTML=thHtml+fmt(bodyTxt);
     if(m.role==='user' && m.attachments && m.attachments.length){
@@ -813,6 +885,22 @@ CM.ChatBot = (function(){
   }
   async function runAssistant(){
     const conv=activeConv(); if(!conv) return;
+    // ścieżki bez modelu (działają nawet bez klucza API i bez modelu lokalnego):
+    //  • „jakie masz komendy?” / „co potrafisz” → lista narzędzi,
+    //  • krótkie jednoznaczne polecenie („włącz jasny motyw”) → wykonanie od razu (zaufane, wpisał użytkownik)
+    const lastUser=[...conv.messages].reverse().find(m=>m.role==='user');
+    if(lastUser && isHelpRequest(lastUser.content)){
+      conv.messages.push({id:uid(), role:'assistant', content:helpText(), ts:Date.now(), genMs:1});
+      conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv); return;
+    }
+    const quickCmd=lastUser && (lastUser.content||'').trim().length<=64 && intentFallback(lastUser.content);
+    if(quickCmd){
+      const t0=performance.now(); let result='', ok=true;
+      try{ result=((window.CMApp&&CMApp.exec)?CMApp.exec(quickCmd.action, quickCmd.args):'')||t('done'); }catch(e){ ok=false; result=(e&&e.message)||t('failed'); }
+      conv.messages.push({id:uid(), role:'assistant', content:'', ts:Date.now(), genMs:Math.max(1,Math.round(performance.now()-t0)),
+        actions:[{action:quickCmd.action, args:quickCmd.args, ok, result}]});
+      conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv); return;
+    }
     const entry=useCloud()?cloudEntry():null;
     if(useLocal() && !CM.LocalAI.hasWebGPU()){
       conv.messages.push({id:uid(), role:'assistant', content:t('noWebGPU'), ts:Date.now(), noKey:true}); saveConvs(); renderMessages();
@@ -892,6 +980,7 @@ CM.ChatBot = (function(){
         chip.classList.remove('cb-chip-run'); chip.classList.add('cb-chip-err'); chip.innerHTML='⚠ '+esc(entry.result); }
     };
     const execLive=(a, fromStream, trusted)=>{
+      if(!trusted && !validAction(a)) return;   // nieznana nazwa / brak wymaganych argumentów → pomiń (bez czerwonego chipa)
       const key=a.action+'|'+JSON.stringify(a.args||{});
       if(actKeys.has(key)){ if(fromStream&&(local||useOllama())) softStop(); return; }
       actKeys.add(key);
@@ -984,12 +1073,18 @@ CM.ChatBot = (function(){
       if(structured){
         const o=parseStructured(acc);
         if(o){ const thk=quick?'':splitThink(acc).think;   // zachowaj tok rozumowania (Ollama thinking / <think>) obok odpowiedzi
-          acc=(thk?('<think>'+thk+'</think>\n'):'')+(o.reply||(o.actions.length?t('done'):'')); for(const a of o.actions) execLive(a, false, false); }   // model output → untrusted (allowlista)
+          // akcje tylko wtedy, gdy użytkownik wydał POLECENIE (pytanie „wymień komendy” nie może ich uruchamiać),
+          // najwyżej 4 i tylko poprawne (validAction w execLive); model output → untrusted (allowlista)
+          const cmd=lastUserMsg && looksLikeCommand(lastUserMsg.content);
+          const acts=cmd ? o.actions.filter(validAction).slice(0,4) : [];
+          for(const a of acts) execLive(a, false, false);
+          const ran=liveActs.length>0;
+          acc=(thk?('<think>'+thk+'</think>\n'):'')+(o.reply||(ran?t('done'):t('noCommand'))); }
       }
       if(_paintT){ clearTimeout(_paintT); _paintT=null; }
       if(typing.parentNode) typing.remove();
       // final sweep (covers blocks that closed between last paint and stream end)
-      for(const a of extractActions(stripThink(acc))) execLive(a, false, false);   // model output → untrusted
+      if(!lastUserMsg || looksLikeCommand(lastUserMsg.content)) for(const a of extractActions(stripThink(acc)).slice(0,4)) execLive(a, false, false);   // model output → untrusted
       conv.messages.push({id:uid(), role:'assistant', content:acc, ts:Date.now(),
         actions:liveActs.length?liveActs.slice():undefined, genMs:Math.round(performance.now()-tStart)});
       conv.updatedAt=Date.now(); saveConvs(); renderMessages();
@@ -1003,7 +1098,7 @@ CM.ChatBot = (function(){
           actions:liveActs.length?liveActs.slice():undefined, genMs:Math.round(performance.now()-tStart)});
         conv.updatedAt=Date.now(); saveConvs(); renderMessages(); maybeTitle(conv);
       } else {
-        const msg=aborted?t('aborted'):(t('errPrefix')+((e&&e.message)||String(e)));
+        const msg=aborted?t('aborted'):friendlyError(e);
         if(acc){ conv.messages.push({id:uid(), role:'assistant', content:acc+'\n\n'+msg, ts:Date.now(),
           actions:liveActs.length?liveActs.slice():undefined}); }
         else { conv.messages.push({id:uid(), role:'assistant', content:msg, ts:Date.now(),
@@ -1059,5 +1154,6 @@ CM.ChatBot = (function(){
     if(wasOpen){ panel.classList.remove('hidden'); panel.classList.add('cb-open'); if(launcher) launcher.classList.add('cb-hidden'); } });
 
   return { init, open, close, toggle, isOpen:()=>isOpen, votes:getVotes, refresh:refreshModelUI, acceptDrop, dragOver, tools:()=>TOOLS.slice(),
+    _check:{validAction, looksLikeCommand, isHelpRequest, friendlyError, parseStructured},   // do testów / smoke
     _newChat:()=>newConversation(), _convs:()=>convs, _thumb:thumb, _exec:(a,g)=>CMApp.exec(a,g) };
 })();
