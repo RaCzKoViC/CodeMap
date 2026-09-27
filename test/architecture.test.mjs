@@ -7,9 +7,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { runAnalysis } from '../cli/analyze.mjs';
 import { architectureMarkdown } from '../cli/architecture.mjs';
+import { writeTree, LAYER_RULES } from './harness.mjs';
 
 let dir;
-const write = (rel, text) => { const p = path.join(dir, ...rel.split('/')); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); };
+const write = (rel, text) => writeTree(dir, rel, text);
 const md = async (lang) => { const r = await runAnalysis(dir, { git: false, coverage: false, modules: ['testgen'], lang }); return architectureMarkdown(r.CM, r.graph, r.report, { lang, version: '9.9.9' }); };
 
 before(() => {
@@ -21,7 +22,7 @@ before(() => {
   write('app/view.js', "import { total } from '../lib/core.js';\nexport class View { constructor(t) { this.t = t + total([2]); } }\n");
   write('test/core.test.js', "import { total } from '../lib/core.js';\n");
   write('NOTES.txt', 'notes\n');   // typ „Tekst" → „Text" po angielsku
-  write('.codemap.rules.json', '{ "layers": [ { "name": "lib", "match": ["lib/**"] }, { "name": "app", "match": ["app/**"] } ], "forbid": [ { "from": "lib", "to": "app" } ] }');
+  write('.codemap.rules.json', LAYER_RULES);
 });
 after(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 

@@ -243,6 +243,10 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
   żeby punkty były porównywalne; tabela w podsumowaniu, `history` w `--json`, sekcja ze zmianami reguł w `--md`.
   W aplikacji: Projekt → **Trend zdrowia** dla folderu wczytanego razem z `.git` — to samo liczenie w przeglądarce
   z paskiem postępu i anulowaniem, wykres wyniku w czasie, tabela punktów i największe zmiany reguł.
+- **Przed commitem**: `codemap check` porównuje indeks gita (dokładnie to, co wejdzie do commita) z HEAD — ryzyko,
+  pliki zależne, zmiana health score i nowe znaleziska; kod wyjścia 1, gdy commit dodaje zakazaną zależność warstw,
+  cykl importów albo cykl pakietów (zmienia to `--fail-on`). `codemap check --install-hook` instaluje to jako hook
+  pre-commit (cudzego hooka nie nadpisuje; jednorazowe pominięcie: `git commit --no-verify`).
 - Paczka npm (jeszcze nieopublikowana — nazwa `codemap` jest zajęta, więc idzie pod zakresem): `npm run npm-pack -- --name @zakres/codemap`
   buduje paczkę 170 KB (CLI + 17 modułów analizy), instaluje ją w katalogu tymczasowym i uruchamia zainstalowane
   `codemap analyze`; potem `npm publish dist/npm/<plik>.tgz --access public` i `npx @zakres/codemap analyze .`.
@@ -254,7 +258,8 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
   albo Cursor, tę samą analizę jako narzędzia tylko do odczytu: `project_overview`, `find_files`, `code_search` (BM25),
   `file_info`, `dependencies`, `dependents`, `change_impact` (ścieżki albo `base` z gita — ryzyko z powodami, pliki
   dotknięte zmianą, recenzenci), `hotspots`, `findings`, `cycles`, `owners`, `tests`, `change_coupling`, `ask_map`
-  (pytania językiem naturalnym), `test_skeleton`, `architecture` (ten sam `ARCHITECTURE.md`) i `refresh`; `--osv` dodaje `vulnerable_dependencies` (do OSV.dev idą
+  (pytania językiem naturalnym), `test_skeleton`, `architecture` (ten sam `ARCHITECTURE.md`), `staged_check` (`codemap check` na
+  zmianach w indeksie — agent sprawdza własny commit) i `refresh`; `--osv` dodaje `vulnerable_dependencies` (do OSV.dev idą
   tylko nazwy i wersje pakietów).
 - Claude Code: `claude mcp add codemap -- node /ścieżka/do/CodeMap/cli/codemap.mjs mcp /ścieżka/do/projektu`; inni klienci
   (`.mcp.json`): `{"mcpServers": {"codemap": {"command": "node", "args": ["/ścieżka/do/CodeMap/cli/codemap.mjs", "mcp", "."]}}}`.

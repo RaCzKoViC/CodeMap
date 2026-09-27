@@ -3,9 +3,15 @@
 // kolejności co index.html. Testy dostają obiekt CM z czystymi modułami (bez DOM, bez sieci).
 // Kontekst i loader są wspólne z CLI (cli/runtime.mjs) — testy i `codemap analyze` widzą to samo środowisko.
 import vm from 'node:vm';
+import fs from 'node:fs';
+import path from 'node:path';
 import { ROOT, memStorage, docStub, createContext, runFile, loadCM as loadModules } from '../cli/runtime.mjs';
 
 export { ROOT, memStorage, docStub, createContext, runFile };
+/** Plik projektu-fixture: ścieżka z „/" względem `dir`, katalogi po drodze tworzone. */
+export function writeTree(dir, rel, text) { const p = path.join(dir, ...rel.split('/')); fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, text); }
+/** `.codemap.rules.json` z warstwami lib → app i zakazem lib → app (ARCHITECTURE.md, codemap check). */
+export const LAYER_RULES = '{ "layers": [ { "name": "lib", "match": ["lib/**"] }, { "name": "app", "match": ["app/**"] } ], "forbid": [ { "from": "lib", "to": "app" } ] }';
 /** Wartości zwracane z kontekstu vm mają prototypy obcego realmu (Array/Object), więc
  *  assert.deepStrictEqual je odrzuca — host() klonuje dane do realmu testu. */
 export const host = (v) => structuredClone(v);

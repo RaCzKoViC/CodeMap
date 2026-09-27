@@ -160,6 +160,24 @@ rozpakowywane. Historia git jest czytana z `.git` analizowanego katalogu albo na
 nadrzędnego (analiza podkatalogu monorepo), także gdy `.git` jest plikiem (`git worktree`, submoduł);
 płytki klon (`fetch-depth: 1`) daje historię tylko od granicy klonu.
 
+### Przed commitem: `codemap check`
+
+```bash
+codemap check                    # zmiany w indeksie (git add) vs HEAD
+codemap check --install-hook     # hook pre-commit (.git/hooks albo core.hooksPath); --uninstall-hook usuwa
+```
+
+Stan „po" to indeks gita — dokładnie to, co wejdzie do commita (także przy `git add -p` i `git commit -a`);
+stan „przed" to HEAD. Oba są czytane poleceniami tylko do odczytu (`ls-files`, `ls-tree`, `cat-file`) — bez
+checkoutu i bez zmian w indeksie — i analizowane tak samo (bez historii git i pokrycia, więc porównywalnie).
+Wynik: ryzyko i liczba zależnych plików (jak w przeglądzie PR, z historią git), zmiana health score, nowe
+znaleziska i osoby znające zmieniany kod. Kod **1**, gdy commit wprowadza nowe znaleziska z `--fail-on` —
+domyślnie `archviolation,cycles,pkgcycle` (zakazane zależności warstw z `.codemap.rules.json`, cykle importów
+i pakietów); `--fail-on high` = każde nowe znalezisko wysokiej ważności, `--fail-on none` = tylko informacja.
+Hook nie nadpisuje cudzego `pre-commit` (podaje linię do dopisania); jednorazowe pominięcie:
+`git commit --no-verify`. Opcje `--fail-on`, `--exclude` i `--no-git` podane przy `--install-hook` trafiają
+do hooka. `--json <plik>` zapisuje wynik (nowe znaleziska, ryzyko, zmiana wyniku, powody porażki).
+
 API dla innych narzędzi (np. rozszerzenia edytora):
 
 ```js

@@ -243,6 +243,10 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   so the points are comparable; a table in the summary, `history` in `--json`, a section with per-rule changes in `--md`.
   In the app: Project → **Health trend** for a folder loaded with its `.git` — the same computation in the browser with
   a progress bar and cancel, a chart of the score over time, a table of points and the largest rule changes.
+- **Before a commit**: `codemap check` compares the git index (exactly what will be committed) with HEAD — risk,
+  dependents, health score change and new findings; exit code 1 when the commit adds a forbidden layer dependency,
+  an import cycle or a package cycle (`--fail-on` changes that). `codemap check --install-hook` installs it as a
+  pre-commit hook (never overwrites someone else's hook; skip once with `git commit --no-verify`).
 - npm package (not published yet — the name `codemap` is taken, so it goes under a scope): `npm run npm-pack -- --name @scope/codemap`
   builds a 170 KB package (CLI + 17 analysis modules), installs it in a temp dir and runs the installed `codemap analyze`;
   then `npm publish dist/npm/<file>.tgz --access public` and `npx @scope/codemap analyze .`.
@@ -254,7 +258,8 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   the same analysis as read-only tools: `project_overview`, `find_files`, `code_search` (BM25), `file_info`,
   `dependencies`, `dependents`, `change_impact` (paths or a git `base` — risk with reasons, impacted files, reviewers),
   `hotspots`, `findings`, `cycles`, `owners`, `tests`, `change_coupling`, `ask_map` (natural-language questions),
-  `test_skeleton`, `architecture` (the same `ARCHITECTURE.md`) and `refresh`; `--osv` adds `vulnerable_dependencies` (only package names and versions go to OSV.dev).
+  `test_skeleton`, `architecture` (the same `ARCHITECTURE.md`), `staged_check` (`codemap check` on the
+  staged changes — the agent can verify its own commit) and `refresh`; `--osv` adds `vulnerable_dependencies` (only package names and versions go to OSV.dev).
 - Claude Code: `claude mcp add codemap -- node /path/to/CodeMap/cli/codemap.mjs mcp /path/to/project`; other clients
   (`.mcp.json`): `{"mcpServers": {"codemap": {"command": "node", "args": ["/path/to/CodeMap/cli/codemap.mjs", "mcp", "."]}}}`.
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // CodeMap CLI — ta sama analiza co w aplikacji, z wiersza poleceń i w CI (bez zależności npm).
+//   codemap check [ścieżka=.] [--fail-on …|none] [--json f] [--install-hook | --uninstall-hook] — zmiany w indeksie vs HEAD
 //   codemap mcp [ścieżka=.] [--osv] [--no-git] [--exclude glob]… — serwer MCP (cli/mcp.mjs) dla agentów AI
 //   codemap analyze [ścieżka=.] [--json f] [--md f] [--sarif f] [--map f] [--export dot|mermaid|graphml --out f]
 //                   [--min-score N] [--fail-on high|med|low|info|<reguły>] [--max-findings N]
@@ -12,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runAnalysis, mapJSON, DEFAULTS } from './analyze.mjs';
 import { toSummary, SEVS, SEV_RANK } from './report.mjs';
-import { strings, countOf, CliError } from './strings.mjs';
+import { strings, countOf, riskLine, CliError } from './strings.mjs';
 import { loadCodeMap } from './runtime.mjs';
 import { changedFiles, prReport, baseline, diffFindings, prMarkdown } from './pr.mjs';
 import { healthHistory, historyTable, historyMarkdown } from './history.mjs';
@@ -36,7 +37,8 @@ export function parseArgs(argv, RULES) {
   const o = { cmd: null, dir: null, lang, json: null, md: null, sarif: null, map: null, export: null, out: null,
     minScore: null, failOn: [], maxFindings: null, git: DEFAULTS.git, gitMax: DEFAULTS.gitMax, coverage: [], noCoverage: false,
     exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false,
-    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null, osv: false, architecture: null };
+    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null, osv: false, architecture: null,
+    failNone: false, installHook: false, uninstallHook: false };
   const num = (flag, v) => { const n = Number(v); if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw new CliError(tr('eNum', { o: flag, v })); return n; };
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i], val = null;
@@ -64,6 +66,7 @@ export function parseArgs(argv, RULES) {
       case '--pr-link': o.prLink = need(); break;
       case '--fail-on':
         for (const raw of need().split(',').map((s) => s.trim()).filter(Boolean)) {
+          if (raw.toLowerCase() === 'none') { o.failNone = true; continue; }   // codemap check: tylko informacja
           const sev = SEV_ALIAS[raw.toLowerCase()];
           const rule = RULES.find((r) => r.toLowerCase() === raw.toLowerCase());
           if (sev) o.failOn.push({ sev });
@@ -80,6 +83,9 @@ export function parseArgs(argv, RULES) {
       case '--max-content': o.maxContent = Math.floor(num(a, need())); break;
       case '--osv': o.osv = true; break;
       case '--architecture': o.architecture = need(); break;
+      case '--staged': break;   // codemap check: jedyny tryb (indeks vs HEAD), flaga dla czytelności hooków
+      case '--install-hook': o.installHook = true; break;
+      case '--uninstall-hook': o.uninstallHook = true; break;
       case '--history': o.history = Math.max(1, Math.min(200, Math.floor(num(a, need())))); break;
       case '-q': case '--quiet': o.quiet = true; break;
       case '--color': o.color = true; break;
@@ -144,6 +150,10 @@ export async function main(argv = process.argv.slice(2)) {
       await serve({ dir: o.dir || '.', lang: explicitLang ? lang : 'en', git: o.git, exclude: o.exclude, osv: o.osv, version: CM0.VERSION });
       return 0;
     }
+    if (o.cmd === 'check') {   // zmiany w indeksie vs HEAD przed commitem (cli/check.mjs)
+      const { checkCommand } = await import('./check.mjs');
+      return await checkCommand(o, { cliPath: fileURLToPath(import.meta.url), writeOut });
+    }
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 
     const aOpts = { lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
@@ -192,8 +202,7 @@ export async function main(argv = process.argv.slice(2)) {
       const stream = o.stdoutUsed ? process.stderr : process.stdout;
       const color = o.color != null ? o.color : (!!stream.isTTY && !process.env.NO_COLOR) || !!process.env.FORCE_COLOR;
       stream.write(toSummary(CM, report, { color }) + '\n');
-      if (report.pr) { const p = report.pr, lvl = { high: lang === 'en' ? 'high' : 'wysokie', med: lang === 'en' ? 'medium' : 'średnie', low: lang === 'en' ? 'low' : 'niskie' }[p.level];
-        stream.write('  ' + tr('prLine', { base: p.base }).padEnd(18) + tr('prVal', { risk: p.risk, lvl, n: p.changed.length + p.outside.length, a: p.add, d: p.del, dep: p.impacted }) + '\n'); }
+      if (report.pr) stream.write('  ' + tr('prLine', { base: report.pr.base }).padEnd(18) + riskLine(lang, report.pr) + '\n');
       if (report.baseline) { const b = report.baseline, d = b.delta;
         stream.write('  ' + tr('blLine', { base: b.ref }).padEnd(18) + tr('blVal', { b: b.score, s: report.score, sign: d > 0 ? '+' : d < 0 ? '−' : '±', d: Math.abs(d), nf: b.newFindings, rf: b.resolvedFindings }) + '\n'); }
       if (hist) stream.write('\n' + historyTable(hist, lang) + '\n');

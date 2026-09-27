@@ -6,6 +6,11 @@ const STR = {
 
 Użycie:
   codemap analyze [ścieżka=.] [opcje]
+  codemap check [ścieżka=.] [--fail-on <lista>|none] [--json <plik>] [--no-git] [--exclude glob]…
+                         zmiany w indeksie (git add) vs HEAD przed commitem: ryzyko, zasięg, nowe znaleziska;
+                         kod 1 przy nowych znaleziskach z --fail-on (domyślnie archviolation,cycles,pkgcycle)
+  codemap check --install-hook | --uninstall-hook
+                         hook pre-commit wołający codemap check (cudzego hooka nie nadpisuje)
   codemap mcp [ścieżka=.] [--osv] [--no-git] [--exclude glob]… [--lang pl|en]
                          serwer MCP (stdio) dla agentów AI: te same analizy jako narzędzia tylko do odczytu
   codemap --help | --version
@@ -96,6 +101,11 @@ Reguły: {rules}`,
 
 Usage:
   codemap analyze [path=.] [options]
+  codemap check [path=.] [--fail-on <list>|none] [--json <file>] [--no-git] [--exclude glob]…
+                         staged changes (git add) vs HEAD before a commit: risk, reach, new findings;
+                         exit 1 on new findings from --fail-on (default archviolation,cycles,pkgcycle)
+  codemap check --install-hook | --uninstall-hook
+                         a pre-commit hook running codemap check (an existing foreign hook is left alone)
   codemap mcp [path=.] [--osv] [--no-git] [--exclude glob]… [--lang pl|en]
                          MCP server (stdio) for AI agents: the same analysis as read-only tools
   codemap --help | --version
@@ -207,6 +217,12 @@ export function strings(lang) {
     if (sub) for (const p in sub) s = s.split('{' + p + '}').join(String(sub[p]));
     return s;
   };
+}
+
+/** Ryzyko zmian jednym wierszem (analyze --base, check): „ryzyko 48/100 (średnie) · plików 1 (+3 / −0) · zależnych 0". */
+export function riskLine(lang, p) {
+  const en = lang === 'en', lvl = { high: en ? 'high' : 'wysokie', med: en ? 'medium' : 'średnie', low: en ? 'low' : 'niskie' }[p.level] || p.level;
+  return strings(lang)('prVal', { risk: p.risk, lvl, n: p.changed.length + p.outside.length, a: p.add, d: p.del, dep: p.impacted });
 }
 
 /** Błąd użycia / wykonania → kod wyjścia 2 (komunikat już przetłumaczony). */

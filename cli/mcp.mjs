@@ -8,6 +8,7 @@ import readline from 'node:readline';
 import { runAnalysis } from './analyze.mjs';
 import { MCP_MODULES } from './runtime.mjs';
 import { architectureMarkdown } from './architecture.mjs';
+import { stagedCheckText } from './check.mjs';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const S = (props = {}, required = []) => ({ type: 'object', properties: props, required });
@@ -31,6 +32,7 @@ export const TOOLS = [
   { name: 'ask_map', description: 'Natural-language question about the map answered from the graph, e.g. "untested files with complexity over 50 in src", "top 5 most changed files", "files in cycles".', inputSchema: S({ question: str('the question') }, ['question']) },
   { name: 'test_skeleton', description: 'Test file skeleton for a code file following the project conventions (framework, location, imports, cases ordered by complexity).', inputSchema: S({ path: str('file path') }, ['path']) },
   { name: 'architecture', description: 'ARCHITECTURE.md of the project generated from the map: layers in dependency order (with upstream dependencies = cycles), packages, entry points, core modules, hotspots, ownership, test conventions, rules and cycles.', inputSchema: S() },
+  { name: 'staged_check', description: 'Pre-commit check of the staged changes (git index) against HEAD: risk, dependents, health score change and NEW findings; reports BLOCKING architecture problems (forbidden layer dependencies, import cycles, package cycles) the commit would introduce. Run after `git add`, before committing.', inputSchema: S() },
   { name: 'refresh', description: 'Re-run the analysis after files changed on disk.', inputSchema: S() },
 ];
 const OSV_TOOL = { name: 'vulnerable_dependencies', description: 'Known vulnerabilities of the project dependencies from OSV.dev (lockfile / manifest versions; only package names and versions are sent).', inputSchema: S() };
@@ -131,6 +133,8 @@ export function createServer(opts = {}) {
   }
 
   async function callTool(name, a) {
+    // własna analiza indeksu i HEAD (cli/check.mjs) — nie czeka na analizę katalogu
+    if (name === 'staged_check') return stagedCheckText(dir, { lang, git: opts.git !== false, exclude: opts.exclude || [] });
     const st = await ready();
     switch (name) {
       case 'project_overview': return overview(st);

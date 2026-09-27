@@ -20,6 +20,13 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   (najczęściej importowane), hotspoty z właścicielami, własność folderów z historii git, testy z konwencją
   (`CM.TestGen`), `.codemap.rules.json` z liczbą naruszeń, cykle plików i pakietów, ukryte sprzężenia. Bez daty —
   deterministyczny; PL/EN. CI publikuje `ARCHITECTURE.md` samego CodeMap w artefakcie `codemap-report`.
+- **`codemap check` — kontrola przed commitem** (`cli/check.mjs`): stan „po" = indeks gita (to, co wejdzie do commita,
+  także przy `git add -p` i `git commit -a` — hook dziedziczy `GIT_INDEX_FILE`), stan „przed" = HEAD; oba czytane
+  poleceniami tylko do odczytu (`ls-files -s`, `ls-tree`, `cat-file --batch`), bez checkoutu. Ta sama analiza dla obu
+  (bez historii git i pokrycia — porównywalnie), ryzyko, zależni i osoby znające kod z `CM.PRCore` z historią git.
+  Kod 1 przy nowych znaleziskach z `--fail-on` (domyślnie `archviolation,cycles,pkgcycle`; `none` = tylko informacja),
+  `--json`, `--install-hook` / `--uninstall-hook` (cudzego hooka nie nadpisuje, respektuje `core.hooksPath`),
+  narzędzie MCP `staged_check`. `runAnalysis({loaded})` przyjmuje listę plików z pamięci, `applyGitHistory` osobno.
 
 
 ### Zmienione — Faza 13 (wydajność)

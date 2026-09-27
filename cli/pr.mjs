@@ -8,15 +8,15 @@ import path from 'node:path';
 import { CliError } from './strings.mjs';
 
 const TXT = {
-  pl: { noGit: 'przegląd zmian (--base) wymaga repozytorium git i polecenia git', badRef: 'nie znaleziono refa bazowego „{r}" (w CI: actions/checkout z fetch-depth: 0)',
+  pl: { noGit: 'przegląd zmian (--base, check) wymaga repozytorium git i polecenia git', badRef: 'nie znaleziono refa bazowego „{r}" (w CI: actions/checkout z fetch-depth: 0)',
     head: 'Stan zdrowia', vs: 'względem', newF: 'Nowe znaleziska', fixedF: 'Usunięte znaleziska', none: 'brak', more: '…i {n} więcej' },
-  en: { noGit: 'change review (--base) needs a git repository and the git command', badRef: 'base ref "{r}" not found (in CI: actions/checkout with fetch-depth: 0)',
+  en: { noGit: 'change review (--base, check) needs a git repository and the git command', badRef: 'base ref "{r}" not found (in CI: actions/checkout with fetch-depth: 0)',
     head: 'Health', vs: 'vs', newF: 'New findings', fixedF: 'Resolved findings', none: 'none', more: '…and {n} more' },
 };
 const tx = (lang, k, v) => { let s = (TXT[lang] || TXT.pl)[k]; for (const p in (v || {})) s = s.replace('{' + p + '}', v[p]); return s; };
 
-function git(repoRoot, args, lang) {
-  try { return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }); }
+export function git(repoRoot, args, lang, extra) {
+  try { return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], ...extra }); }
   catch (e) {
     if (e && e.code === 'ENOENT') throw new CliError(tx(lang, 'noGit'));
     throw e;
@@ -32,9 +32,14 @@ export function assertRef(repoRoot, ref, lang) {
 /** Pliki zmienione między merge-base(base, HEAD) a HEAD: [{path, status, from?, add, del}], ścieżki względem `sub`. */
 export function changedFiles(repoRoot, base, sub, lang) {
   assertRef(repoRoot, base, lang);
-  const range = base + '...HEAD';
-  const st = git(repoRoot, ['-c', 'core.quotepath=false', 'diff', '--name-status', '-M', '-z', range], lang).split('\0');
-  const num = git(repoRoot, ['-c', 'core.quotepath=false', 'diff', '--numstat', '-M', '-z', range], lang).split('\0');
+  return diffFiles(repoRoot, [base + '...HEAD'], sub, lang);
+}
+/** Zmiany w indeksie względem HEAD (`git diff --cached`; w hooku pre-commit także przy `commit -a` — GIT_INDEX_FILE). */
+export function stagedFiles(repoRoot, sub, lang) { return diffFiles(repoRoot, ['--cached'], sub, lang); }
+
+function diffFiles(repoRoot, spec, sub, lang) {
+  const st = git(repoRoot, ['-c', 'core.quotepath=false', 'diff', '--name-status', '-M', '-z', ...spec], lang).split('\0');
+  const num = git(repoRoot, ['-c', 'core.quotepath=false', 'diff', '--numstat', '-M', '-z', ...spec], lang).split('\0');
   // --numstat -z: „add\tdel\tpath" albo przy zmianie nazwy „add\tdel\t" + stara + nowa
   const lines = new Map();
   for (let i = 0; i < num.length; i++) {

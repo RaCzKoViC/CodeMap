@@ -22,6 +22,7 @@ export const DEFAULTS = Object.freeze({
   exclude: [],       // globy (względem analizowanego katalogu) pomijane przy wczytywaniu
   modules: [],       // dodatkowe moduły js/ w kontekście (serwer MCP: cli/runtime.mjs MCP_MODULES)
   osv: false,        // podatne zależności z api.osv.dev (sieć: tylko nazwy i wersje pakietów) — wyłącznie na żądanie
+  loaded: null,      // {files, coverage, stats} zamiast czytania katalogu (cli/check.mjs: stan z gita)
 });
 const MAX_COV = 256 * 1024 * 1024;   // jak tests-ui.js
 
@@ -42,8 +43,8 @@ export async function runAnalysis(dir, opts = {}) {
   const repoRoot = findRepoRoot(root);
   const sub = repoRoot ? path.relative(repoRoot, root).split(path.sep).join('/') : '';
 
-  // 1. pliki
-  const loaded = loadProjectFiles(root, CM, { maxContent: o.maxContent, exclude: o.exclude });
+  // 1. pliki (albo gotowa lista z pamięci — `codemap check`: stan indeksu i HEAD z gita, bez checkoutu)
+  const loaded = o.loaded || loadProjectFiles(root, CM, { maxContent: o.maxContent, exclude: o.exclude });
   if (loaded.stats.symlinks) warnings.push(tr('wSymlinks', { n: loaded.stats.symlinks }));
   const T1 = performance.now();
 
@@ -75,24 +76,9 @@ export async function runAnalysis(dir, opts = {}) {
   const T2 = performance.now();
 
   // 4. historia git
-  let head = null;
   if (o.git && repoRoot) {
-    try {
-      const gitFiles = await readGitFiles(repoRoot, { lazy: true });
-      if (gitFiles) {
-        const r = await CM.GitLocal.runInThread(gitFiles, { max: o.gitMax });
-        const GC = CM.GitCore;
-        let commits = r.commits || [];
-        if (sub) commits = GC.rebase(commits, sub);
-        const paths = [];
-        for (const n of graph.nodes.values()) if (n.type === 'file' && n.path) paths.push(n.path);
-        const res = GC.analyze(commits, paths);
-        head = r.head || null;
-        GC.applyToGraph(graph, res, { source: 'local', head, truncated: !!(r.stats && r.stats.truncated), listed: commits.length });
-      }
-    } catch (e) {
-      warnings.push(tr('wGit', { m: (e && (e.code ? e.code + ': ' : '') + e.message) || String(e) }));
-    }
+    try { await applyGitHistory(CM, graph, repoRoot, sub, { gitMax: o.gitMax }); }
+    catch (e) { warnings.push(tr('wGit', { m: (e && (e.code ? e.code + ': ' : '') + e.message) || String(e) })); }
   }
   const T3 = performance.now();
 
@@ -115,6 +101,21 @@ export async function runAnalysis(dir, opts = {}) {
   const sarif = toSarif({ CM, graph, rep, lang: o.lang, uriPrefix: sub });
   const markdown = toMarkdown(CM, rep, report);
   return { CM, graph, rep, report, sarif, markdown, root, repoRoot, sub };
+}
+
+/** Historia git z .git na graf (hotspoty, własność, recenzenci) — krok 4 analizy; `codemap check` nakłada ją później. */
+export async function applyGitHistory(CM, graph, repoRoot, sub, { gitMax = DEFAULTS.gitMax } = {}) {
+  const gitFiles = await readGitFiles(repoRoot, { lazy: true });
+  if (!gitFiles) return null;
+  const r = await CM.GitLocal.runInThread(gitFiles, { max: gitMax });
+  const GC = CM.GitCore;
+  let commits = r.commits || [];
+  if (sub) commits = GC.rebase(commits, sub);
+  const paths = [];
+  for (const n of graph.nodes.values()) if (n.type === 'file' && n.path) paths.push(n.path);
+  const head = r.head || null;
+  GC.applyToGraph(graph, GC.analyze(commits, paths), { source: 'local', head, truncated: !!(r.stats && r.stats.truncated), listed: commits.length });
+  return head;
 }
 
 /**
