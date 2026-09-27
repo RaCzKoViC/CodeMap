@@ -168,6 +168,13 @@ describe('findDuplicates', () => {
     assert.equal(c.blocks, 1); assert.ok(c.tokens >= 60, 'tokens ' + c.tokens);
     assert.equal(M.cloneBlocks(fa, M.fingerprints(FILL_D.join('\n'))).blocks, 0);
   });
+  test('powtarzalny kod (24 prawie identyczne linie) w dwóch plikach → jeden długi blok, nie urwany na powtórzeniach', () => {
+    const rep = Array.from({ length: 24 }, (_, i) => 'export function fn' + i + '(a, b){ if(a > b){ return a - b; } return b - a + ' + i + '; }');
+    const a = fileNode('core/a.js', ["import { u } from '../ui/u.js';", ...rep]);
+    const b = fileNode('ui/u.js', ['export const u = 1;', ...rep]);
+    const [p] = M.findDuplicates([a, b]);
+    assert.ok(p && p.longest > 500, JSON.stringify(p));
+  });
   test('kandydaci tylko z kodu: dokumenty, konfiguracje, dane i pliki generowane odpadają', () => {
     const code = { ...fileNode('src/x.js', [...FILL_A, ...BLOCK]), langInfo: { text: true, cat: 'code' } };
     const doc = { ...fileNode('README.pl.md', [...FILL_A, ...BLOCK]), langInfo: { text: true, cat: 'doc' } };
