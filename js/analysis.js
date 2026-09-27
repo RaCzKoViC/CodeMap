@@ -92,7 +92,7 @@ CM.Analysis = (function(){
   function add(deps, spec, kind, etype, extra){
     spec = (spec||'').trim();
     if(!spec) return;
-    if(/^(https?:)?\/\//i.test(spec) || spec.startsWith('data:') || spec.startsWith('#') ||
+    if(/^(https?:)?\/\//i.test(spec) || spec.startsWith('data:') || (spec.startsWith('#') && kind !== 'pkg-import') ||
        spec.startsWith('mailto:') || spec.startsWith('tel:') || spec.startsWith('javascript:')) return;
     deps.push(extra ? Object.assign({spec, kind, etype}, extra) : {spec, kind, etype});
   }
@@ -100,9 +100,9 @@ CM.Analysis = (function(){
 
   function jsDeps(c, d){
     // `export … from './x'` = reexport (barrel) — ta sama krawędź, flaga dla przyszłego grafu symboli
-    matchAll(/(import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>add(d,m[2], rel(m[2]), 'import', m[1]==='export' ? {reexport:true} : null));
-    matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
-    matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], rel(m[1]), 'import'));
+    matchAll(/(import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>add(d,m[2], jsKind(m[2]), 'import', m[1]==='export' ? {reexport:true} : null));
+    matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], jsKind(m[1]), 'import'));
+    matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], jsKind(m[1]), 'import'));
     // odwołania dynamiczne: worker / URL względem modułu / importScripts / require.resolve / glob Vite
     // (`fetch('./x.json')` celowo NIE — za dużo fałszywych trafień). Ścieżki workerów i URL-i są względne
     // wobec skryptu, więc także bez `./` traktujemy je jak 'rel'.
@@ -252,6 +252,8 @@ CM.Analysis = (function(){
     });
   }
   function rel(spec){ return (spec.startsWith('.') || spec.startsWith('/')) ? 'rel' : 'bare'; }
+  // JS: `#x` = subpath imports z package.json (pole "imports", Node ≥ 14), nie kotwica
+  function jsKind(spec){ return /^#[\w@$-]/.test(spec) ? 'pkg-import' : rel(spec); }
   // CamelCase → snake_case jak Macro.underscore w Elixirze (HTTPClient → http_client)
   function snakeCase(s){ return s.replace(/([A-Z]+)([A-Z][a-z])/g,'$1_$2').replace(/([a-z\d])([A-Z])/g,'$1_$2').toLowerCase(); }
 
@@ -303,7 +305,9 @@ CM.Analysis = (function(){
     try{
       if(n === 'package.json'){
         const j = looseJSON(content);
-        if(typeof j.name === 'string' && j.name.trim()) return {kind:'package', eco:'npm', dir, name:j.name.trim(), main:j.main, module:j.module, exports:j.exports};
+        const imports = (j.imports && typeof j.imports === 'object' && !Array.isArray(j.imports)) ? j.imports : undefined;
+        if(typeof j.name === 'string' && j.name.trim()) return {kind:'package', eco:'npm', dir, name:j.name.trim(), main:j.main, module:j.module, exports:j.exports, imports};
+        if(imports) return {kind:'package', eco:'npm', dir, name:'', imports};   // aplikacja bez nazwy — tylko „imports"
         return null;
       }
       if(/^(tsconfig|jsconfig)(\..+)?\.json$/.test(n)){   // też tsconfig.base.json / tsconfig.app.json — cele `extends`
@@ -405,6 +409,30 @@ CM.Analysis = (function(){
       }
     }
     return null;
+  }
+  // `#x` → najbliższy package.json nad plikiem z polem "imports": dokładny klucz albo wzorzec `#x/*`; cel jak w exports
+  // (string / warunki import-require-default…); cel spoza projektu (nazwa pakietu) → brak krawędzi
+  function importsTarget(imports, spec){
+    if(spec in imports) return exportTarget(imports[spec]);
+    let best = null, bestLen = -1;
+    for(const k of Object.keys(imports)){
+      const star = k.indexOf('*'); if(star < 0) continue;
+      const pre = k.slice(0, star), suf = k.slice(star+1);
+      if(spec.startsWith(pre) && spec.endsWith(suf) && spec.length >= pre.length+suf.length && pre.length > bestLen){
+        const t = exportTarget(imports[k]); if(t){ best = t.replace('*', spec.slice(pre.length, spec.length-suf.length)); bestLen = pre.length; }
+      }
+    }
+    return best;
+  }
+  function pkgImportResolve(file, spec, idx){
+    let d = dirname(file.path);
+    for(;;){
+      const m = idx.importsByDir.get(d);
+      if(m){ const t = importsTarget(m.imports, spec);
+        return (t && /^\.{1,2}\//.test(t)) ? tryExact(idx.byPath, expand(normPath(joinPath(m.dir, t)), 'js')) : null; }
+      if(!d) return null;
+      d = dirname(d);
+    }
   }
   function packageResolve(spec, idx){
     if(!idx.pkgs.size) return null;
@@ -681,6 +709,7 @@ CM.Analysis = (function(){
         return null;
       }
       case 'php-ns': { const cls = spec.split('\\').pop(); return suffixFind(idx, [cls+'.php'], dir); }
+      case 'pkg-import': return pkgImportResolve(file, spec, idx);
       case 'bare': {
         if(fam==='css'){ const base = joinPath(dir, spec); return tryExact(idx.byPath, expand(base,'css')); }
         if(fam==='js'){
@@ -725,7 +754,9 @@ CM.Analysis = (function(){
     for(const f of files){ if(!f.deps) continue; for(const d of f.deps){ if(d.kind !== 'decl') continue;
       const k = family(f.lang)+':'+d.spec; if(!decl.has(k)) decl.set(k, []); if(!decl.get(k).includes(f)) decl.get(k).push(f); } }
     const pkgsOf = (eco) => (manifests||[]).filter(m => m && m.kind === 'package' && m.eco === eco && m.name).map(m => ({...m, dir: normPath(m.dir||'')}));
-    const idx = {byPath, byBase, folderByPath, files, alias, decl, pkgs: packageIndex(manifests),
+    const importsByDir = new Map();   // katalog package.json → {dir, imports} (subpath imports `#x`)
+    for(const m of (manifests||[])) if(m && m.kind === 'package' && (!m.eco || m.eco === 'npm') && m.imports) importsByDir.set(normPath(m.dir||''), {dir: normPath(m.dir||''), imports: m.imports});
+    const idx = {byPath, byBase, folderByPath, files, alias, decl, pkgs: packageIndex(manifests), importsByDir,
       cargo: pkgsOf('cargo'), dart: new Map(pkgsOf('dart').map(p => [p.name, p])),
       aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];

@@ -19,6 +19,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   zakresem właściciela (`npm publish dist/npm/<plik>.tgz --access public`).
 
 ### Zmienione — Faza 8 (jakość własna)
+- Analiza: **`package.json#imports`** (subpath imports Node, `import x from '#utils/log'`) — najbliższy `package.json`
+  nad plikiem z polem `imports`, dokładny klucz albo wzorzec `#x/*`, warunki jak w `exports`; cel spoza projektu
+  (nazwa pakietu) bez krawędzi. `#x` w JS nie jest już odrzucany jako kotwica (w HTML / CSS nadal jest).
 - Usunięte 20 układów nieosiągalnych z interfejsu, ChatBota i linków (tree, radial, grid, honeycomb, vortex…):
   `layouts.js` 899 → ~400 linii; test pilnuje, że lista w UI = układy obsługiwane przez `apply` (bez martwych
   i brakujących). Zapisany widok z usuniętym układem przywraca się z bieżącym (nieznana nazwa jest pomijana).

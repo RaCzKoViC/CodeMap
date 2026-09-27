@@ -210,3 +210,22 @@ describe('externalName', () => {
     assert.equal(A.externalName('java.util.List'), 'java');
   });
 });
+
+describe('package.json#imports (subpath imports `#x`)', () => {
+  const G = (files) => new CM.Graph.Graph().build(files.map(([path, content]) => ({ path, content, size: content.length })), { name: 't' });
+  const edges = (g) => host(g.edges.filter((e) => e.type === 'import').map((e) => e.source + '>' + e.target).sort());
+  test('dokładny klucz, wzorzec z *, warunki; najbliższy package.json; kotwice w HTML nadal pomijane', () => {
+    const g = G([
+      ['package.json', JSON.stringify({ imports: { '#config': { import: './src/config.js', require: './src/config.cjs' }, '#utils/*': './src/utils/*.js', '#dep': 'lodash' } })],
+      ['src/app.js', "import cfg from '#config';\nimport { log } from '#utils/log';\nimport _ from '#dep';\nconst x = require('#utils/fmt');"],
+      ['src/config.js', 'export default {};'], ['src/utils/log.js', 'export const log = 1;'], ['src/utils/fmt.js', 'module.exports = 1;'],
+      ['pkg/package.json', JSON.stringify({ name: 'pkg', imports: { '#config': './own.js' } })], ['pkg/own.js', ''], ['pkg/lib/a.js', "import c from '#config';"],
+      ['index.html', '<a href="#top">x</a>'],
+    ]);
+    assert.deepEqual(edges(g), ['pkg/lib/a.js>pkg/own.js', 'src/app.js>src/config.js', 'src/app.js>src/utils/fmt.js', 'src/app.js>src/utils/log.js']);
+  });
+  test('ekstrakcja: `#x` w JS to pkg-import, w HTML / CSS kotwica bez zależności', () => {
+    assert.deepEqual(host(A.extractDeps("import a from '#a/b';", 'js').map((d) => [d.spec, d.kind])), [['#a/b', 'pkg-import']]);
+    assert.equal(A.extractDeps('<a href="#x">', 'html').length, 0);
+  });
+});
