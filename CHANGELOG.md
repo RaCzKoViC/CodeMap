@@ -6,6 +6,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 ## [Unreleased]
 
 ### Zmienione — Faza 8 (jakość własna)
+- Testy renderera (`test/renderer.test.mjs`, 9): kamera świat ↔ ekran przy obrocie i pochyleniu, pamięć macierzy,
+  przybliżanie z punktem pod kursorem, trafianie węzłów (billboard przy pochyleniu) i krawędzi (prosta / łuk), `fit`
+  z panelami, wybór backendu bez WebGL, rysowanie na atrapie kontekstu, eksport SVG z escapowaniem.
 - Escapowanie HTML z jednego miejsca: `U.escapeHtml` (tekst i atrybuty) i `U.escapeText` (sam tekst, dla kolorowania
   składni) zamiast 8 lokalnych kopii w `ui.js`, `chatbot.js`, `drive.js`, `repo-hosts.js`, `mindmap.js`, `renderer.js`.
 
