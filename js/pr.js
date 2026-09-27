@@ -11,6 +11,7 @@
   I.extend('pl', {'project.pr':'Przegląd PR — mapa wpływu…'});
   I.extend('en', {'project.pr':'PR review — impact map…',
     'pr.title':'PR review — impact map','pr.input':'Pull / merge request number or URL','pr.hint':'The map shows the files changed in the PR, the files that depend on them and the risk of each change (change frequency, complexity, dependents, tests, change size, author familiarity). Git history and test coverage make the risk more accurate.',
+    'pr.listLoading':'Open pull / merge requests…','pr.listNone':'No open pull / merge requests.','pr.listHead':'Open','pr.draft':'draft','pr.listErr':'Could not load the list: ',
     'pr.go':'Analyse','pr.cancel':'Cancel','pr.loading':'Fetching PR #','pr.needRepo':'The PR impact map needs a repository loaded from GitHub / GitLab / Bitbucket (Load → repository, or a #repo= link).',
     'pr.bad':'Enter a PR number (e.g. 42) or its URL.','pr.otherRepo':'This PR belongs to another repository — load it and analyse the PR?','pr.fail':'PR: ',
     'pr.done':'PR #','pr.doneRisk':' — risk ','pr.doneFiles':', files: ','pr.doneDeps':', dependents: ','pr.section':'Pull request','pr.risk':'risk',
@@ -100,6 +101,24 @@
     foot.appendChild(el('button',{class:'tb-btn',type:'button',text:T('pr.cancel','Anuluj'),onclick:closeModal})); foot.appendChild(go);
     const submit=()=>{ const v=inp.value.trim(); if(!v) return; closeModal(); run(v); };
     go.onclick=submit; inp.onkeydown=(e)=>{ if(e.key==='Enter') submit(); };
+    // otwarte PR / MR repozytorium — wybór kliknięciem zamiast wpisywania numeru (1 zapytanie API)
+    const meta=A.graph&&A.graph.meta;
+    if(CM.GitRemote && CM.GitRemote.listPRs && CM.GitRemote.supported(meta)){
+      const box=el('div',{class:'pr-list'}, el('div',{class:'muted small',text:T('pr.listLoading','Otwarte pull / merge requesty…')}));
+      body.insertBefore(box, body.querySelector('.share-warn'));
+      CM.GitRemote.listPRs(meta, {token:CM.UIKit.repoToken()}).then((list)=>{
+        box.innerHTML='';
+        if(!list.length){ box.appendChild(el('div',{class:'muted small',text:T('pr.listNone','Brak otwartych pull / merge requestów.')})); return; }
+        box.appendChild(el('div',{class:'field-label',text:T('pr.listHead','Otwarte')+' ('+list.length+')'}));
+        const ul=el('div',{class:'pr-items'});
+        for(const p of list){
+          ul.appendChild(el('button',{class:'pr-item',type:'button',title:p.url||'',onclick:()=>{ inp.value=String(p.number); submit(); }},
+            el('b',{text:'#'+p.number}), el('span',{class:'pr-item-t',text:(p.draft?'['+T('pr.draft','szkic')+'] ':'')+p.title}),
+            el('span',{class:'muted small',text:(p.author?'@'+p.author+' · ':'')+(p.updated?U.relTime(p.updated):'')})));
+        }
+        box.appendChild(ul);
+      }).catch((e)=>{ box.innerHTML=''; box.appendChild(el('div',{class:'muted small',text:T('pr.listErr','Nie udało się pobrać listy: ')+(e&&e.message||e)})); });
+    }
     m.open(); setTimeout(()=>inp.focus(),30);
   }
 

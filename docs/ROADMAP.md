@@ -96,7 +96,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] Komentarz w PR z GitHub Action (`pr-comment`): ryzyko, pliki, zdrowie przed/po, nowe znaleziska, link do mapy.
 - [x] Sugerowani recenzenci z własności plików (git).
 - [x] CLI `--base` / `--baseline` / `--pr-md` / `--max-score-drop`: health score przed/po, próg „nie pogarszaj".
-- [ ] Zostało: wybór PR z listy otwartych PR w oknie, porównanie przed/po także w aplikacji (dziś tylko CLI).
+- [x] Wybór PR z listy otwartych PR w oknie (`GitRemote.listPRs`). Zostało: porównanie przed/po także w aplikacji (dziś tylko CLI).
 
 ## Faza 6 — tryb na żywo i skala — WYKONANA 2026-09-27 (v1.3.0; zostały drobne: etykiety na GPU, pamięć tree-sittera, próg benchmarku)
 

@@ -5,6 +5,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 5 (dokończenie)
+- **Wybór PR z listy**: okno „Przegląd PR…" pokazuje otwarte pull / merge requesty repozytorium (`GitRemote.listPRs` — GitHub,
+  GitLab, Bitbucket, jedno zapytanie, najświeższe pierwsze) z autorem, czasem i oznaczeniem szkicu; kliknięcie uruchamia
+  analizę. Sprawdzone na preactjs/preact (24 otwarte PR); test na podstawionym fetch dla trzech hostingów.
+
 ### Dodane — Faza 8 (społeczność)
 - **Galeria przykładowych repozytoriów** (`js/gallery.js`): 9 małych projektów open source w 7 językach (Express,
   Preact, ky, petite-vue, Flask, Gin, serde json, Gson, Rake — 53–313 plików), karty z opisem, liczbą plików

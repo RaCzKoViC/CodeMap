@@ -182,6 +182,25 @@ CM.GitRemote = (function(){
       files, truncated:page>30&&last===100, remaining:rate.remaining};
   }
 
+  // otwarte PR / MR (jedno zapytanie, najświeższe pierwsze) → [{number, title, author, draft, updated, url}]
+  async function listPRs(meta, opts){
+    opts=opts||{}; if(!supported(meta)) return [];
+    const rate={remaining:null, limited:false}, sig=opts.signal, max=Math.min(50, opts.max||30);
+    if(meta.host==='gitlab'){
+      const h={}; if(opts.token) h['PRIVATE-TOKEN']=opts.token;
+      const arr=await client(h, sig, rate)('https://gitlab.com/api/v4/projects/'+encodeURIComponent(meta.repo)+'/merge_requests?state=opened&order_by=updated_at&sort=desc&per_page='+max);
+      return (Array.isArray(arr)?arr:[]).map(m=>({number:m.iid, title:m.title||'', author:(m.author&&m.author.username)||'', draft:!!(m.draft||m.work_in_progress), updated:ms(m.updated_at), url:m.web_url||''}));
+    }
+    if(meta.host==='bitbucket'){
+      const h={}; if(opts.token) h['Authorization']='Bearer '+opts.token;
+      const j=await client(h, sig, rate)('https://api.bitbucket.org/2.0/repositories/'+meta.repo+'/pullrequests?state=OPEN&sort=-updated_on&pagelen='+max);
+      return ((j&&j.values)||[]).map(m=>({number:m.id, title:m.title||'', author:(m.author&&(m.author.nickname||m.author.display_name))||'', draft:false, updated:ms(m.updated_on), url:(m.links&&m.links.html&&m.links.html.href)||''}));
+    }
+    const h={'Accept':'application/vnd.github+json'}; if(opts.token) h['Authorization']='Bearer '+opts.token;
+    const arr=await client(h, sig, rate)('https://api.github.com/repos/'+meta.repo+'/pulls?state=open&sort=updated&direction=desc&per_page='+max);
+    return (Array.isArray(arr)?arr:[]).map(m=>({number:m.number, title:m.title||'', author:(m.user&&m.user.login)||'', draft:!!m.draft, updated:ms(m.updated_at), url:m.html_url||''}));
+  }
+
   // meta = graph.meta z loadera (host, repo, branch, sub); opts = {token, max=1000, maxDetails, onProgress, signal}
   function supported(meta){ return !!(meta && meta.repo && /^(github|gitlab|bitbucket)$/.test(meta.host||'')); }
   async function fetchHistory(meta, opts){
@@ -191,5 +210,5 @@ CM.GitRemote = (function(){
     if(meta.host==='bitbucket') return bitbucket(meta, o);
     return github(meta, o);
   }
-  return {fetchHistory, fetchPR, supported, _diffLines:diffLines, _parseRaw:parseRaw};
+  return {fetchHistory, fetchPR, listPRs, supported, _diffLines:diffLines, _parseRaw:parseRaw};
 })();
