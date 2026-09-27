@@ -102,7 +102,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 
 - [x] Obserwacja folderu (`js/live.js`): FileSystemObserver + skan dat modyfikacji, analiza tylko zmienionych plików,
   przebudowa z zachowaniem stanu, RAG (wektory po hashu) i historia git (nowy commit) na bieżąco.
-  Zostało: wznowienie obserwacji po przeładowaniu (uchwyt w IndexedDB + zgoda użytkownika).
+  [x] Wznowienie obserwacji po przeładowaniu (uchwyt w IndexedDB, „↻ Wznów na żywo” na pasku stanu, zgoda za kliknięciem).
 - [x] Renderer WebGL2 (`js/gl-layer.js`) dla dużych map: krawędzie i figury na GPU, etykiety na canvas 2D,
   wygaszanie gęstych krawędzi zamiast LOD; 20 tys. plików / 60 tys. krawędzi ~1–2 ms na klatkę. Szybsza kamera
   (`cam.xf`) przyspieszyła też canvas 2D ~2×. POZOSTAŁO: etykiety na GPU (atlas glifów) i hit-test z siatką

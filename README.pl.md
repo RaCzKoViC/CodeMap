@@ -50,6 +50,8 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 - **Folder na żywo** (Wczytaj → Folder na żywo, Chrome / Edge): mapa nadąża za edycją — zmienione pliki są
   czytane i analizowane w Web Workerze, pozycje, zaznaczenie, kamera i kolorowanie zostają, zmiany świecą na
   mapie, nowy commit odświeża historię git. Pliki z sekretami (`.env`, klucze prywatne) są na mapie, ale bez treści.
+  Po przeładowaniu strony pasek stanu proponuje **↻ Wznów na żywo: <folder>** — jedno kliknięcie (przeglądarka ponownie
+  pyta o zgodę na odczyt) i folder jest wczytany i znów obserwowany, niezmienione pliki prosto z pamięci analizy.
 - **Archiwa** ZIP, TAR, TGZ, GZ — rozpakowywane w przeglądarce (`DecompressionStream`).
 - **PDF** — mapa z zakładek i stron.
 - **Repozytoria** GitHub, GitLab, Bitbucket po adresie URL (publiczne lub z tokenem), wybór gałęzi/tagu,

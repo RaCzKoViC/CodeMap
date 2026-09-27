@@ -35,7 +35,12 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   wersji zasobów. Niezmieniony plik — ten sam rozmiar i data modyfikacji z dysku albo sha bloba git — nie jest
   analizowany ani nawet haszowany; zgodny sam rozmiar → worker porównuje skrót treści. Ponowne wczytanie 2800 plików:
   analiza 2,4 s → 0,05 s (całość 2,6 → 0,2 s); zmiana jednego pliku analizuje tylko ten plik. Ustawienia → Instalacja
-  → „Wyczyść pamięć analizy" (z liczbą projektów i rozmiarem); „Usuń wszystkie dane" też ją czyści.
+  → „Wyczyść pamięć analizy" (z liczbą projektów i rozmiarem); „Usuń wszystkie dane" też ją czyści. Zapis
+  zaplanowany przed czyszczeniem jest porzucany (epoka), więc pamięć nie odradza się po „Wyczyść".
+- **Wznowienie folderu na żywo po przeładowaniu** (`js/live.js`): uchwyt folderu zapamiętany w IndexedDB
+  (`codemap-live`); po przeładowaniu strony pasek stanu pokazuje „↻ Wznów na żywo: nazwa” (kliknięcie = gest,
+  którego przeglądarka wymaga do ponownej zgody na odczyt) i „×” (nie wznawiaj); zakończenie obserwacji, wczytanie
+  innego projektu albo „Wyczyść” zapominają folder; akcja ChatBota `liveResume`.
 - **Analiza w kilku workerach naraz** (do 4, pliki rozdzielone po rozmiarze od największych): pierwsze wczytanie
   ok. 2,3× szybsze niż w jednym workerze (pomiar: 1 → 5,9 s, 4 → 2,6 s; 8 workerów nie przyspiesza).
 - `tools/bench.mjs` (`npm run bench`): syntetyczne projekty 5k / 20k plików, wczytanie + klatka z wymuszoną

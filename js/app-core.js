@@ -405,7 +405,7 @@
     // zapis pamięci w tle (nie blokuje budowania mapy); tylko gdy coś przeanalizowano od nowa
     if(AC && meta && gen===A._ingestGen && todo.length){
       const sizes=new Map(); for(const f of withContent){ const p=norm(f.path); if(p) sizes.set(p, f.content.length); }
-      const go=()=>AC.save(meta, ASSET_V, res, sizes, ids).catch(()=>{});
+      const ep=AC.epoch(), go=()=>AC.save(meta, ASSET_V, res, sizes, ids, ep).catch(()=>{});
       if(window.requestIdleCallback) requestIdleCallback(go, {timeout:1500}); else setTimeout(go, 500);
     }
     return res;

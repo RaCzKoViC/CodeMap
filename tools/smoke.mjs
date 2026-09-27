@@ -327,9 +327,16 @@ const liveRes = await evalJs(`(async()=>{ try{
   const g1=CMApp.graph, kept=!!g1.nodes.get('src/a.js') && g1.nodes.get('src/a.js').x===x0;
   const edge=g1.edges.some(e=>e.type==='import'&&e.source==='src/b.js'&&e.target==='src/c.js');
   const badge=!!document.getElementById('st-live');
-  CM.Live.stop(true); const off=!CM.Live.state().on && !document.getElementById('st-live');
+  // wznowienie po przeładowaniu: uchwyt w IndexedDB → zatrzymanie jak przy zamknięciu strony (bez zapominania)
+  // → przycisk „Wznów na żywo” → kliknięcie wczytuje folder i znów obserwuje; zakończenie przez użytkownika zapomina
+  const mem=((await CM.Live.remembered())||{}).name;
+  CM.Live.stop(true, true); const offered=await CM.Live.offerResume(); const pill=document.querySelector('#st-live-resume .st-live-go');
+  if(pill) pill.click(); for(let i=0;i<40 && !CM.Live.state().on;i++) await sleep(100);
+  const resumed=CM.Live.state().on && !document.getElementById('st-live-resume') && !!CMApp.graph.nodes.get('src/c.js');
+  CM.Live.stop(); await sleep(100); const forgot=!(await CM.Live.remembered());
+  const off=!CM.Live.state().on && !document.getElementById('st-live');
   try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){}
-  return {ok, skipped, added:res&&res.added, changed:res&&res.changed, kept, edge, badge, off};
+  return {ok, skipped, added:res&&res.added, changed:res&&res.changed, kept, edge, badge, off, mem, offered, pill:!!pill, resumed, forgot};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
 let failed = 0;
@@ -362,8 +369,9 @@ check(agentRes && !agentRes.error && agentRes.steps === 'dependents:true,codeSea
   `agent z narzędziami: tool_calls + JSON w treści, źródła [n], graf nietknięty: ${JSON.stringify(agentRes)}`);
 check(prRes && !prRes.error && prRes.changed === 2 && prRes.outside === 1 && prRes.impacted > 0 && prRes.cur === "pr" && prRes.card && prRes.md && prRes.link && prRes.chat && prRes.persisted && prRes.cleared,
   `mapa wpływu PR: ryzyko, zależne, nakładka, panel, raport, link, ChatBot: ${JSON.stringify(prRes)}`);
-check(liveRes && !liveRes.error && liveRes.ok && liveRes.skipped && String(liveRes.added)==="src/c.js" && String(liveRes.changed)==="src/b.js" && liveRes.kept && liveRes.edge && liveRes.badge && liveRes.off,
-  `tryb na żywo (OPFS): zmiany → przebudowa z zachowaniem pozycji: ${JSON.stringify(liveRes)}`);
+check(liveRes && !liveRes.error && liveRes.ok && liveRes.skipped && String(liveRes.added)==="src/c.js" && String(liveRes.changed)==="src/b.js" && liveRes.kept && liveRes.edge && liveRes.badge && liveRes.off
+  && liveRes.mem === 'smoke-live' && liveRes.offered && liveRes.pill && liveRes.resumed && liveRes.forgot,
+  `tryb na żywo (OPFS): zmiany → przebudowa z zachowaniem pozycji, wznowienie po przeładowaniu: ${JSON.stringify(liveRes)}`);
 check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
   `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
 {

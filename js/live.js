@@ -4,14 +4,17 @@
 // wyzwalacz + skan dat modyfikacji co kilka sekund (tylko gdy karta jest widoczna). Zmienione pliki są czytane
 // i analizowane w workerze, graf przebudowany z zachowaniem pozycji, zwinięć, zaznaczenia, kamery, nakładki,
 // danych git / testów / PR; zmiany świecą na mapie. Nowy commit (.git/logs/HEAD) przelicza historię git.
+// Uchwyt folderu jest zapamiętany w IndexedDB: po przeładowaniu strony pasek stanu proponuje „Wznów na żywo”
+// (kliknięcie = gest użytkownika, którego przeglądarka wymaga do ponownej zgody na odczyt).
 (function(){
   const A=CM.App, U=CM.util, $=U.$, el=U.el, I=CM.i18n, L=CM.Loaders;
   const state=A.state, T=(k,f)=>I.t(k,f);
-  I.extend('pl', {'load.live':'Folder na żywo (obserwuj zmiany)'});
+  I.extend('pl', {'load.live':'Folder na żywo (obserwuj zmiany)', 'live.resumeAsk':'Wznów na żywo: ', 'live.resumeTitle':'Folder obserwowany przed przeładowaniem strony — kliknij, aby wczytać go ponownie i dalej śledzić zmiany', 'live.forget':'Nie wznawiaj'});
   I.extend('en', {'load.live':'Live folder (watch changes)', 'live.on':'LIVE', 'live.pause':'Pause', 'live.resume':'Resume', 'live.stop':'Stop watching',
     'live.reading':'Reading folder…', 'live.changes':'Live: ', 'live.mod':' changed', 'live.add':' added', 'live.del':' removed',
     'live.stopped':'Stopped watching the folder.', 'live.denied':'No permission to read the folder.', 'live.unsupported':'This browser cannot watch folders (File System Access API — use Chrome or Edge).',
-    'live.gitRerun':'New commit — refreshing git history…', 'live.title':'Watching the folder — changes are applied to the map automatically'});
+    'live.gitRerun':'New commit — refreshing git history…', 'live.title':'Watching the folder — changes are applied to the map automatically',
+    'live.resumeAsk':'Resume live: ', 'live.resumeTitle':'Folder watched before the page was reloaded — click to load it again and keep following changes', 'live.forget':'Do not resume'});
 
   const DEF_POLL=2500;
   const S={on:false, paused:false, dir:null, name:'', files:new Map(), pre:new Map(), timer:0, observer:null, busy:false, again:false,
@@ -65,6 +68,31 @@
     return rec;
   }
 
+  // ---------------- zapamiętany folder (IndexedDB) — wznowienie po przeładowaniu ----------------
+  const DB='codemap-live';
+  function idb(){ return new Promise((res, rej)=>{ const r=indexedDB.open(DB, 1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  async function kv(op, val){
+    try{ const db=await idb();
+      try{ return await new Promise((res, rej)=>{ const tx=db.transaction('kv', op==='get'?'readonly':'readwrite'), st=tx.objectStore('kv');
+        const q=op==='get'?st.get('last'):op==='put'?st.put(val, 'last'):st.delete('last'); q.onsuccess=()=>res(q.result); q.onerror=()=>rej(q.error); }); }
+      finally{ db.close(); } }
+    catch(e){ return null; }
+  }
+  const remember=(dir)=>kv('put', {handle:dir, name:dir.name, at:Date.now()});
+  const forget=()=>{ const b=$('#st-live-resume'); if(b) b.remove(); return kv('del'); };
+  const remembered=()=>kv('get');
+  // pasek stanu: „↻ Wznów na żywo: nazwa” + „×” (nie wznawiaj)
+  async function offerResume(){
+    if(S.on || $('#st-live-resume')) return false;
+    const r=await remembered(); if(!r || !r.handle || S.on) return false;
+    const b=el('span',{id:'st-live-resume', class:'st-live st-live-resume', title:T('live.resumeTitle','Folder obserwowany przed przeładowaniem strony — kliknij, aby wczytać go ponownie i dalej śledzić zmiany')});
+    b.appendChild(el('button',{class:'st-live-btn st-live-go', type:'button', text:'↻ '+T('live.resumeAsk','Wznów na żywo: ')+r.name,
+      onclick:async()=>{ b.remove(); const ok=await start(r.handle); if(!ok) forget(); }}));
+    b.appendChild(el('button',{class:'st-live-btn', type:'button', title:T('live.forget','Nie wznawiaj'), text:'×', onclick:()=>forget()}));
+    const host=$('#st-project'); if(host&&host.parentNode) host.parentNode.insertBefore(b, host.nextSibling); else document.body.appendChild(b);
+    return true;
+  }
+
   // ---------------- start / stop ----------------
   async function pick(){
     if(typeof window.showDirectoryPicker!=='function'){ U.toast(T('live.unsupported','Ta przeglądarka nie potrafi obserwować folderów (File System Access API — użyj Chrome lub Edge).'),'error',7000); return false; }
@@ -74,7 +102,7 @@
   async function start(dir, opts){
     opts=opts||{};
     try{ if(dir.queryPermission && (await dir.queryPermission({mode:'read'}))!=='granted' && (await dir.requestPermission({mode:'read'}))!=='granted'){ U.toast(T('live.denied','Brak uprawnień do odczytu folderu.'),'error'); return false; } }catch(e){}
-    stop(true);
+    stop(true, true);
     const my=++S.gen;
     const ok=await A.ingest(async (onProgress, onStatus)=>{
       onStatus && onStatus(T('live.reading','Czytanie folderu…'));
@@ -89,12 +117,15 @@
     }, T('live.reading','Czytanie folderu…'));
     if(!ok || my!==S.gen) return false;
     S.on=true; S.paused=false; S.dir=dir; S.name=dir.name; S.interval=opts.interval||adaptive();
+    remember(dir); const rb=$('#st-live-resume'); if(rb) rb.remove();
     rememberPre();
     observe(); schedule(); renderBadge();
     return true;
   }
-  function stop(silent){
+  // keep = restart tego samego mechanizmu (bez zapominania folderu); zakończenie przez użytkownika albo inny projekt → zapomnij
+  function stop(silent, keep){
     const was=S.on; S.on=false; S.paused=false; S.gen++;
+    if(was && !keep) forget();
     clearTimeout(S.timer); S.timer=0;
     if(S.observer){ try{ S.observer.disconnect(); }catch(e){} S.observer=null; }
     S.dir=null; S.files=new Map(); S.pre=new Map(); S.pulses.clear(); renderBadge();
@@ -210,13 +241,18 @@
     const b=$('#btn-load-live');
     if(b){ if(typeof window.showDirectoryPicker!=='function') b.classList.add('hidden'); b.onclick=()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); pick(); }; }
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && S.on && !S.paused) schedule(200); });
+    setTimeout(()=>{ offerResume(); }, 1200);   // po przywróceniu sesji (mapa z poprzedniego razu jest już na ekranie)
   }
   // inny projekt (wczytanie, mapa z pliku, czyszczenie) kończy obserwację — ale nie nasz własny ingest
+  // inny wczytany projekt albo „wyczyść” — propozycja wznowienia traci sens
+  A.onProjectLoaded(({reason, meta})=>{ if(!S.on && (reason==='clear' || (reason==='ingest' && !(meta && meta.live)))) forget(); });
   A.onProjectLoaded(({reason, meta})=>{ if(!S.on) return; if(reason==='ingest' && meta && meta.live && meta.name===S.name) return; if(reason==='live') return; stop(true); });
   if(A.registerAction){
     A.registerAction({name:'liveFolder', sig:'', desc:'pick a local folder and keep the map in sync with its changes (File System Access; Chrome/Edge)', descPl:'folder na żywo — mapa nadąża za zmianami plików', auto:false, run:()=>{ pick(); return T('load.live','Folder na żywo (obserwuj zmiany)'); }});
+    A.registerAction({name:'liveResume', sig:'', desc:'resume watching the folder that was live before the page was reloaded', descPl:'wznów folder na żywo sprzed przeładowania', auto:false,
+      run:async()=>{ const r=await remembered(); if(!r||!r.handle) return '—'; const b=$('#st-live-resume'); if(b) b.remove(); const ok=await start(r.handle); return ok?T('load.live','Folder na żywo (obserwuj zmiany)')+': '+r.name:T('live.denied','Brak uprawnień do odczytu folderu.'); }});
     A.registerAction({name:'liveStop', sig:'', desc:'stop watching the live folder', descPl:'zakończ obserwację folderu', auto:true, run:()=>{ const was=S.on; stop(); return was?T('live.stopped','Zakończono obserwację folderu.'):'—'; }});
   }
-  CM.Live={pick, start, stop, poll, pause:()=>setPaused(true), resume:()=>setPaused(false), state:()=>({on:S.on, paused:S.paused, name:S.name, files:S.files.size, observer:!!S.observer, interval:S.interval})};
+  CM.Live={pick, start, stop, poll, offerResume, remembered, forget, pause:()=>setPaused(true), resume:()=>setPaused(false), state:()=>({on:S.on, paused:S.paused, name:S.name, files:S.files.size, observer:!!S.observer, interval:S.interval})};
   setTimeout(wire, 0);
 })();

@@ -10,7 +10,7 @@
 CM.AnalysisCache = (function(){
   const U = CM.util;
   const DIR = 'codemap-analysis', INDEX = 'index.json', MAX_PROJECTS = 12, MAX_BYTES = 200e6;
-  let off = false, last = null;
+  let off = false, last = null, epoch = 0;   // epoka: clear() unieważnia zapisy zaplanowane wcześniej
 
   async function dir(){
     if(off) return null;
@@ -54,12 +54,15 @@ CM.AnalysisCache = (function(){
   }
 
   // wyniki analizy (Map ścieżka → {metrics, deps, symbols, hash}) + rozmiary treści i tożsamości plików → zapis w tle
-  async function save(meta, version, results, sizes, ids){
+  // ep = epoch() z chwili zaplanowania zapisu — po „Wyczyść” w międzyczasie zapis jest porzucany
+  async function save(meta, version, results, sizes, ids, ep){
+    if(ep != null && ep !== epoch) return false;
     const k = projectKey(meta), d = k && await dir(); if(!d || !results || !results.size) return false;
     try{
       const files = {};
       for(const [p, r] of results){ if(!r || r.error || r.hash == null) continue; const s = sizes.get(p); if(s == null) continue;
         files[p] = [s, r.hash, r.metrics, r.deps, r.symbols, (ids && ids.get(p)) || '']; }
+      if(ep != null && ep !== epoch) return false;
       const bytes = await writeText(d, fileName(k), JSON.stringify({v:version, at:Date.now(), name:meta.name||'', files}));
       const idx = await readIndex(d); idx[k] = {at:Date.now(), bytes, name:meta.name||'', files:Object.keys(files).length};
       // limity: najstarsze projekty wypadają (liczba i łączny rozmiar)
@@ -77,9 +80,10 @@ CM.AnalysisCache = (function(){
     return {available:true, projects:ks.length, bytes:ks.reduce((a, k) => a + (idx[k].bytes || 0), 0), last};
   }
   async function clear(){
+    epoch++;
     try{ const root = await navigator.storage.getDirectory(); await root.removeEntry(DIR, {recursive:true}); }catch(e){}
     last = null; return true;
   }
 
-  return {load, save, stats, clear, projectKey, get available(){ return !off; }};
+  return {load, save, stats, clear, projectKey, epoch:()=>epoch, get available(){ return !off; }};
 })();

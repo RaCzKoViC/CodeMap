@@ -22,3 +22,11 @@ describe('pamięć analizy — klucz projektu', () => {
     assert.deepEqual({ ...(await AC.stats()) }, { available: false, projects: 0, bytes: 0 });
   });
 });
+
+describe('pamięć analizy — epoka czyszczenia', () => {
+  test('zapis zaplanowany przed „Wyczyść” jest porzucany', async () => {
+    const ep = AC.epoch(); await AC.clear();
+    assert.equal(AC.epoch(), ep + 1);
+    assert.equal(await AC.save({ kind: 'local', name: 'x' }, 'v1', new Map([['a.js', { hash: '1' }]]), new Map([['a.js', 1]]), null, ep), false);
+  });
+});
