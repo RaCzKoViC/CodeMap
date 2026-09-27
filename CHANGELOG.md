@@ -53,8 +53,25 @@ Faza 2 planu rozwoju — głębsza analiza ([docs/ROADMAP.md](docs/ROADMAP.md)).
   ciemny) — główna przyczyna, dla której modele lokalne „nie sterowały aplikacją".
 - Gramatyka JSON Ollamy tylko dla małych modeli i nigdy z rozumowaniem (z nią ~1 tok/s; duże modele
   trzymają JSON z promptu).
+- ChatBot bez błędów przy małych modelach lokalnych (zgłoszenie z Llama 3.2 3B, „wymień wszystkie dostępne
+  komędy" → seria czerwonych chipów): akcje modelu walidowane przed wykonaniem (wymagane argumenty, znana
+  nazwa, maks. 4 naraz); pytanie bez czasownika-polecenia nie uruchamia żadnych akcji; prośba o listę
+  komend/narzędzi (także z literówkami) i komendy `/…` działają **bez modelu i bez klucza**; zamiast pustego
+  „✓ wykonano" — odpowiedź tekstowa albo wskazówka; błędy dostawców jako krótki komunikat ze szczegółami;
+  uszkodzone rozmowy w `localStorage` są naprawiane przy wczytaniu; brak `Uncaught AbortError` po
+  zatrzymaniu strumienia (`reader.cancel()`).
+- ChatBot: wyniki narzędzi informacyjnych (`/stats`, `/topFiles`, `/findText`, `/dependsOn`…) są treścią
+  odpowiedzi (markdown), a nie ściśniętym chipem; opisy w menu `/` i w pomocy po polsku (model nadal
+  dostaje angielski katalog); awatar asystenta przy początku dymka.
+- `/stats` liczył węzły symboli tree-sittera jako foldery („foldery: 1281").
+- Legenda „Typy plików": `.js` i `.mjs` to dwa wiersze „JavaScript" — przy powtórzonej nazwie pokazuje
+  rozszerzenie.
 - Testy: `test/export.test.mjs`, `test/metrics.test.mjs`, `test/rules.test.mjs`; smoke sprawdza eksport
-  trzech formatów na grafie demo.
+  trzech formatów na grafie demo oraz ChatBota bez modelu (pomoc, walidacja akcji, 0 chipów błędu).
+
+### Dokumentacja
+- Nowe zrzuty w README (mapa repozytorium CodeMap, graf symboli, ChatBot z menu `/`) zamiast
+  `docs/screenshot-demo.png`; generuje je `node tools/screenshots.mjs` (headless Chrome, powtarzalnie).
 
 ## [1.0.0] — 2026-09-25
 

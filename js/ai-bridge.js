@@ -312,7 +312,7 @@
       // ---- narzędzia „/" ChatBota: statystyki, listy, wyszukiwanie w treści, zależności ----
       case 'stats': { _needProject(); const g=A.graph; let files=0, folders=0, ext=0, lines=0; const langs=new Map(); const big=[];
         for(const n of g.nodes.values()){ if(n.type==='file'){ files++; lines+=n.metrics?n.metrics.lines:0; const l=(n.langInfo&&n.langInfo.name)||n.lang; langs.set(l,(langs.get(l)||0)+1); big.push(n); }
-          else if(n.type==='external') ext++; else if(n.id!=='__root__'&&n.id!=='__ext__') folders++; }
+          else if(n.type==='external') ext++; else if(n.type==='folder'&&n.id!=='__root__'&&n.id!=='__ext__') folders++; }
         big.sort((a,b)=>((b.metrics&&b.metrics.lines)||0)-((a.metrics&&a.metrics.lines)||0));
         const cyc=g.importCycles?g.importCycles().components.length:0;
         const top=[...langs.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v])=>k+' ×'+v).join(', ');

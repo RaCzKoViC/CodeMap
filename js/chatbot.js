@@ -212,6 +212,32 @@ CM.ChatBot = (function(){
   // ---- narzędzia menu „/": nazwa, sygnatura i opis wyciągnięte z katalogu ----
   const TOOLS=ACTION_CATALOG.map(line=>{ const [sig,desc]=line.split(' — '); const m=/^(\w+)(?:\s+(.*))?$/.exec(sig.trim())||[]; return {name:m[1]||sig, sig:(m[2]||'').trim(), desc:(desc||'').trim()}; })
     .filter(x=>/^[a-zA-Z]/.test(x.name));
+  // opisy dla użytkownika po polsku (menu „/" i pomoc); model dostaje zawsze angielski ACTION_CATALOG
+  const TOOL_PL={
+    loadDemo:'wczytaj projekt demonstracyjny', loadRepo:'wczytaj repozytorium GitHub/GitLab/Bitbucket z adresu URL',
+    clearProject:'wyczyść wczytany projekt', setMode:'przełącz tryb aplikacji', setLayout:'zmień układ mapy CodeMap',
+    search:'szukaj plików/ścieżek i podświetl wyniki na mapie', focusNode:'wyśrodkuj kamerę na najlepiej pasującym węźle',
+    openNode:'pokaż węzeł i otwórz podgląd pliku', fit:'dopasuj całą mapę do ekranu', zoom:'przybliż lub oddal kamerę',
+    rotate:'obróć mapę', toggle3D:'włącz/wyłącz widok pseudo-3D', flyMode:'nawigacja lotem (WASD)',
+    collapseAll:'zwiń/rozwiń wszystkie foldery', toggleImpact:'podświetlanie wpływu zależności', toggleMinimap:'zwiń/rozwiń minimapę',
+    setFilter:'filtry widoczności elementów i połączeń', setMetric:'metryka złożoności/rozmiaru i jej próg',
+    toggleLang:'pokaż/ukryj jeden język lub technologię (np. „js")', openSettings:'otwórz Ustawienia', openDrive:'otwórz Dysk i Sejf',
+    openHistory:'otwórz historię migawek', openCompare:'otwórz porównanie schematów', saveMap:'eksportuj mapę do .json',
+    snapshot:'zapisz migawkę projektu', exportImage:'eksportuj mapę jako obraz', copyLink:'skopiuj link do bieżącego widoku',
+    detectCycles:'wykryj cykle zależności', hotspots:'pokaż hotspoty (rozmiar × zależności)',
+    inspect:'analiza statyczna (antywzorce) wczytanego projektu', aiAnalyze:'analiza struktury przez AI',
+    setTheme:'motyw jasny/ciemny', setPreset:'gotowy zestaw kolorów', setAccent:'kolor akcentu', setBackground:'kolor tła mapy',
+    setGlass:'suwaki wyglądu (przezroczystość, rozmycie)', setSpacing:'suwaki skali mapy', renderOption:'opcje rysowania',
+    resetAppearance:'przywróć domyślny wygląd', togglePanel:'zwiń/rozwiń panel boczny', setLang:'zmień język całej aplikacji',
+    startTutorial:'uruchom samouczek', mindmap:'operacje trybu MindMap', installPWA:'zainstaluj aplikację',
+    symbols:'graf symboli tree-sitter (funkcje, klasy, wywołania)', help:'lista wszystkich narzędzi',
+    stats:'statystyki projektu: pliki, foldery, języki, największe pliki, cykle', topFiles:'najwięksi według metryki (z podświetleniem)',
+    findText:'szukaj frazy w TREŚCI plików', listLang:'pliki jednego języka (z podświetleniem)',
+    dependsOn:'co zależy od tego pliku/folderu', dependencies:'od czego zależy ten plik/folder',
+    explain:'AI objaśnia wskazany element (tylko struktura)', exportGraph:'eksportuj widoczny graf (DOT/Mermaid/GraphML)',
+    clearChat:'nowa rozmowa',
+  };
+  function toolDesc(x){ return (I.getLang()!=='en' && TOOL_PL[x.name]) || x.desc; }
   // Actions the model may run ON ITS OWN: view/appearance changes only — reversible with one click and
   // with no effect outside this tab. Everything else (loading, clearing, saving, exporting, clipboard,
   // MindMap mutations, paid AI calls, install prompt, language, tutorial, vault) is rendered as a
@@ -356,6 +382,8 @@ CM.ChatBot = (function(){
     setMetric:(a)=>nonEmpty(a.metric)||typeof a.min==='number',
     exportGraph:(a)=>a.format==null||oneOf(a.format,['dot','mermaid','graphml']),
   };
+  // narzędzia, które ZWRACAJĄ informację (statystyki, listy, zależności) — ich wynik jest treścią odpowiedzi
+  const INFO_TOOLS=new Set(['stats','topFiles','findText','listLang','dependsOn','dependencies','help','listActions']);
   function knownAction(name){ return TOOLS.some(x=>x.name===name) || ['setNodeScale','setFontScale','runInspection','listActions'].includes(name); }
   function validAction(a){
     if(!a || typeof a.action!=='string' || !a.action.trim() || !knownAction(a.action)) return false;
@@ -368,7 +396,7 @@ CM.ChatBot = (function(){
   const HELP_RE=/(\b(jakie|wymie[nń]|lista|list[aę]?|poka[zż]|podaj|wypisz|show|what|which|all)[\s\S]{0,40}?\b(kom[eę]n?d|polece[nń]|akcj|narz[eę]dz|funkcj|mo[zż]liwo[sś]|command|action|tool|feature))|co potrafisz|co umiesz|w czym (mi )?pomo|what can you do|^\s*(help|pomoc|komendy|commands|\/help)\s*[?!.]*\s*$/i;
   function isHelpRequest(text){ return HELP_RE.test(String(text||'')); }
   function helpText(){
-    const lines=TOOLS.map(x=>'- `/'+x.name+(x.sig?' '+x.sig:'')+'` — '+x.desc);
+    const lines=TOOLS.map(x=>'- `/'+x.name+(x.sig?' '+x.sig:'')+'` — '+toolDesc(x));
     return t('helpHead')+'\n\n'+lines.join('\n');
   }
   // przyjazny komunikat błędu dostawcy (oryginał w szczegółach, przycięty)
@@ -598,7 +626,7 @@ CM.ChatBot = (function(){
     if(!toolsEl) return;
     const q=toolQuery(); if(q===null){ hideTools(); return; }
     const ql=q.toLowerCase();
-    const list=TOOLS.filter(x=>!ql||x.name.toLowerCase().includes(ql)||x.desc.toLowerCase().includes(ql)).slice(0,40);
+    const list=TOOLS.filter(x=>!ql||x.name.toLowerCase().includes(ql)||x.desc.toLowerCase().includes(ql)||toolDesc(x).toLowerCase().includes(ql)).slice(0,40);
     toolsEl.innerHTML=''; toolsEl.classList.remove('hidden');
     toolsEl.appendChild(el('div',{class:'cb-tools-h',text:t('tools')+' · '+t('toolRun')}));
     if(!list.length){ toolsEl.appendChild(el('div',{class:'cb-tools-empty',text:t('toolNoMatch')})); return; }
@@ -606,7 +634,7 @@ CM.ChatBot = (function(){
       const row=el('div',{class:'cb-tool'+(i===0?' sel':''),'data-name':x.name});
       row.appendChild(el('span',{class:'cb-tool-n',text:'/'+x.name}));
       if(x.sig) row.appendChild(el('span',{class:'cb-tool-s',text:x.sig}));
-      row.appendChild(el('span',{class:'cb-tool-d',text:x.desc}));
+      row.appendChild(el('span',{class:'cb-tool-d',text:toolDesc(x)}));
       if(!AUTO_OK.has(x.name)) row.appendChild(el('span',{class:'cb-tool-w',text:'▶'}));
       row.onmousedown=(e)=>{ e.preventDefault(); pickTool(x.name); };
       toolsEl.appendChild(row);
@@ -639,7 +667,8 @@ CM.ChatBot = (function(){
     conv.messages.push({id:uid(), role:'user', content:'/'+action+(Object.keys(args||{}).length?(' '+JSON.stringify(args)):''), ts:Date.now(), slash:true});
     let result='', ok=true;
     try{ result=(window.CMApp&&CMApp.exec)?(CMApp.exec(action, args)||t('done')):''; }catch(e){ ok=false; result=(e&&e.message)||String(e); }
-    conv.messages.push({id:uid(), role:'assistant', content:'', ts:Date.now(), actions:[{action, args, ok, result}], genMs:1, slash:true});
+    const info=ok && INFO_TOOLS.has(action);
+    conv.messages.push({id:uid(), role:'assistant', content:info?String(result):'', ts:Date.now(), actions:info?undefined:[{action, args, ok, result}], genMs:1, slash:true});
     conv.updatedAt=Date.now(); saveConvs(); renderMessages(); renderSidebar();
   }
   /* ---------------- załączniki: elementy mapy przeciągnięte do wiadomości ---------------- */
@@ -807,7 +836,7 @@ CM.ChatBot = (function(){
             delete a.pending; saveConvs(); renderMessages();
           };
           chips.appendChild(c);
-        } else chips.appendChild(el('div',{class:'cb-chip'+(a.ok?'':' cb-chip-err'),html:(a.ok?'⚡ ':'⚠ ')+esc(a.result||a.action)}));
+        } else chips.appendChild(el('div',{class:'cb-chip'+(a.ok?'':' cb-chip-err'),html:(a.ok?'⚡ ':'⚠ ')+esc(a.ok&&INFO_TOOLS.has(a.action)?('/'+a.action):(a.result||a.action))}));
       }); wrap.appendChild(chips); }
     // hover toolbar
     const tb=el('div',{class:'cb-mtools'});
@@ -1079,7 +1108,8 @@ CM.ChatBot = (function(){
           const acts=cmd ? o.actions.filter(validAction).slice(0,4) : [];
           for(const a of acts) execLive(a, false, false);
           const ran=liveActs.length>0;
-          acc=(thk?('<think>'+thk+'</think>\n'):'')+(o.reply||(ran?t('done'):t('noCommand'))); }
+          const infos=liveActs.filter(a=>a.ok&&INFO_TOOLS.has(a.action)).map(a=>String(a.result||''));
+          acc=(thk?('<think>'+thk+'</think>\n'):'')+(o.reply||(ran?t('done'):t('noCommand')))+(infos.length?('\n\n'+infos.join('\n\n')):''); }
       }
       if(_paintT){ clearTimeout(_paintT); _paintT=null; }
       if(typing.parentNode) typing.remove();

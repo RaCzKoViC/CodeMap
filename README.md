@@ -13,7 +13,13 @@
 
 **Demo online:** https://raczkovic.github.io/CodeMap/#demo
 
-![CodeMap — mapa projektu demonstracyjnego](docs/screenshot-demo.png)
+![CodeMap — mapa repozytorium CodeMap w układzie siłowym: pliki, foldery i importy](docs/screenshot-map.png)
+
+| Graf symboli i wywołań (tree-sitter) | ChatBot sterujący mapą, menu narzędzi `/` |
+|:---:|:---:|
+| [![Graf symboli: funkcje pliku symbols-core.js i ich wywołania, panel szczegółów symbolu](docs/screenshot-symbols.png)](docs/screenshot-symbols.png) | [![ChatBot: wyniki /stats i /topFiles oraz lista narzędzi po wpisaniu /](docs/screenshot-chatbot.png)](docs/screenshot-chatbot.png) |
+
+<sub>Zrzuty przedstawiają samo repozytorium CodeMap wczytane jako projekt; odtwarza je `node tools/screenshots.mjs`.</sub>
 
 ---
 
@@ -216,7 +222,9 @@ Zasady, które utrzymują projekt prostym:
 - brak kroku budowania i zależności npm po stronie frontendu — nowe biblioteki tylko ładowane na żądanie;
 - każdy tekst w UI przez `CM.i18n.t()` z tłumaczeniem PL **i** EN;
 - zmiana plików `js/` lub `css/` = bump `?v=` w `index.html` i `CACHE` w `sw.js`;
-- `index.html` edytuj narzędziem zachowującym UTF-8.
+- `index.html` edytuj narzędziem zachowującym UTF-8;
+- przed commitem `npm run verify` (testy, lint, sonda gramatyk) i `node tools/smoke.mjs` (headless Chrome);
+  po zmianach w wyglądzie `node tools/screenshots.mjs` odświeża zrzuty w `docs/`.
 
 Historia zmian: [CHANGELOG.md](CHANGELOG.md).
 

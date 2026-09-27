@@ -413,11 +413,14 @@ CM.UI = (function(){
     const box=$('#lang-filters'); box.innerHTML='';
     const stats=Array.from(graph.langStats.values()).sort((a,b)=>b.count-a.count);
     if(!stats.length){ box.appendChild(el('p',{class:'muted small',text:I.t('cu.noData','Brak danych.')})); return; }
+    // typy liczone są per rozszerzenie — .js i .mjs to dwa wiersze „JavaScript", więc powtórzona nazwa dostaje rozszerzenie
+    const byName=new Map(); for(const s of stats) byName.set(s.info.name,(byName.get(s.info.name)||0)+1);
     for(const s of stats){
       const off=state.langsOff.has(s.key);
+      const label=byName.get(s.info.name)>1&&s.key?s.info.name+' (.'+s.key+')':s.info.name;
       const row=el('div',{class:'lang-row'+(off?' off':''),onclick:()=>H.toggleLang(s.key)},
         el('span',{class:'swatch',style:`background:${s.info.color}`}),
-        el('span',{class:'lname',text:s.info.name}),
+        el('span',{class:'lname',text:label}),
         el('span',{class:'lcount',text:s.count}));
       box.appendChild(row);
     }
