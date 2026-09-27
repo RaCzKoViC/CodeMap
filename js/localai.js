@@ -140,6 +140,11 @@ CM.LocalAI = (function(){
     for(const fn of progressCbs){ try{ fn(progress); }catch(e){ /* błąd odbiorcy UI nie przerywa ładowania */ } }
   }
   const abortErr=()=>Object.assign(new Error(I.t('lai.cancelled','Przerwano.')),{name:'AbortError'});
+  // worker silnika nie wstał (np. CSP zablokowało import biblioteki w module workera) — bez tego CreateWebWorkerMLCEngine
+  // czeka na odpowiedź workera w nieskończoność („Uruchamiam silnik…"); odrzucenie przełącza na silnik w wątku strony
+  const workerFailed=(w)=>{ const p=new Promise((_, rej)=>{ w.addEventListener('error', (e)=>{ if(e && e.preventDefault) e.preventDefault();
+    rej(new Error('WebLLM worker: '+((e && e.message) || 'nie wstał'))); }, {once:true}); });
+    p.catch(()=>{}); return p; };   // błąd po wygranym wyścigu (silnik już działa) nie jest „unhandled"
 
   // ensureEngine z RE-CHECKIEM CELU: pętla sprawdza modelId() po każdym awaicie, więc zmiana modelu
   // w trakcie cudzego ładowania nigdy nie odda silnika ze STARYM modelem, a osierocony silnik nie
@@ -184,7 +189,7 @@ CM.LocalAI = (function(){
             // ubija fetch wag; wiszący Create przegrywa wyścig i nie robi stale-write)
             eng=await Promise.race([
               lib.CreateWebWorkerMLCEngine(w, realId, {initProgressCallback:emitProgress, appConfig:cfg}, {context_window_size:2048}),
-              cancelP
+              cancelP, workerFailed(w)
             ]);
             eng.__worker=w; eng.__wurl=wurl;
           }catch(we){
@@ -367,7 +372,7 @@ CM.LocalAI = (function(){
       let eng=null, w=null, wurl=null;
       try{ const src='import {WebWorkerMLCEngineHandler} from "'+CDN+'";const h=new WebWorkerMLCEngineHandler();self.onmessage=(m)=>h.onmessage(m);';
         wurl=URL.createObjectURL(new Blob([src],{type:'text/javascript'})); w=new Worker(wurl,{type:'module'});
-        eng=await lib.CreateWebWorkerMLCEngine(w, id, {initProgressCallback:prog, appConfig:cfg}); eng.__worker=w; eng.__wurl=wurl; }
+        eng=await Promise.race([lib.CreateWebWorkerMLCEngine(w, id, {initProgressCallback:prog, appConfig:cfg}), workerFailed(w)]); eng.__worker=w; eng.__wurl=wurl; }
       catch(e){ quiet(()=>{ if(w) w.terminate(); if(wurl) URL.revokeObjectURL(wurl); });
         eng=await lib.CreateMLCEngine(id, {initProgressCallback:prog, appConfig:cfg}); }
       embEng=eng; embId=id; return eng;

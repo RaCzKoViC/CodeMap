@@ -175,13 +175,27 @@ describe('WebLLM: JSON wymuszony gramatyką (jsonChat)', () => {
     assert.match(m.seen[1].last, /^Tool result \(findFiles\):\n/);
     assert.ok(m.seen[1].last.length <= 'Tool result (findFiles):\n'.length + 40, 'wynik przycięty do maxResult');
   });
-  test('ucięty JSON → tekst jako odpowiedź; limit kroków → ostatnie wywołanie bez schematu (zwykły tekst)', async () => {
+  test('ostatni krok ze schematem samej odpowiedzi; wywołanie narzędzia zamiast odpowiedzi nie trafia do czatu; args-tablica → {}', async () => {
+    const g = build();
+    // jak na WebLLM 0,5B: to samo wywołanie w kółko (args jako tablica), a w ostatnim kroku znów JSON narzędzia
+    const rep = raw(['{"tool":"findFiles","args":[]}', '{"tool":"findFiles","args":[]}', '{"tool":"findFiles","args":[]}']);
+    const r = await AG.run({ chat: AG.jsonChat(rep.fn), messages: [{ role: 'user', content: 'co robi reducer?' }], ctx: { graph: g }, maxSteps: 2 });
+    assert.equal(r.answer, '', 'bez surowego {"tool":…} jako odpowiedzi');
+    assert.deepEqual(host(r.steps.map((s) => [s.name, s.args])), [['findFiles', {}]]);
+    assert.deepEqual(host(rep.seen[2].schema), { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] });
+    const ans = raw(['{"tool":"findFiles","args":{"query":"a"}}', '{"tool":"findFiles","args":{"query":"b"}}', '{"answer":"Reducer łączy akcje ze stanem [1]."}']);
+    assert.equal((await AG.run({ chat: AG.jsonChat(ans.fn), messages: [{ role: 'user', content: 'x' }], ctx: { graph: g }, maxSteps: 2 })).answer, 'Reducer łączy akcje ze stanem [1].');
+    // inne ścieżki (Ollama z JSON-em w treści): ostatni krok z wywołaniem narzędzia też nie jest odpowiedzią
+    const plain = { calls: 0 }; const chat = async (msgs, tools) => (tools ? { content: '{"name":"findFiles","arguments":{"query":"q' + (plain.calls++) + '"}}' } : { content: '{"name":"findFiles","arguments":{"query":"z"}}' });
+    assert.equal((await AG.run({ chat, messages: [{ role: 'user', content: 'x' }], ctx: { graph: g }, maxSteps: 1 })).answer, '');
+  });
+  test('ucięty JSON → tekst jako odpowiedź; limit kroków → ostatnie wywołanie ze schematem samej odpowiedzi', async () => {
     const g = build();
     const cut = await AG.run({ chat: AG.jsonChat(raw(['{"tool":"answer","answer":"Niedokończ']).fn), messages: [{ role: 'user', content: 'x' }], ctx: { graph: g } });
     assert.equal(cut.answer, '{"tool":"answer","answer":"Niedokończ');
     const loop = raw(['{"tool":"findFiles","args":{"query":"a"}}', '{"tool":"findFiles","args":{"query":"b"}}', 'Odpowiedź końcowa.']);
     const r = await AG.run({ chat: AG.jsonChat(loop.fn), messages: [{ role: 'user', content: 'y' }], ctx: { graph: g }, maxSteps: 2 });
-    assert.equal(r.answer, 'Odpowiedź końcowa.');
-    assert.equal(loop.seen[2].schema, null);
+    assert.equal(r.answer, 'Odpowiedź końcowa.');   // bez gramatyki (proza) — tekst jak dotąd
+    assert.deepEqual(host(loop.seen[2].schema.required), ['answer']);
   });
 });

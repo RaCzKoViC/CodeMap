@@ -119,7 +119,10 @@
           mSel.innerHTML='';
           list.forEach(m=>{ const o=el('option',{value:m.name,text:m.name+(m.sizeGB?(' ('+m.sizeGB+' GB)'):'')}); if(m.name===CM.Ollama.model()) o.selected=true; mSel.appendChild(o); });
           stat.textContent=t('ai.ollamaOnline')+list.length; stat.className='set-localai-stat ok';
-        }catch(e){ mSel.innerHTML=''; stat.textContent=(e&&e.message)||String(e); stat.className='set-localai-stat err'; }
+        }catch(e){ mSel.innerHTML=''; stat.className='set-localai-stat err';
+          // blokada CORS (serwer żyje, origin niedopuszczony): komunikat + polecenia OLLAMA_ORIGINS po jednym w linii
+          stat.textContent=(e&&(e.short||e.message))||String(e);
+          if(e && e.code==='cors' && e.hint) stat.appendChild(el('pre',{class:'set-ol-hint', text:e.hint.split(' · ').join('\n')})); }
         if(CM.ChatBot&&CM.ChatBot.refresh) CM.ChatBot.refresh();
         renderPull(); renderRag();
       };

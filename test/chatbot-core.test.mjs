@@ -216,3 +216,28 @@ describe('chatbot-render.js: bezpieczny markdown (bez DOM)', () => {
     assert.doesNotMatch(R.thinkHTML({ think: 'x', open: false }, true), / open>/);
   });
 });
+
+describe('tryb JSON WebLLM: błąd gramatyki / CSP → ponowienie bez responseFormat', () => {
+  const C = CM.ChatBotCore;
+  test('jsonUnsupported: EvalError, CompileError, komunikaty CSP i gramatyki tak; przerwanie i zwykły błąd sieci nie', () => {
+    assert.ok(C.jsonUnsupported(Object.assign(new Error('x'), { name: 'EvalError' })));
+    assert.ok(C.jsonUnsupported(Object.assign(new Error('x'), { name: 'CompileError' })));
+    assert.ok(C.jsonUnsupported(new Error("Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive")));
+    assert.ok(C.jsonUnsupported(new Error('WebAssembly.instantiate(): Refused to compile or instantiate WebAssembly module')));
+    assert.ok(C.jsonUnsupported(new Error('Invalid grammar in response_format')));
+    assert.ok(!C.jsonUnsupported(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+    assert.ok(!C.jsonUnsupported(new Error('Failed to fetch model weights')));
+    assert.ok(!C.jsonUnsupported(null));
+  });
+  test('withJsonFallback: jedno ponowienie bez responseFormat i sygnał dla sesji; inne błędy i wywołania bez gramatyki przechodzą', async () => {
+    const seen = []; let off = 0;
+    const call = async (o) => { seen.push(!!o.responseFormat); if (o.responseFormat) throw Object.assign(new Error('csp'), { name: 'EvalError' }); return 'ok:' + o.temperature; };
+    assert.equal(await C.withJsonFallback(call, { responseFormat: { type: 'json_object' }, temperature: 0.3 }, () => off++), 'ok:0.3');
+    assert.deepEqual(seen, [true, false]); assert.equal(off, 1);
+    await assert.rejects(C.withJsonFallback(async () => { throw new Error('boom'); }, { responseFormat: {} }, () => off++), /boom/);
+    await assert.rejects(C.withJsonFallback(async () => { throw Object.assign(new Error('x'), { name: 'EvalError' }); }, {}, () => off++), /x/);   // bez gramatyki — nie ma czego wyłączać
+    assert.equal(off, 1);
+    const twice = async (o) => { throw Object.assign(new Error('grammar ' + !!o.responseFormat), { name: 'EvalError' }); };
+    await assert.rejects(C.withJsonFallback(twice, { responseFormat: {} }), /grammar false/);   // drugi błąd — już bez kolejnych prób
+  });
+});

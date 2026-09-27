@@ -169,7 +169,10 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   node:test; pytest / unittest; Go testing; Rust; JUnit 5), położenie i przyrostek wybrane głosowaniem z istniejących par
   test ↔ kod, import eksportowanych symboli, przypadki od najbardziej złożonych funkcji; kopiowanie albo pobranie pliku.
 - **WebLLM** — modele uruchamiane w przeglądarce (WebGPU), wagi w cache, bez wysyłania czegokolwiek.
-- **Ollama** — lokalny serwer modeli na Twoim komputerze.
+- **Ollama** — lokalny serwer modeli na Twoim komputerze. Gdy strona działa z innego adresu niż ten, który Ollama
+  dopuszcza (np. GitHub Pages albo własny VPS), Ollama odpowiada `403` bez nagłówków CORS — CodeMap odróżnia to od
+  wyłączonego serwera i pokazuje gotowe polecenie `OLLAMA_ORIGINS` dla Twojego systemu (Windows `setx`, macOS
+  `launchctl setenv`, Linux `systemctl edit`); potem uruchom Ollamę ponownie, zamykając ją także z zasobnika.
 - **Klucze API (chmura)** — dowolna liczba kluczy: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
   OpenRouter, DeepSeek, xAI, Together. Dostawca jest **wykrywany po formacie klucza** i potwierdzany
   przyciskiem „Testuj" (lista modeli), model wybierany per klucz; działające klucze używane rotacyjnie.

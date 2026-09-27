@@ -748,6 +748,7 @@ body.light .cb-modelsel option:disabled, body.light .set-ai-input option:disable
 .set-localai-stat{margin-top:8px;font-size:12.5px;color:var(--text-dim);font-family:var(--mono);min-height:16px}
 .set-localai-stat.ok{color:#4ade80}
 .set-localai-stat.err{color:#f87171}
+.set-ol-hint{margin:6px 0 0;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,.05);color:var(--text);white-space:pre-wrap;user-select:all;font-size:11.5px}
 .set-localai-list{margin-top:6px}
 .set-localai-mrow{display:flex;align-items:center;gap:10px;padding:6px 10px;border:1px solid var(--glass-border);border-radius:9px;margin-bottom:6px;background:rgba(255,255,255,.03)}
 .set-localai-mname{font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

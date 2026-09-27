@@ -137,3 +137,42 @@ describe('embed i pull', () => {
     for (const s of O.SUGGESTED) assert.match(s.size, /^\d+(\.\d)? GB$/);
   });
 });
+
+describe('niedostępna Ollama: blokada CORS a wyłączony serwer', () => {
+  const loadAt = (route, origin) => {
+    const fetch = async (url, init = {}) => route(url, init);
+    const CM = loadCM(['util', 'i18n', 'ollama'], { fetch, localStorage: memStorage(), AbortSignal, location: { origin } });
+    return CM.Ollama;
+  };
+  test('fetch pada, a zapytanie no-cors przechodzi → CORS z poleceniami OLLAMA_ORIGINS dla originu strony', async () => {
+    const modes = [];
+    const O = loadAt((url, init) => { modes.push(init.mode || 'cors'); if (init.mode === 'no-cors') return new Response(null, { status: 200 }); throw new TypeError('Failed to fetch'); }, 'https://raczkovic.github.io');
+    const e = await O.models(true).then(() => null, (x) => x);
+    assert.equal(e.code, 'cors');
+    assert.match(e.message, /CORS/);
+    assert.match(e.hint, /setx OLLAMA_ORIGINS "https:\/\/raczkovic\.github\.io"/);
+    assert.match(e.hint, /launchctl setenv OLLAMA_ORIGINS/);
+    assert.match(e.hint, /Environment="OLLAMA_ORIGINS=https:\/\/raczkovic\.github\.io"/);
+    assert.deepEqual(modes, ['cors', 'no-cors']);
+    const st = await O.check();
+    assert.equal(st.ok, false); assert.equal(st.code, 'cors'); assert.ok(st.hint);
+  });
+  test('oba zapytania padają → serwer wyłączony (bez instrukcji CORS); przekroczony czas → wyłączony bez sondy', async () => {
+    const O = loadAt(() => { throw new TypeError('Failed to fetch'); }, 'http://localhost:8787');
+    const e = await O.models(true).then(() => null, (x) => x);
+    assert.equal(e.code, 'offline'); assert.match(e.message, /ollama serve/); assert.doesNotMatch(e.message, /OLLAMA_ORIGINS/);
+    let probes = 0;
+    const T = loadAt((url, init) => { if (init.mode === 'no-cors') { probes++; return new Response(null); } throw Object.assign(new Error('timeout'), { name: 'TimeoutError' }); }, 'http://localhost:8787');
+    assert.equal((await T.models(true).then(() => null, (x) => x)).code, 'offline');
+    assert.equal(probes, 0);
+  });
+  test('czat i pobieranie modelu też rozróżniają CORS; przerwanie (AbortError) przechodzi bez zmian', async () => {
+    const O = loadAt((url, init) => { if (init.mode === 'no-cors') return new Response(null); if (init.signal && init.signal.aborted) throw Object.assign(new Error('a'), { name: 'AbortError' }); throw new TypeError('Failed to fetch'); }, 'null');   // strona otwarta z dysku ma origin "null"
+    O.setModel('x');
+    const e = await O.chat([{ role: 'user', content: 'hi' }], {}).then(() => null, (x) => x);
+    assert.equal(e.code, 'cors'); assert.match(e.hint, /OLLAMA_ORIGINS "\*"/);   // strona z dysku → dowolny origin
+    assert.equal((await O.pull('m', () => {}).then(() => null, (x) => x)).code, 'cors');
+    const ac = new AbortController(); ac.abort();
+    assert.equal((await O.chat([{ role: 'user', content: 'hi' }], { signal: ac.signal }).then(() => null, (x) => x)).name, 'AbortError');
+  });
+});

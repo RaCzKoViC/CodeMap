@@ -44,6 +44,26 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Bramka benchmarku analizy w CI porównuje z medianą 3 ostatnich zielonych przebiegów** (`--baseline a,b,c`): ten sam
   kod dawał na runnerach 2,3–3,4 s (django), więc jeden szczęśliwie szybki przebieg jako baza fałszywie zatrzymywał CI.
 
+### Poprawione — modele lokalne
+- **WebLLM znów startuje** (`index.html`, `deploy/Caddyfile`): moduł-worker silnika importuje WebLLM z esm.run /
+  jsDelivr, a Chrome sprawdza takie importy dyrektywą `worker-src` — przy `worker-src 'self' blob:` import był blokowany
+  i czat wisiał na „Uruchamiam silnik…". CDN-y dopisane do `worker-src`; do tego błąd workera (`error`) kończy wyścig
+  startu (`js/localai.js`), więc zamiast wiszenia działa istniejący zapas — silnik w głównym wątku.
+- **Ollama: blokada CORS odróżniona od wyłączonego serwera** (`js/ollama.js`): przeglądarka zgłasza oba przypadki tym
+  samym `TypeError`, więc po nieudanym zapytaniu idzie próba `mode:'no-cors'` — gdy przechodzi, serwer żyje i odrzuca
+  tę stronę (`code:'cors'`). Komunikat i Ustawienia → AI pokazują gotowe polecenie `OLLAMA_ORIGINS` z adresem tej
+  strony dla Windows / macOS / Linux (do zaznaczenia jednym kliknięciem); przekroczony czas to od razu „nie odpowiada".
+  Nowe `CM.Ollama.check()` → `{ok, code: null | 'cors' | 'offline', models}`.
+- **Tryb JSON modeli lokalnych z bezpiecznym zapasem** (`CM.ChatBotCore.withJsonFallback`): gdy WebLLM odrzuci gramatykę
+  JSON (błąd CSP / `unsafe-eval` / WebAssembly / schematu), czat i agent 📚 wyłączają tryb JSON (`localJsonOk=false`)
+  i ponawiają to samo zapytanie raz bez `responseFormat`; przerwanie przez użytkownika nie jest ponawiane.
+- **Agent 📚 nie pokazuje surowego wywołania narzędzia jako odpowiedzi** (`js/agent.js`): krok końcowy dostaje schemat
+  `{answer}`, JSON narzędzia w kroku końcowym jest odrzucany, `args` inne niż obiekt → `{}`; gdy model nie sformułuje
+  odpowiedzi, czat mówi to wprost i pokazuje znalezione fragmenty.
+- **Jedna CSP** dla GitHub Pages (`<meta>`) i VPS (nagłówek Caddy): pod Caddy obie obowiązują i się przecinają, więc
+  różnica ujawniała się dopiero w produkcji. `test/csp.test.mjs` pilnuje identyczności (nagłówek dodaje tylko
+  `frame-ancestors`), braku inline / `'unsafe-eval'` w skryptach i dostępu do Ollamy w `connect-src`.
+
 ## [1.6.0] — 2026-09-27
 
 CodeMap dla agentów AI (faza 15): serwer MCP z 19 narzędziami, generowany `ARCHITECTURE.md` i `codemap check` przed

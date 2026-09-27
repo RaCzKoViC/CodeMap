@@ -69,7 +69,10 @@ CM.ChatBot = (function(){
     setVotes(v); m.rating=next; saveConvs();
   }
 
-  let localJsonOk=true;   // wyłączany na sesję, gdy silnik odrzuci gramatykę (starszy WebLLM/Ollama)
+  let localJsonOk=true;   // wyłączany na sesję, gdy silnik odrzuci gramatykę (starszy WebLLM/Ollama albo CSP strony)
+  // gramatyka JSON WebLLM odrzucona (starszy silnik, CSP bez 'unsafe-eval') → reszta sesji bez niej, bieżące pytanie
+  // ponawiane bez responseFormat (CM.ChatBotCore.withJsonFallback)
+  const withJsonFallback=(call, opts)=>C.withJsonFallback(call, opts, ()=>{ localJsonOk=false; });
 
   /* ---------------- state / DOM refs ---------------- */
   let panel=null, launcher=null, sidebarEl=null, msgsEl=null, inputEl=null, sendBtn=null, builtLang=null;
@@ -507,9 +510,7 @@ CM.ChatBot = (function(){
         const off=CM.LocalAI.onProgress(p=>{ if(p&&p.text) setStage(p.text+(p.pct?(' '+p.pct+'%'):'')); });
         setStage(CM.LocalAI.status()!=='ready'?t('stLoading'):'');
         if(structured){ streamOpts.responseFormat={type:'json_object', schema:JSON.stringify(ACT_SCHEMA)}; streamOpts.temperature=0.3; streamOpts.frequencyPenalty=0.6; }
-        try{ acc=await CM.LocalAI.chat(messages, streamOpts); }
-        catch(e){ if(structured && e && e.name!=='AbortError' && /schema|grammar|json|format/i.test(String(e.message||''))){ localJsonOk=false; }
-          throw e; }
+        try{ acc=await withJsonFallback((o)=>CM.LocalAI.chat(messages, o), streamOpts); }
         finally{ off(); updateSub(); }
       } else if(useOllama()){
         // Ollama NIE przerywa generacji po zerwaniu polaczenia (reload/Stop) i kolejkuje zadania per model —
@@ -612,7 +613,7 @@ CM.ChatBot = (function(){
       const agentCtx=()=>({graph:CM.App.graph, rag:CM.RAG, gitCore:CM.GitCore, testMap:CM.TestMap, signal:abortCtl.signal,
         view:(ids)=>{ const R=CM.App.renderer; if(!R) return; R.setHighlight(new Set(ids)); const n=CM.App.graph.nodes.get(ids[0]); if(n&&window.CMApp&&CMApp.focusNode){ CMApp.focusNode(n.id); R.setHighlight(new Set(ids)); } }});
       const agentDone=(res)=>{ done=true; if(paintT){ clearTimeout(paintT); paintT=null; }
-        finish(stripThink(res.answer)||t('ragNothing'), {sources:res.sources, ragMode:'agent', steps:res.steps.map(s=>({name:s.name, args:s.args, ok:s.ok, summary:s.summary}))}); };
+        finish(stripThink(res.answer)||t(res.sources&&res.sources.length?'agentNoAnswer':'ragNothing'), {sources:res.sources, ragMode:'agent', steps:res.steps.map(s=>({name:s.name, args:s.args, ok:s.ok, summary:s.summary}))}); };
       if(local){
         const off=CM.LocalAI.onProgress(p=>{ if(p&&p.text) setStage(p.text+(p.pct?(' '+p.pct+'%'):'')); });
         if(CM.LocalAI.status()!=='ready') setStage(t('stLoading'));
@@ -621,8 +622,9 @@ CM.ChatBot = (function(){
           try{
             const res=await CM.Agent.run({messages:[{role:'system',content:C.ragAgentPrompt(sys)+'\n\n'+CM.Agent.jsonProtocol()}].concat(messages.slice(1)), sources:ctx.sources.slice(),
               maxSteps:3, maxResult:1400, signal:abortCtl.signal, ctx:agentCtx(),
-              chat:CM.Agent.jsonChat((msgs, schema)=>CM.LocalAI.chat(msgs, {signal:abortCtl.signal, temperature:0.2, maxTokens:schema?700:600,
-                responseFormat:schema?{type:'json_object', schema:JSON.stringify(schema)}:undefined})),
+              // gramatyka JSON tylko, gdy silnik ją przyjmuje (localJsonOk); błąd gramatyki / CSP → ten sam krok bez niej
+              chat:CM.Agent.jsonChat((msgs, schema)=>withJsonFallback((o)=>CM.LocalAI.chat(msgs, o), {signal:abortCtl.signal, temperature:0.2, maxTokens:schema?700:600,
+                responseFormat:schema&&localJsonOk?{type:'json_object', schema:JSON.stringify(schema)}:undefined})),
               onStep:(s)=>setStage('🔧 '+s.name+' '+argText(s.args))});
             agentDone(res); return;
           } finally{ off(); updateSub(); }

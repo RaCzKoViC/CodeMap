@@ -201,7 +201,9 @@ CM.Agent = (function(){
     }
     // limit kroków — ostatnie pytanie bez narzędzi wymusza odpowiedź
     const fin=await o.chat(msgs.concat([{role:'user', content:'Answer the original question now using the information gathered above. Cite snippets as [n].'}]), null);
-    return {answer:String(fin.content||'').trim(), steps, sources:ctx.sources, native};
+    let answer=String(fin.content||'').trim();
+    if(answer && toolCalls({content:answer}).calls.length) answer='';   // znów wywołanie narzędzia (JSON w treści) — to nie odpowiedź
+    return {answer, steps, sources:ctx.sources, native};
   }
 
   // ---------------- WebLLM: JSON wymuszony gramatyką zamiast natywnych narzędzi (faza 11) ----------------
@@ -214,13 +216,18 @@ CM.Agent = (function(){
     return 'Reply with ONE JSON object and nothing else. To use a tool: {"tool":"<name>","args":{…}}. When you can answer: {"tool":"answer","answer":"<answer, cite snippets as [n]>"}.\nTools:\n'
       +TOOLS.map(t=>'- '+t.name+'('+Object.keys(t.parameters.properties).map(k=>k+((t.parameters.required||[]).includes(k)?'':'?')).join(', ')+'): '+t.description).join('\n');
   }
+  // ostatni krok (limit, bez narzędzi): schemat z samą odpowiedzią — mały model z protokołem „jeden JSON" inaczej
+  // powtarza wywołanie narzędzia, które trafiało do czatu jako tekst
+  function answerSchema(){ return {type:'object', properties:{answer:{type:'string'}}, required:['answer']}; }
   function jsonChat(rawChat){
     return async (msgs, tools)=>{
-      if(!tools) return {content:String(await rawChat(msgs, null)||'')};
-      const txt=String(await rawChat(msgs, jsonSchema())||'');
-      let j=null; try{ j=JSON.parse(txt); }catch(e){ /* ucięty JSON (limit tokenów) — tekst idzie dalej jako odpowiedź */ }
-      if(j && j.tool==='answer') return {content:String(j.answer||'')};
-      if(j && j.tool) return {content:JSON.stringify({tool:j.tool, args:(j.args && typeof j.args==='object')?j.args:{}})};
+      const txt=String(await rawChat(msgs, tools ? jsonSchema() : answerSchema())||'');
+      let j=null; try{ j=JSON.parse(txt); }catch(e){ /* ucięty JSON (limit tokenów) albo proza bez gramatyki — tekst idzie dalej */ }
+      if(j && typeof j==='object' && typeof j.answer==='string' && (!j.tool || j.tool==='answer')) return {content:j.answer};
+      if(j && j.tool && j.tool!=='answer'){
+        if(!tools) return {content:''};   // wywołanie narzędzia zamiast odpowiedzi — JSON-a nie pokazujemy
+        return {content:JSON.stringify({tool:j.tool, args:(j.args && typeof j.args==='object' && !Array.isArray(j.args))?j.args:{}})};
+      }
       return {content:txt};
     };
   }

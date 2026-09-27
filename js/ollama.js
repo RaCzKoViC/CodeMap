@@ -18,7 +18,28 @@ CM.Ollama = (function(){
   // pole `error` z odpowiedzi błędu Ollamy; treść bez JSON → '' (komunikat z kodu HTTP)
   const errBody=async(r)=>{ try{ return (await r.json()).error||''; }catch(e){ return ''; } };
 
-  const offlineErr=()=>new Error(I.t('ol.offline','Ollama nie odpowiada pod ')+base()+I.t('ol.offlineHint',' — uruchom aplikację Ollama (lub `ollama serve`) i spróbuj ponownie.'));
+  const offlineErr=()=>Object.assign(new Error(I.t('ol.offline','Ollama nie odpowiada pod ')+base()+I.t('ol.offlineHint',' — uruchom aplikację Ollama (lub `ollama serve`) i spróbuj ponownie.')), {code:'offline'});
+  // origin tej strony do OLLAMA_ORIGINS (plik z dysku → „*")
+  const pageOrigin=()=>{ try{ return location.origin && location.origin!=='null' ? location.origin : '*'; }catch(e){ return '*'; } };
+  function corsHint(o){
+    return 'Windows: setx OLLAMA_ORIGINS "'+o+'" · macOS: launchctl setenv OLLAMA_ORIGINS "'+o+'" · Linux: sudo systemctl edit ollama.service → [Service] Environment="OLLAMA_ORIGINS='+o+'"';
+  }
+  const corsErr=()=>{ const o=pageOrigin(), short=I.t('ol.cors','Ollama działa pod ')+base()+I.t('ol.corsMid',', ale blokuje zapytania z tej strony (CORS). Dopuść ją zmienną OLLAMA_ORIGINS i uruchom Ollamę ponownie (zamknij ją też z zasobnika): ');
+    return Object.assign(new Error(short+corsHint(o)), {code:'cors', origin:o, short, hint:corsHint(o)}); };
+  // fetch do Ollamy nie wyszedł (TypeError): serwer wyłączony ALBO odpowiedział bez nagłówka CORS dla tej strony — Ollama
+  // z domyślnym OLLAMA_ORIGINS odrzuca obce originy (403 bez Access-Control-Allow-Origin), co przeglądarka zgłasza
+  // identycznie. Rozróżnienie: zapytanie `no-cors` przechodzi (odpowiedź nieprzezroczysta), gdy serwer żyje, a pada,
+  // gdy nikt nie słucha. Przekroczony czas to nie CORS — serwer żyje, ale nie odpowiada.
+  async function unreachable(e){
+    if(e && e.name==='TimeoutError') return offlineErr();
+    try{ await fetch(base()+'/api/version', {mode:'no-cors', cache:'no-store', signal:AbortSignal.timeout?AbortSignal.timeout(2500):undefined}); return corsErr(); }
+    catch(err){ return offlineErr(); }
+  }
+  // stan połączenia dla ustawień: {ok, code: 'cors' | 'offline' | null, message, hint}
+  async function check(){
+    try{ const list=await models(true); return {ok:true, code:null, models:list}; }
+    catch(e){ return {ok:false, code:e.code||null, message:(e&&e.message)||String(e), hint:e.hint||''}; }
+  }
 
   let _models=null;               // cache listy modeli (odświeżany przez models(true))
   let _raw=null;                  // surowa lista /api/tags (także modele embeddingów — dla RAG)
@@ -26,7 +47,7 @@ CM.Ollama = (function(){
     if(_models && !force) return _models;
     let r;
     try{ r=await fetch(base()+'/api/tags',{signal:AbortSignal.timeout?AbortSignal.timeout(4000):undefined}); }
-    catch(e){ throw offlineErr(); }
+    catch(e){ throw await unreachable(e); }
     if(!r.ok) throw new Error('Ollama: HTTP '+r.status);
     const j=await r.json();
     _raw=j.models||[];
@@ -55,7 +76,7 @@ CM.Ollama = (function(){
     if(opts.think===false) body.think=false;
     let r;
     try{ r=await fetch(base()+'/api/chat',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:opts.signal}); }
-    catch(e){ if(e&&e.name==='AbortError') throw e; throw offlineErr(); }
+    catch(e){ if(e&&e.name==='AbortError') throw e; throw await unreachable(e); }
     if(!r.ok){ const t=(await r.text().catch(()=>'')).slice(0,200); const e=new Error('Ollama: HTTP '+r.status+(t?' — '+t:'')); if(/does not support tools|tools? (are|is) not supported/i.test(t)) e.code='notools'; throw e; }
     const j=await r.json(); const msg=j.message||{};
     return {content:msg.content||'', tool_calls:msg.tool_calls||null, thinking:msg.thinking||''};
@@ -73,7 +94,7 @@ CM.Ollama = (function(){
   async function embed(texts, opts){
     opts=opts||{}; const m=opts.model; if(!m) throw new Error('embed: model');
     const post=(path, body)=>fetch(base()+path,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:opts.signal})
-      .catch(e=>{ if(e&&e.name==='AbortError') throw e; throw offlineErr(); });
+      .catch(async e=>{ if(e&&e.name==='AbortError') throw e; throw await unreachable(e); });
     if(!_legacyEmbed){
       const r=await post('/api/embed', {model:m, input:texts, truncate:true});
       if(r.ok){ const j=await r.json(); if(Array.isArray(j.embeddings) && j.embeddings.length===texts.length) return j.embeddings; }
@@ -106,7 +127,7 @@ CM.Ollama = (function(){
         body:JSON.stringify(body), signal:opts.signal });
     }catch(e){
       if(e&&e.name==='AbortError') throw e;
-      throw offlineErr();
+      throw await unreachable(e);
     }
     if(!r.ok){ const d=await errBody(r);
       throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
@@ -154,7 +175,7 @@ CM.Ollama = (function(){
     name=String(name||'').trim(); if(!name) throw new Error('model');
     let r;
     try{ r=await fetch(base()+'/api/pull',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:name, stream:true}), signal }); }
-    catch(e){ if(e&&e.name==='AbortError') throw e; throw offlineErr(); }
+    catch(e){ if(e&&e.name==='AbortError') throw e; throw await unreachable(e); }
     if(!r.ok){ const d=await errBody(r); throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
     const reader=r.body.getReader(); const dec=new TextDecoder(); let buf='', last=null;
     try{
@@ -184,5 +205,5 @@ CM.Ollama = (function(){
     {name:'gemma3:4b', size:'3.3 GB', note:'Google, wielojęzyczny'},
     {name:'gpt-oss:20b', size:'13 GB', note:'OpenAI open-weight (myślący; 16 GB+ RAM)'},
   ];
-  return { base, setBase, model, setModel, models, online, chat, chatTools, pull, modelSizeGB, embeddingModels, embed, SUGGESTED, DEF_BASE };
+  return { base, setBase, model, setModel, models, online, check, chat, chatTools, pull, modelSizeGB, embeddingModels, embed, SUGGESTED, DEF_BASE };
 })();

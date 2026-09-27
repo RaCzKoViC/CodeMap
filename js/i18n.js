@@ -281,6 +281,7 @@ CM.i18n = (function(){
     "lai.noModel":"This model is not available in this WebLLM engine build: ",
     "lai.cancelled":"Cancelled.","lai.ctxTooBig":"The question or project is too large for the local model — shorten the question or pick a bigger model.",
     "ol.offline":"Ollama is not responding at ","ol.offlineHint":" — start the Ollama app (or `ollama serve`) and try again.",
+    "ol.cors":"Ollama is running at ","ol.corsMid":", but blocks requests from this page (CORS). Allow it with OLLAMA_ORIGINS and restart Ollama (quit it from the tray too): ",
     "ol.noModel":"No Ollama model selected — open Settings → AI and refresh the model list.",
     "cm.toolDraw":"Draw","cm.toolDrawTitle":"Freehand drawing on the map (pen, shapes, arrows, text)","cm.edgeRemoved":"Connection removed.",
     "ca.loadError":"Loading error: ","ca.cancelLoad":"Cancel","ca.loadCancelled":"Loading cancelled.","ca.bigRepo":"Large repository — the view was automatically slimmed down (no connections, small shapes, wide spread).",

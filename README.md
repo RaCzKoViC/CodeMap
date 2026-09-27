@@ -169,7 +169,10 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
   node:test; pytest / unittest; Go testing; Rust; JUnit 5), its location and suffix voted from existing test ↔ code pairs,
   imports of the exported symbols and cases ordered by complexity; copy or download.
 - **WebLLM** — models that run in the browser (WebGPU), with weights cached and nothing sent anywhere.
-- **Ollama** — a local model server on your own computer.
+- **Ollama** — a local model server on your own computer. If the page is served from a different origin than
+  Ollama allows (e.g. GitHub Pages or your own VPS), Ollama answers `403` without CORS headers — CodeMap tells that apart
+  from a stopped server and shows the ready `OLLAMA_ORIGINS` command for your system (Windows `setx`, macOS
+  `launchctl setenv`, Linux `systemctl edit`); restart Ollama afterwards, including quitting it from the tray.
 - **API keys (cloud)** — as many keys as you like: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
   OpenRouter, DeepSeek, xAI, Together. The provider is **detected from the key format** and confirmed with the
   **Test** button (which fetches the model list); the model is chosen per key, and working keys are used in rotation.

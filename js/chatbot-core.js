@@ -383,9 +383,27 @@ CM.ChatBotCore = (function(){
     if(typeof o.required==='function') REQUIRED[o.name]=o.required;
   }
 
+  // tryb JSON nie wstaje: silnik bez gramatyki albo CSP strony (bez 'unsafe-eval') blokuje kompilator gramatyki WebLLM
+  // (xgrammar: EvalError / CompileError WebAssembly) — to nie błąd pytania, tylko trybu
+  function jsonUnsupported(e){
+    return !!e && e.name!=='AbortError' && (e.name==='EvalError' || e.name==='CompileError'
+      || /schema|grammar|json|format|content security|unsafe-eval|\bcsp\b|webassembly|evalerror/i.test(String(e.message||'')));
+  }
+  // call(opts) z opts.responseFormat; błąd gramatyki / CSP → onUnsupported() (np. localJsonOk=false na resztę sesji) i JEDNO
+  // ponowienie bez responseFormat — JSON z samego promptu, parseStructured / CM.Agent.jsonChat i tak go wyłuskają
+  async function withJsonFallback(call, opts, onUnsupported){
+    try{ return await call(opts); }
+    catch(e){
+      if(!opts || !opts.responseFormat || !jsonUnsupported(e)) throw e;
+      if(onUnsupported) onUnsupported(e);
+      const o=Object.assign({}, opts); delete o.responseFormat;
+      return call(o);
+    }
+  }
+
   return { ACTION_CATALOG, TOOLS, TOOL_PL, AUTO_OK, INFO_TOOLS, REQUIRED, PRIMARY_ARG, ACT_SCHEMA,
     appState, toolDesc, buildSystemPrompt, intentFallback, splitThink, stripThink, normalizeAction, normalizeArgs,
     knownAction, validAction, looksLikeCommand, isHelpRequest, helpText, friendlyError,
     jsonReplyPrefix, parseStructured, extractActions, stripActions, parseSlash, argText,
-    attachmentsContext, chatMessages, ragPrompt, ragAgentPrompt, ragHistory, titleMessages, cleanTitle, addTool };
+    attachmentsContext, chatMessages, ragPrompt, ragAgentPrompt, ragHistory, titleMessages, cleanTitle, addTool, jsonUnsupported, withJsonFallback };
 })();
