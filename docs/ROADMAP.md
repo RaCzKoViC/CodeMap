@@ -196,6 +196,40 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Strona z dokumentacją i przewodnikami na Pages, nagrania ekranu.
 - Backend na serwerze (konfiguracja w `deploy/`).
 
+## Faza 13 — wydajność na dużych repozytoriach — W TOKU 2026-09-27
+
+Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s całej analizy statycznej.
+- ✅ Przyczyna w CLI / Action / VS Code / testach: kontekst `vm` z interceptorami globalnych (ten sam kod poza `vm`
+  10× szybszy) → `vm.constants.DONT_CONTEXTIFY`; analiza CodeMap 2,9 → 0,7 s, Odysseus-Lab (1 649 plików, 464 tys.
+  linii) ≈ 2,3 s na rozgrzanym dysku (zimny odczyt przez Defendera: 17 s — nie po stronie CodeMap).
+- Duplikaty: szybsze odciski i parowanie, pamięć odcisków (tylko zmienione pliki liczone od nowa), liczenie poza
+  wątkiem interfejsu.
+- Analiza statyczna (Inspect) w tle — interfejs nie zamarza, wyniki pojawiają się stopniowo.
+- Benchmark na prawdziwych dużych repozytoriach: wczytanie, analiza statyczna, pamięć — z progiem regresji w CI.
+- Trend zdrowia w tle i z pamięcią punktów per commit (drugie otwarcie natychmiast).
+
+## Faza 14 — dokładność 2.0
+
+- Korpus: prawdziwe monorepo z workspaces (pakiety i macierz zależności na żywym przykładzie).
+- Martwy kod (nieużywane eksporty i pliki) jako reguła, sprawdzany wyrocznią: knip (JS/TS), vulture (Python).
+- Dokładność grafu wywołań: tree-sitter porównany z „znajdź odwołania" kompilatora TypeScript.
+- Propozycja reguł architektury z warstw macierzy zależności — do zatwierdzenia jednym klikiem.
+
+## Faza 15 — CodeMap dla agentów AI
+
+- Serwer MCP (`codemap mcp`, stdio): zależne pliki i wpływ zmiany, hotspoty, właściciele, cykle, pytania o mapę,
+  szkielety testów, podatne zależności — ta sama analiza co CLI.
+- Generowany `ARCHITECTURE.md` (warstwy, pakiety, hotspoty, właściciele, konwencje), odświeżany w CI.
+- `codemap check --staged`: wpływ zmian i reguły architektury przed commitem (hook pre-commit).
+
+## Faza 16 — jakość własna 3 i dopracowanie
+
+- Zdrowie CodeMap 62 → 75+: najbardziej złożone pliki (renderer, analysis, loaders, chatbot), 22 pliki z dynamicznym
+  `innerHTML` → bezpieczne budowanie elementów, duplikaty w testach → wspólne fixture'y.
+- Znane błędy: dwa węzły w dokładnie tym samym miejscu nie rozsuwają się (physics); serwer po cichu obcina metadane albumu.
+- Dostępność: nawigacja po mapie klawiaturą, tekstowe podsumowanie dla czytników ekranu.
+- Lista kontrolna ręcznego sprawdzenia agenta WebLLM (WebGPU).
+
 ## Kolejność
 
 Faza 0 w całości, potem harness testowy z fazy 1 (bez niego przebudowa `app.js` i parserów jest ryzykowna).
@@ -208,3 +242,6 @@ własnego kodu z progiem w CI i angielskie README → tryb na żywo → agent z 
 
 Po v1.4.0 (plan z 2026-09-27): faza 9 (korpus referencyjny, potem dług) i sprzężenie zmian z fazy 10 → reszta fazy 10
 → faza 11; faza 12 równolegle, gdy właściciel założy konta.
+
+Po v1.5.1 (plan z 2026-09-27): faza 13 (zaczynając od duplikatów — zmierzone wąskie gardło) → faza 15 (MCP, wartość
+na zewnątrz; CLI ma już całą analizę) → faza 14 → faza 16; faza 12 nadal czeka na konta.

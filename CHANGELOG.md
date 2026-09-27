@@ -5,6 +5,13 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Zmienione — Faza 13 (wydajność)
+- **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym
+  z `vm.constants.DONT_CONTEXTIFY` (Node ≥ 20.18 / 22.8) — globalny obiekt jest zwykłym obiektem, bez interceptorów
+  „kontekstyfikacji", przez które każde odwołanie do globalnych (np. `Math.imul` w odciskach duplikatów, wołane
+  miliony razy) było ok. 10× wolniejsze niż w przeglądarce. Na repozytorium CodeMap: analiza 2,9 s → 0,7 s (odciski
+  duplikatów 3,1 s → 0,19 s, graf 0,52 → 0,21 s); starszy Node — dotychczasowy kontekst.
+
 ## [1.5.1] — 2026-09-27
 
 ### Poprawione

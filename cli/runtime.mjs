@@ -52,9 +52,13 @@ export function docStub() {
 
 // Celowo BEZ MessageChannel i Worker: moduły wtedy oddają sterowanie przez setTimeout i liczą w bieżącym
 // wątku (w Node port MessageChannel z onmessage trzymałby proces przy życiu).
+// DONT_CONTEXTIFY (Node ≥ 20.18 / 22.8): globalny obiekt kontekstu jest zwykłym obiektem — bez interceptorów
+// „kontekstyfikacji", przez które każde odwołanie do globalnych (Math.imul w odciskach duplikatów, Map, Uint32Array…)
+// było ok. 10× wolniejsze niż w przeglądarce (analiza statyczna CodeMap: 2,1 s → ułamek). Starszy Node — jak dawniej.
+const NO_CTXIFY = vm.constants && vm.constants.DONT_CONTEXTIFY;
 export function createContext(extra = {}) {
-  const g = {};
-  g.window = g; g.self = g; g.globalThis = g;
+  const g = NO_CTXIFY ? vm.createContext(NO_CTXIFY) : {};
+  g.window = g; g.self = g; if (!NO_CTXIFY) g.globalThis = g;
   Object.assign(g, {
     console, performance, setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask,
     structuredClone, TextEncoder, TextDecoder, URL, URLSearchParams, Blob,
@@ -71,7 +75,7 @@ export function createContext(extra = {}) {
     addEventListener() {}, removeEventListener() {},
     devicePixelRatio: 1, innerWidth: 1280, innerHeight: 800,
   }, extra);
-  return vm.createContext(g);
+  return NO_CTXIFY ? g : vm.createContext(g);
 }
 
 export function runFile(ctx, rel) {
