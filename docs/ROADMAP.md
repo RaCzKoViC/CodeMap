@@ -147,7 +147,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   poziom pakietów) — precyzja i kompletność per repozytorium, lista rozbieżności do poprawek, próg w CI (zadanie
   `corpus`, 97 %). Pierwszy przebieg: 79 % / 80 %; po poprawkach (TS `.js`→`.ts`, stdlib Pythona, `from . import x`,
   Go z `go.mod`, krawędzie `typeOnly`) 100 % / 100 % na 5 repozytoriach (gin sprawdza CI — lokalnie brak Go).
-- Próg regresji benchmarku względem poprzedniego wyniku (dziś benchmark tylko informacyjny).
+- ✅ Próg regresji benchmarku względem poprzedniego wyniku: `--baseline` + `--tolerance 1.5` z progami bezwzględnymi
+  (500 ms wczytania, 10 ms klatki); w CI odniesieniem jest artefakt ostatniego zielonego przebiegu main.
 - Dług wskazany przez własną analizę: 57 złożonych plików bez testów (najpierw app-core, loaders, drive, sync),
   47 pustych `catch`, 76 zduplikowanych fragmentów; cel: zdrowie 45 → 60+.
 

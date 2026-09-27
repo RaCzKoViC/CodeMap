@@ -32,7 +32,7 @@ export const CORPUS = [
 ];
 
 const sh = (cmd, args, cwd, opts = {}) => execFileSync(cmd, args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 << 20, ...opts });
-const has = (cmd) => { try { execSync(cmd + ' --version', { stdio: 'ignore' }); return true; } catch { return false; } };
+const has = (cmd, ver = '--version') => { try { execSync(cmd + ' ' + ver, { stdio: 'ignore' }); return true; } catch { return false; } };
 const posix = (p) => p.split(sep).join('/');
 function walk(dir, base = dir, out = []) {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -134,7 +134,7 @@ function golistEdges(c, dir) {
 const ORACLES = {
   esbuild: { available: () => true, edges: esbuildEdges },
   grimp: { available: () => has(process.platform === 'win32' ? 'python' : 'python3'), edges: grimpEdges },
-  golist: { available: () => has('go'), edges: golistEdges },
+  golist: { available: () => has('go', 'version'), edges: golistEdges },
 };
 
 // ---------------- porównanie ----------------

@@ -7,12 +7,15 @@
 //   node tools/bench.mjs --n 50000 --json bench.json --max-frame 50
 //   --summary: tabela Markdown do $GITHUB_STEP_SUMMARY (CI) albo na stdout
 // --max-frame: kod wyjścia 1, gdy mediana klatki przy dopasowaniu przekroczy próg (ms) — do CI.
-import { writeFile, appendFile } from 'node:fs/promises';
+// --baseline poprzedni.json [--tolerance 1.5]: regres = wczytanie albo klatka (najlepszy backend) wolniejsze niż
+//   poprzedni wynik × tolerancja I o więcej niż próg bezwzględny (500 ms / 10 ms — szum runnera); brak pliku = bez porównania.
+import { writeFile, appendFile, readFile } from 'node:fs/promises';
 import { startBrowser, sleep } from './cdp.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const SIZES = String(arg('n', '5000,20000')).split(',').map((x) => parseInt(x, 10)).filter((x) => x > 0);
 const OUT = arg('json', null), MAX_FRAME = parseFloat(arg('max-frame', '0')) || 0;
+const BASE = arg('baseline', null), TOL = parseFloat(arg('tolerance', '1.5')) || 1.5;
 
 let B;
 try { B = await startBrowser({ prefix: 'codemap-bench-', width: 1400, height: 900 }); }
@@ -61,10 +64,27 @@ try {
 } catch (e) { console.error('✖ ' + (e && e.message || e)); B.close(); process.exit(2); }
 B.close();
 if (OUT) await writeFile(OUT, JSON.stringify({ at: new Date().toISOString(), results }, null, 2));
+// porównanie z poprzednim wynikiem (ten sam N): wczytanie i najlepsza klatka dopasowania
+const bestFit = (r) => Math.min(...Object.values(r.frames || {}).map((f) => f.fit));
+const cmp = [];
+if (BASE) {
+  let base = null;
+  try { base = JSON.parse(await readFile(BASE, 'utf8')); } catch { console.log(`– brak poprzedniego wyniku (${BASE}) — bez porównania`); }
+  for (const r of results) {
+    const b = base && (base.results || []).find((x) => x.N === r.N); if (!b) continue;
+    for (const [what, now, was, floor] of [['wczytanie', r.load, b.load, 500], ['klatka', bestFit(r), bestFit(b), 10]]) {
+      if (!(was > 0) || !isFinite(now)) continue;
+      cmp.push({ N: r.N, what, now, was, ratio: now / was, bad: now > was * TOL && now - was > floor });
+    }
+  }
+  for (const c of cmp) console.log(`${c.bad ? '✖' : '✔'} N=${c.N} ${c.what}: ${c.now} ms (poprzednio ${c.was} ms, ${c.ratio.toFixed(2)}×, próg ${TOL}×)`);
+}
 if (process.argv.includes('--summary')) {
   const rows = ['### Benchmark renderera', '', '| pliki | węzły | krawędzie | wczytanie | backend | klatka: dopasowanie | ×8 | przesuwanie |', '|---:|---:|---:|---:|---|---:|---:|---:|'];
   for (const r of results) for (const [b, f] of Object.entries(r.frames)) rows.push(`| ${r.N} | ${r.nodes} | ${r.edges} | ${r.load} ms | ${b} | ${f.fit} ms | ${f.zoom8} ms | ${f.pan} ms |`);
-  const md = rows.join('\n') + '\n\nKlatka z wymuszoną rasteryzacją (getImageData / gl.finish), mediana z 7; runner bez GPU = WebGL programowy.\n';
+  let md = rows.join('\n') + '\n\nKlatka z wymuszoną rasteryzacją (getImageData / gl.finish), mediana z 7; runner bez GPU = WebGL programowy.\n';
+  if (cmp.length) md += '\n| pliki | pomiar | teraz | poprzednio | zmiana |\n|---:|---|---:|---:|---:|\n' +
+    cmp.map((c) => `| ${c.N} | ${c.what} | ${c.now} ms | ${c.was} ms | ${c.bad ? '✖ ' : ''}${c.ratio.toFixed(2)}× |`).join('\n') + `\n\nRegres: > ${TOL}× poprzedniego wyniku i więcej niż 500 ms (wczytanie) / 10 ms (klatka).\n`;
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, md); else console.log('\n' + md);
 }
 if (MAX_FRAME) {
@@ -72,3 +92,4 @@ if (MAX_FRAME) {
   if (worst > MAX_FRAME) { console.error(`✖ klatka ${worst} ms > próg ${MAX_FRAME} ms`); process.exit(1); }
   console.log(`✔ najwolniejsza klatka (najlepszy backend) ${worst} ms ≤ ${MAX_FRAME} ms`);
 }
+if (cmp.some((c) => c.bad)) { console.error(`✖ regres wydajności względem poprzedniego wyniku (próg ${TOL}×)`); process.exit(1); }

@@ -14,6 +14,9 @@ permissions:
 jobs:
   frontend:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read   # artefakt benchmarku z poprzedniego przebiegu
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,10 +38,18 @@ jobs:
         run: npm run smoke
         env:
           CHROME: /usr/bin/google-chrome
-      # czasy wczytania i klatki (canvas 2D vs WebGL) na syntetycznych projektach 5k / 20k plików — informacyjnie,
-      # bez progu (runner bez GPU); tabela w podsumowaniu, JSON jako artefakt do porównań między commitami
-      - name: Benchmark renderera (informacyjnie)
-        run: node tools/bench.mjs --n 5000,20000 --json bench.json --summary
+      # czasy wczytania i klatki (canvas 2D vs WebGL) na syntetycznych projektach 5k / 20k plików; tabela w podsumowaniu,
+      # JSON jako artefakt. Regres = ponad 1,5× wyniku ostatniego zielonego przebiegu main i więcej niż 500 ms
+      # (wczytanie) / 10 ms (klatka) — rozrzut runnera to ±8 % wczytania i 1–5 ms klatki WebGL (programowy, bez GPU)
+      - name: Poprzedni wynik benchmarku (ostatni zielony przebieg main)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh run list -R "$GITHUB_REPOSITORY" -w CI -b main -s success -L 1 --json databaseId -q '.[0].databaseId')
+          if [ -n "$id" ]; then gh run download "$id" -R "$GITHUB_REPOSITORY" -n bench -D bench-base; fi
+      - name: Benchmark renderera (próg regresji 1,5×)
+        run: node tools/bench.mjs --n 5000,20000 --json bench.json --summary --baseline bench-base/bench.json --tolerance 1.5
         env:
           CHROME: /usr/bin/google-chrome
       - uses: actions/upload-artifact@v4

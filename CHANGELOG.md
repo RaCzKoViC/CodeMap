@@ -15,6 +15,10 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Krawędzie `typeOnly`**: `import type` / `export type … from` (TypeScript) oznaczone na krawędzi (zapis mapy i
   wczytanie zachowują flagę); zwykły import tej samej pary plików ją zdejmuje. Korpus porównuje je z esbuildem
   uczciwie (esbuild usuwa `import type` z definicji).
+- **Próg regresji benchmarku**: `tools/bench.mjs --baseline poprzedni.json --tolerance 1.5` — regres, gdy wczytanie
+  albo najlepsza klatka jest wolniejsza niż 1,5× poprzedniego wyniku i o więcej niż 500 ms / 10 ms (szum runnera: ±8 %
+  wczytania, 1–5 ms klatki); w CI punktem odniesienia jest artefakt `bench` ostatniego zielonego przebiegu main,
+  porównanie trafia do podsumowania.
 
 ### Poprawione — rozbieżności znalezione korpusem
 - **TypeScript ESM (NodeNext)**: `import './x.js'` w źródle .ts wskazuje `x.ts` / `x.tsx` (`.mjs` → `.mts`,
