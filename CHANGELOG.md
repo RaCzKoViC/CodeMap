@@ -19,6 +19,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   zakresem właściciela (`npm publish dist/npm/<plik>.tgz --access public`).
 
 ### Zmienione — Faza 8 (jakość własna)
+- **Wersjonowanie ustawień** (`js/prefs.js`, `codemap_settings._v = 2`): migracja przy odczycie — `_menuTint` → `_menuRgb`,
+  układ spoza listy (także 20 usuniętych) → `pack`, pola po usuniętych kontrolkach wypadają; dotyczy też bloba z synchronizacji
+  z innego urządzenia. Sprawdzone na starym blobie w przeglądarce; 3 testy.
 - **Podział `chatbot.js`** (1373 → 694 linie): `chatbot-strings.js` (teksty PL/EN), `chatbot-core.js` (`CM.ChatBotCore` — logika
   bez DOM: katalog narzędzi, prompty, parsowanie i walidacja akcji, `/` komendy, `intentFallback`), `chatbot-render.js`
   (markdown, wiadomości, źródła, kroki agenta, menu `/`, uchwyty okna); API `CM.ChatBot` bez zmian; 28 testów logiki.

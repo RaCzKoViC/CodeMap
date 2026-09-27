@@ -45,6 +45,7 @@
     s._theme = document.body.classList.contains('light')?'light':'dark';
     const pre=document.querySelector('#theme-presets .thpre.active'); if(pre) s._preset=pre.dataset.pre;
     const mr=document.documentElement.style.getPropertyValue('--menu-rgb'); if(mr) s._menuRgb=mr.trim();
+    if(CM.Prefs) s._v=CM.Prefs.VERSION;   // wersja formatu (prefs.js — migracja starszych bloby, także z synchronizacji)
     return s;
   }
   function saveSettings(){ try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(collectSettings())); }catch(e){} }
@@ -62,7 +63,7 @@
     // tint only if it matches the theme (a dark tint under light — or vice versa — looks broken)
     if(s._preset && A._applyThemePreset && THEME_PRESETS[s._preset]){ A._applyThemePreset(s._preset); }
     else{
-      const tint=s._menuRgb||s._menuTint;   // _menuTint = legacy pre-preset storage
+      const tint=s._menuRgb;   // dawne _menuTint przepisuje migracja (prefs.js)
       if(tint && (_lum(tint)>0.5)===themeLight){
         document.documentElement.style.setProperty('--menu-rgb', tint);
         document.documentElement.style.setProperty('--glass-rgb', tint);
@@ -79,6 +80,10 @@
   }
   function wireSettings(){
     let saved=null; try{ saved=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'null'); }catch(e){}
+    if(saved && CM.Prefs){
+      const sel=$('#sel-layout'), mig=CM.Prefs.migrate(saved, {ids:SETTINGS_INPUTS, layouts:sel?[...sel.options].map(o=>o.value):null, defaultLayout:'pack'});
+      if(mig && !CM.Prefs.same(mig, saved)){ saved=mig; try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(mig)); }catch(e){} }
+    }
     applySettings(saved);
     const persist=U.debounce(saveSettings, 250);
     const onEvt=(e)=>{ if(e.target && e.target.id && SETTINGS_INPUTS.includes(e.target.id)) persist(); };
