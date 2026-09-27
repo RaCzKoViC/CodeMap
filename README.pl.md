@@ -78,10 +78,10 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   pyproject) albo foldery (poziom 1/2) w kolejności dostawcy → konsumenci, więc zdrowe zależności leżą pod przekątną,
   a czerwone komórki nad nią to cykle; klik pokazuje pary importów i podświetla pliki. Reguła Inspect **cykle między pakietami**.
 - **Sprawdzane narzędziami samych ekosystemów**: `npm run corpus` porównuje krawędzie importów CodeMap na przypiętych
-  wydaniach Express, Preact, ky, petite-vue, Flask i Gin z esbuildem (JS/TS), grimp (Python) i `go list` (Go) — precyzja
-  i kompletność per repozytorium, zadanie CI pada poniżej 97 %. Monorepo pnpm Preact Signals (16 pakietów) jest
-  porównywane także na poziomie pakietów: lista pakietów i krawędzie pakiet → pakiet, czyli macierz zależności.
-  Dziś: 100 % / 100 %. Krawędzie z `import type` (TS) mają flagę `typeOnly`.
+  wydaniach Express, Preact, ky, petite-vue, Flask, Requests i Gin z esbuildem (JS/TS), grimp (Python) i `go list` (Go) —
+  precyzja i kompletność per repozytorium, zadanie CI pada poniżej 97 %. Monorepo pnpm Preact Signals (16 pakietów) jest
+  porównywane także na poziomie pakietów: lista pakietów i krawędzie pakiet → pakiet, czyli macierz zależności. Martwy
+  kod — z knipem (nieużywane eksporty JS/TS) i vulture (Python). Dziś: 100 % / 100 %. Krawędzie z `import type` (TS) mają flagę `typeOnly`.
 
 ### Mapa
 - **13 układów**: upakowane koła, drzewo strukturalne, radialny, treemap, icicle, sunburst, siła (force),
@@ -145,7 +145,8 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 głębokie zagnieżdżenie, minifikaty, **zduplikowany kod** — winnowing na treści plików…) z progami
 statystycznymi, **health score** i raportem Markdown. **Nieużywane eksporty** (JS/TS): nazwy eksportowane, których żaden
 plik projektu nie importuje — z importami nazwanymi, namespace, barrelami `export *`, typami z JSDoc `import('./x').T`
-i plikami `.d.ts`, bez wejść pakietów (exports / main / bin, `dist` → `src`); sprawdzane knipem na korpusie (100 %).
+i plikami `.d.ts`, bez wejść pakietów (exports / main / bin, `dist` → `src`); sprawdzane knipem na korpusie (100 %);
+w Pythonie funkcje i klasy najwyższego poziomu, do których nic się nie odwołuje (jak vulture, 100 % na Flasku i Requests).
 Opcjonalny plik **`.codemap.rules.json`** w repozytorium
 (warstwy = globy ścieżek, `forbid` między warstwami, `noCycles`) jest egzekwowany jako reguła
 „naruszenia architektury". W panelu szczegółów każdy plik i folder ma **sprzężenia** Ca / Ce / I

@@ -22,16 +22,18 @@ const MIN_P = parseFloat(arg('min-precision', '0')) || 0, MIN_R = parseFloat(arg
 const REQUIRE_ALL = process.argv.includes('--require-all'), SUMMARY = process.argv.includes('--summary');
 
 // repozytoria z galerii (js/gallery.js) przypięte do wydań; scope = katalogi kodu, którego dotyczy porównanie
-// deadcode: nieużywane eksporty (CM.DeadCode) porównane z knip — tylko ESM (knip nie widzi użycia `require('x').y`)
+// deadcode: martwy kod (CM.DeadCode) porównany z knip (JS/TS; tylko ESM — knip nie widzi użycia `require('x').y`)
+// albo vulture (Python: funkcje i klasy najwyższego poziomu)
 export const CORPUS = [
   { id: 'express', repo: 'expressjs/express', ref: 'v5.2.1', oracle: 'esbuild', scope: ['lib', 'index.js'] },
-  { id: 'preact', repo: 'preactjs/preact', ref: '10.29.8', oracle: 'esbuild', deadcode: true, scope: ['src', 'hooks/src', 'compat/src', 'debug/src', 'devtools/src', 'jsx-runtime/src', 'test-utils/src'] },
-  { id: 'ky', repo: 'sindresorhus/ky', ref: 'v2.1.0', oracle: 'esbuild', deadcode: true, scope: ['source'] },
-  { id: 'petite-vue', repo: 'vuejs/petite-vue', ref: 'v0.4.1', oracle: 'esbuild', deadcode: true, scope: ['src'] },
-  { id: 'flask', repo: 'pallets/flask', ref: '3.1.3', oracle: 'grimp', scope: ['src/flask'], pkg: 'flask', pyroot: 'src' },
+  { id: 'preact', repo: 'preactjs/preact', ref: '10.29.8', oracle: 'esbuild', deadcode: 'knip', scope: ['src', 'hooks/src', 'compat/src', 'debug/src', 'devtools/src', 'jsx-runtime/src', 'test-utils/src'] },
+  { id: 'ky', repo: 'sindresorhus/ky', ref: 'v2.1.0', oracle: 'esbuild', deadcode: 'knip', scope: ['source'] },
+  { id: 'petite-vue', repo: 'vuejs/petite-vue', ref: 'v0.4.1', oracle: 'esbuild', deadcode: 'knip', scope: ['src'] },
+  { id: 'flask', repo: 'pallets/flask', ref: '3.1.3', oracle: 'grimp', deadcode: 'vulture', scope: ['src/flask'], pkg: 'flask', pyroot: 'src' },
+  { id: 'requests', repo: 'psf/requests', ref: 'v2.32.5', oracle: 'grimp', deadcode: 'vulture', scope: ['src/requests'], pkg: 'requests', pyroot: 'src' },
   { id: 'gin', repo: 'gin-gonic/gin', ref: 'v1.12.0', oracle: 'golist', scope: ['.'] },
   // monorepo pnpm (13 pakietów, zagnieżdżone utils/runtime, importy po nazwie przez `paths` z tsconfig): także poziom pakietów
-  { id: 'signals', repo: 'preactjs/signals', ref: '@preact/signals@2.9.4', oracle: 'esbuild', tsconfig: 'tsconfig.json', workspaces: true, deadcode: true,
+  { id: 'signals', repo: 'preactjs/signals', ref: '@preact/signals@2.9.4', oracle: 'esbuild', tsconfig: 'tsconfig.json', workspaces: true, deadcode: 'knip',
     scope: ['core', 'debug', 'devtools-adapter', 'devtools-ui', 'eslint-plugin-signals', 'preact', 'preact/utils', 'preact-transform',
       'react', 'react/runtime', 'react/utils', 'react-transform', 'vite-plugin'].map((p) => 'packages/' + p + '/src') },
 ];
@@ -189,15 +191,18 @@ function knipBin() {
   }
   return join(tools, 'node_modules/knip/bin/knip.js');
 }
-async function deadcodeSets(c, dir) {
+const analyzeInProcess = async (dir) => {   // żywy graf z podglądami treści (mapa JSON ich nie ma)
   const { runAnalysis } = await import('file:///' + join(ROOT, 'cli/analyze.mjs').replace(/\\/g, '/'));
-  const r = await runAnalysis(dir, { git: false, coverage: false, lang: 'en' });
+  return runAnalysis(dir, { git: false, coverage: false, lang: 'en' });
+};
+async function knipSets(c, dir) {
+  const r = await analyzeInProcess(dir);
   const CM = r.CM, g = r.graph, entries = [...CM.DeadCode.entryFiles(g)];
   const hasIn = new Set(g.edges.filter((e) => e.type === 'import').map((e) => e.target));
   for (const n of g.nodes.values()) if (n.type === 'file' && /\.(m?[jt]sx?|c[jt]s)$/.test(n.path) && !/\.d\.[cm]?ts$/.test(n.path)
     && (!hasIn.has(n.id) || n.isTest) && !entries.includes(n.path)) entries.push(n.path);
   const cm = new Set();
-  for (const d of CM.DeadCode.analyze(g)) if (inScope(c, d.path)) for (const x of d.exports) cm.add(d.path + ' # ' + x.name);
+  for (const d of CM.DeadCode.analyzeJs(g)) if (inScope(c, d.path)) for (const x of d.exports) cm.add(d.path + ' # ' + x.name);
   const ws = (entry) => ({ entry, project: ['**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}'], ...Object.fromEntries(KNIP_OFF.map((p) => [p, false])) });
   let cfg = ws(entries);
   if (c.workspaces) {   // knip: każdy pakiet workspace'u to osobny workspace — wejścia muszą trafić do właściwego
@@ -212,6 +217,38 @@ async function deadcodeSets(c, dir) {
   for (const is of JSON.parse(out).issues) if (inScope(c, is.file) && !entries.includes(is.file))
     for (const k of ['exports', 'types', 'nsExports', 'nsTypes']) for (const x of is[k] || []) kn.add(is.file + ' # ' + x.name);
   return { cm, kn, entries: entries.filter((e) => inScope(c, e)).length };
+}
+// Python: vulture (nazwy bez użycia w całym kodzie) — tylko funkcje i klasy najwyższego poziomu, bez dekoratorów
+// (rejestruje je framework) i dunderów; nazwy importowane w __init__.py to API pakietu — pominięte po obu stronach
+const VULTURE = '2.14';
+function vultureSets(c, dir, r) {
+  const venv = join(CACHE, '.venv'), py = join(venv, process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
+  if (!existsSync(py)) sh(process.platform === 'win32' ? 'python' : 'python3', ['-m', 'venv', venv], CACHE);
+  try { sh(py, ['-m', 'vulture', '--version'], CACHE); } catch { sh(py, ['-m', 'pip', 'install', '-q', 'vulture==' + VULTURE], CACHE); }
+  let out;   // kod wyjścia 3 = znalazł martwy kod (to nie błąd)
+  try { out = sh(py, ['-m', 'vulture', ...c.scope, '--min-confidence', '0'], dir); }
+  catch (e) { if (e.status !== 3) throw e; out = String(e.stdout); }
+  const api = new Set();
+  for (const p of walk(dir)) if (inScope(c, p) && /(^|\/)__init__\.py$/.test(p)) {
+    const src = readFileSync(join(dir, p), 'utf8');
+    for (const m of src.matchAll(/^[ \t]*from[ \t]+[\w.]+[ \t]+import[ \t]+(\([^)]*\)|[^\n]*)/gm))
+      for (const x of m[1].replace(/[()\\]/g, ' ').split(',')) { const nm = x.trim().split(/\s+as\s+/)[0]; if (nm) api.add(nm); }
+  }
+  const kn = new Set(), lines = new Map();
+  const lineOf = (p, n) => { if (!lines.has(p)) lines.set(p, readFileSync(join(dir, p), 'utf8').split('\n')); return lines.get(p)[n - 1] || ''; };
+  for (const m of out.matchAll(/^(.+?):(\d+): unused (?:function|class) '([\w]+)'/gm)) {
+    const p = posix(m[1]).replace(/^\.\//, ''), n = +m[2], name = m[3];
+    if (!inScope(c, p) || /^__\w+__$/.test(name) || api.has(name) || !/^(async\s+)?(def|class)\s/.test(lineOf(p, n))) continue;
+    let k = n - 1; while (k > 0 && !lineOf(p, k).trim()) k--;
+    if (k > 0 && /^\s*@/.test(lineOf(p, k))) continue;
+    kn.add(p + ' # ' + name);
+  }
+  const cm = new Set();
+  for (const d of r.CM.DeadCode.analyzePy(r.graph)) if (inScope(c, d.path)) for (const x of d.exports) cm.add(d.path + ' # ' + x.name);
+  return { cm, kn, entries: 0 };
+}
+async function deadcodeSets(c, dir) {
+  return c.deadcode === 'vulture' ? vultureSets(c, dir, await analyzeInProcess(dir)) : knipSets(c, dir);
 }
 
 const compare = (cm, or) => {
@@ -255,11 +292,11 @@ for (const c of CORPUS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
     if (c.deadcode) {   // nieużywane eksporty: CM.DeadCode vs knip (te same wejścia)
       try {
         const d = await deadcodeSets(c, dir), k = compare(d.cm, d.kn);
-        r.deadcode = { codemap: d.cm.size, oracleEdges: d.kn.size, common: k.common, precision: +k.precision.toFixed(4), recall: +k.recall.toFixed(4), extra: k.extra, missing: k.missing, entries: d.entries };
+        r.deadcode = { oracle: c.deadcode === 'vulture' ? 'vulture ' + VULTURE : 'knip ' + KNIP.knip, codemap: d.cm.size, oracleEdges: d.kn.size, common: k.common, precision: +k.precision.toFixed(4), recall: +k.recall.toFixed(4), extra: k.extra, missing: k.missing, entries: d.entries };
         const label = '  martwy kod';
-        console.log(`${k.precision >= MIN_P && k.recall >= MIN_R ? '✔' : '✖'} ${label.padEnd(11)} knip    CodeMap ${String(d.cm.size).padStart(4)} · wyrocznia ${String(d.kn.size).padStart(4)} · wspólne ${String(k.common).padStart(4)} · precyzja ${pct(k.precision)} · kompletność ${pct(k.recall)}`);
+        console.log(`${k.precision >= MIN_P && k.recall >= MIN_R ? '✔' : '✖'} ${label.padEnd(11)} ${c.deadcode.padEnd(7)} CodeMap ${String(d.cm.size).padStart(4)} · wyrocznia ${String(d.kn.size).padStart(4)} · wspólne ${String(k.common).padStart(4)} · precyzja ${pct(k.precision)} · kompletność ${pct(k.recall)}`);
         diffs(k.extra, k.missing);
-      } catch (e) { r.deadcode = { error: String((e && e.message) || e).split('\n')[0].slice(0, 300) }; console.log(`✖   martwy kod  błąd: ${r.deadcode.error}`); }
+      } catch (e) { r.deadcode = { oracle: c.deadcode, error: String((e && e.message) || e).split('\n')[0].slice(0, 300) }; console.log(`✖   martwy kod  błąd: ${r.deadcode.error}`); }
     }
   } catch (e) { console.log(`✖ ${c.id.padEnd(11)} błąd: ${String(e && e.message || e).split('\n')[0].slice(0, 200)}`); results.push({ id: c.id, error: String(e && e.message || e) }); }
 }
@@ -274,8 +311,8 @@ if (SUMMARY && process.env.GITHUB_STEP_SUMMARY) {
   const rows = results.flatMap((r) => r.codemap != null
     ? [`| ${r.id} | \`${r.ref}\` | ${r.oracle} | ${r.codemap} | ${r.oracleEdges} | ${pc(r.precision)} | ${pc(r.recall)} |`,
       ...(r.packages ? [`| ${r.id} — pakiety (${r.packages.found}/${r.packages.expected}) | | package.json + esbuild | ${r.packages.codemap} | ${r.packages.oracleEdges} | ${pc(r.packages.precision)} | ${pc(r.packages.recall)} |`] : []),
-      ...(r.deadcode ? [r.deadcode.error ? `| ${r.id} — nieużywane eksporty | | knip ${KNIP.knip} | — | — | błąd | |`
-        : `| ${r.id} — nieużywane eksporty | | knip ${KNIP.knip} | ${r.deadcode.codemap} | ${r.deadcode.oracleEdges} | ${pc(r.deadcode.precision)} | ${pc(r.deadcode.recall)} |`] : [])]
+      ...(r.deadcode ? [r.deadcode.error ? `| ${r.id} — nieużywane eksporty | | ${r.deadcode.oracle} | — | — | błąd | |`
+        : `| ${r.id} — nieużywane eksporty | | ${r.deadcode.oracle} | ${r.deadcode.codemap} | ${r.deadcode.oracleEdges} | ${pc(r.deadcode.precision)} | ${pc(r.deadcode.recall)} |`] : [])]
     : [`| ${r.id} | | ${r.skipped || ''} | — | — | ${r.error ? 'błąd' : 'pominięte'} | |`]);
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, ['### Korpus referencyjny — krawędzie importów CodeMap vs wyrocznia', '',
     '| repozytorium | wersja | wyrocznia | krawędzie CodeMap | krawędzie wyroczni | precyzja | kompletność |', '|---|---|---|--:|--:|--:|--:|', ...rows, ''].join('\n'));

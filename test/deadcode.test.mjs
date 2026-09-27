@@ -68,6 +68,29 @@ describe('eksporty pliku (exportsOf)', () => {
   });
 });
 
+describe('Python — definicje najwyższego poziomu bez odwołań (jak vulture)', () => {
+  test('pyCode: komentarze, napisy i docstringi wygaszone, f-stringi zostają; długość i linie bez zmian', () => {
+    const src = '# def fake(): pass\nx = "helper"\ny = f"{helper()}"\n"""\nused_in_doc\n"""\n';
+    const c = CM.DeadCode.pyCode(src);
+    assert.equal(c.length, src.length);
+    assert.ok(!/fake|used_in_doc/.test(c) && !c.includes('"helper"'));
+    assert.ok(c.includes('{helper()}'));
+  });
+  test('użycie w kodzie, atrybucie, __all__, API z __init__.py; import to nie użycie; dekorowane i dunder pominięte', () => {
+    const g = new Graph().build([
+      F('pkg/__init__.py', 'from .api import public_fn\n__all__ = ["listed"]\n'),
+      F('pkg/api.py', [
+        'def public_fn(): pass', 'def listed(): pass', 'def used_by_call(): pass', 'def used_as_attr(): pass',
+        'def only_imported(): pass', 'def dead(): pass', 'class DeadClass:', '    def method(self): pass',
+        '@app.route("/")', 'def view(): pass', 'def __getattr__(name): pass', 'def _private_dead(): pass',
+        'def recursive(n):', '    return recursive(n - 1)', ''].join('\n')),
+      F('pkg/use.py', 'from .api import used_by_call, only_imported\nimport pkg.api as api\nused_by_call()\napi.used_as_attr()\n# dead()\ns = "dead"\n'),
+    ].map((f) => ({ ...f })), { name: 't', source: 'test' });
+    const res = host(CM.DeadCode.analyzePy(g)).map((d) => d.path + ': ' + d.exports.map((x) => x.name + ':' + x.line).join(','));
+    assert.deepEqual(res, ['pkg/api.py: only_imported:5,dead:6,DeadClass:7,_private_dead:12']);
+  });
+});
+
 describe('nieużywane eksporty w projekcie', () => {
   const files = [
     F('package.json', '{ "name": "p", "exports": { ".": { "import": "./dist/index.js" } } }'),

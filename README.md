@@ -78,9 +78,10 @@ Click **“✨ See demo”** or open `index.html#demo`.
   pyproject) or folders (level 1/2) ordered providers → consumers, so healthy dependencies sit below the diagonal and red
   cells above it are cycles; a click shows the import pairs and highlights the files. Inspect rule **Cycles between packages**.
 - **Checked against the ecosystems' own tools**: `npm run corpus` compares CodeMap's import edges on pinned releases of
-  Express, Preact, ky, petite-vue, Flask and Gin with esbuild (JS/TS), grimp (Python) and `go list` (Go) — precision and
-  recall per repository, a CI job fails below 97 %. The pnpm monorepo Preact Signals (16 packages) is also compared at the
-  package level: package list and package → package edges, i.e. the dependency matrix. Today: 100 % / 100 %. TypeScript `import type` edges are marked `typeOnly`.
+  Express, Preact, ky, petite-vue, Flask, Requests and Gin with esbuild (JS/TS), grimp (Python) and `go list` (Go) —
+  precision and recall per repository, a CI job fails below 97 %. The pnpm monorepo Preact Signals (16 packages) is also
+  compared at the package level: package list and package → package edges, i.e. the dependency matrix. Dead code is
+  compared with knip (JS/TS unused exports) and vulture (Python). Today: 100 % / 100 %. TypeScript `import type` edges are marked `typeOnly`.
 
 ### Map
 - **13 layouts**: packed circles, structure tree, radial tree, treemap, icicle, sunburst, force,
@@ -144,7 +145,8 @@ Click **“✨ See demo”** or open `index.html#demo`.
 deep nesting, minified files, **duplicated code** — winnowing over file contents…) with statistical
 thresholds, a **health score** and a Markdown report. **Unused exports** (JS/TS): exported names no project file imports,
 following named imports, namespaces, `export *` barrels, JSDoc `import('./x').T` types and `.d.ts` files, with package
-entry points (exports / main / bin, `dist` → `src`) skipped — checked against knip on the reference corpus (100 %).
+entry points (exports / main / bin, `dist` → `src`) skipped — checked against knip on the reference corpus (100 %);
+in Python, top-level functions and classes nothing references (like vulture, 100 % on Flask and Requests).
 An optional **`.codemap.rules.json`** file in the repository
 (layers = path globs, `forbid` between layers, `noCycles`) is enforced as the
 “Architecture rule violations” rule. In the details panel every file and folder shows its **coupling** — Ca / Ce / I

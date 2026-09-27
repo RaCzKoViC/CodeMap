@@ -217,7 +217,8 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
   (lista pakietów + krawędzie pakiet → pakiet) vs esbuild i package.json: 100 % / 100 %; w galerii aplikacji.
 - ✅ Martwy kod JS/TS: reguła `unusedexport` (`js/deadcode.js`) zgodna z knip 6.38 na korpusie (59/59 eksportów, 4 repo
   z monorepo); pliki bez importujących = istniejąca reguła osieroconych plików.
-- Martwy kod Python (funkcje i klasy najwyższego poziomu bez odwołań) sprawdzany wyrocznią vulture.
+- ✅ Martwy kod Python (funkcje i klasy najwyższego poziomu bez odwołań) zgodny z vulture 2.14: Flask 3/3, Requests 9/9
+  (Requests dołączony do korpusu, importy vs grimp 55/55).
 - Dokładność grafu wywołań: tree-sitter porównany z „znajdź odwołania" kompilatora TypeScript.
 - Propozycja reguł architektury z warstw macierzy zależności — do zatwierdzenia jednym klikiem.
 

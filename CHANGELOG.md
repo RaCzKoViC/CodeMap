@@ -45,6 +45,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   (te same wejścia po obu stronach, w monorepo konfiguracja per workspace): preact 17/17, ky 8/8, petite-vue 1/1,
   Preact Signals 33/33 — 100 % / 100 %. Tylko ESM: knip nie widzi użycia `require('x').y`, więc CommonJS pominięty.
   SARIF z linią pierwszego nieużywanego eksportu (tag `dead-code`).
+- **Martwy kod w Pythonie** (ta sama reguła, `CM.DeadCode.analyzePy`): funkcja albo klasa najwyższego poziomu, do której
+  nazwy nic w projekcie się nie odwołuje — jak vulture (import to nie użycie; atrybuty, `__all__`, f-stringi tak;
+  docstringi, komentarze i napisy wygaszone). Świadome różnice: pomijane definicje z dekoratorem (rejestruje je framework),
+  dundery i nazwy importowane w `__init__.py` (API pakietu). Korpus: **vulture 2.14** — Flask 3/3 i nowe repozytorium
+  **Requests 2.32.5** 9/9 (importy vs grimp 55/55), 100 % / 100 %.
 
 ### Zmienione — Faza 13 (wydajność)
 - **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym

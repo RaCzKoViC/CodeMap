@@ -93,8 +93,65 @@ CM.DeadCode = (function(){
     return out;
   }
 
+  // ---- Python (jak vulture): funkcja / klasa najwyższego poziomu, do której nazwy nic w projekcie się nie odwołuje ----
+  // Użycie = wystąpienie nazwy poza definicjami (`def x` / `class x` na dowolnym poziomie) — w kodzie, importach,
+  // atrybutach i w `__all__`; docstringi i napisy wygaszone (f-stringi zostają — wyrażenia w nich to użycia).
+  // Nazwy dunder (`__getattr__` modułu itp.) pomijane: wywołuje je sam Python.
+  function pyCode(src){
+    let out = '', i = 0; const c = src;
+    while(i < c.length){
+      const ch = c[i];
+      if(ch === '#'){ while(i < c.length && c[i] !== '\n'){ out += ' '; i++; } continue; }
+      if(ch !== '"' && ch !== "'"){ out += ch; i++; continue; }
+      const pre = /[rRbBuU]*[fF][rRbB]*$/.test(out.slice(-3).match(/[A-Za-z]*$/)[0]) ? 'f' : '';
+      const tri = c.slice(i, i + 3) === ch.repeat(3), q = tri ? ch.repeat(3) : ch;
+      let j = i + q.length;
+      while(j < c.length && c.slice(j, j + q.length) !== q && (tri || c[j] !== '\n')) j += c[j] === '\\' ? 2 : 1;
+      const end = Math.min(c.length, j + q.length), body = c.slice(i, end);
+      out += pre ? body : body.replace(/[^\n]/g, ' ');
+      i = end;
+    }
+    return out;
+  }
+  function analyzePy(graph){
+    const files = [];
+    for(const n of graph.nodes.values()) if(n.type === 'file' && /\.pyi?$/.test(n.path || '') && n.preview && !n.isTest) files.push(n);
+    const uses = new Map(), defs = [];
+    const bump = (name, k) => uses.set(name, (uses.get(name) || 0) + k);
+    for(const n of files){
+      // import to nie użycie (jak vulture), ale nazwy importowane w __init__.py to API pakietu — nie są martwe
+      const init = /(^|\/)__init__\.pyi?$/.test(n.path), blank = (s) => s.replace(/[^\n]/g, ' ');
+      const src = n.preview, code = pyCode(src)
+        .replace(/^[ \t]*from[ \t]+[\w.]+[ \t]+import[ \t]+(\([^)]*\)|[^\n]*)/gm, (s, list) => {
+          if(init) for(const x of list.replace(/[()\\]/g, ' ').split(',')){ const nm = x.trim().split(/\s+as\s+/)[0]; if(/^[A-Za-z_]\w*$/.test(nm)) bump(nm, 1); }
+          return blank(s);
+        })
+        .replace(/^[ \t]*import[ \t]+[^\n]*/gm, blank);
+      let m; const reAll = /^__all__\s*\+?=\s*[[(]([^\])]*)[\])]/gm;
+      while((m = reAll.exec(src))) for(const x of m[1].match(/['"]([A-Za-z_]\w*)['"]/g) || []) bump(x.slice(1, -1), 1);
+      const reTok = /[A-Za-z_]\w*/g;
+      while((m = reTok.exec(code))) bump(m[0], 1);
+      const reDef = /^([ \t]*)(?:async[ \t]+)?(def|class)[ \t]+([A-Za-z_]\w*)/gm;
+      while((m = reDef.exec(code))){
+        bump(m[3], -1);                                   // definicja to nie użycie
+        // z dekoratorem (@app.route, @click.command, @pytest.fixture…) rejestruje ją framework — nie zgłaszamy
+        const decorated = /(^|\n)[ \t]*@[^\n]*\n\s*$/.test(code.slice(Math.max(0, m.index - 300), m.index));
+        if(!m[1] && !decorated && !/^__\w+__$/.test(m[3])) defs.push({n, name: m[3], line: lineAt(code, m.index), kind: m[2]});
+      }
+    }
+    const byFile = new Map();
+    for(const d of defs) if((uses.get(d.name) || 0) <= 0){
+      if(!byFile.has(d.n.id)) byFile.set(d.n.id, {id: d.n.id, path: d.n.path, exports: []});
+      byFile.get(d.n.id).exports.push({name: d.name, line: d.line, type: false});
+    }
+    return [...byFile.values()];
+  }
+
   // → [{id, path, exports:[{name, line, type}]}] — pliki z eksportami, o które nikt nie pyta
   function analyze(graph){
+    return analyzeJs(graph).concat(analyzePy(graph));
+  }
+  function analyzeJs(graph){
     const files = [];
     for(const n of graph.nodes.values()) if(n.type === 'file' && CODE.test(n.path || '')) files.push(n);   // także .d.ts importowane przez kogoś (ambientowe nie mają importujących)
     const byId = new Map(files.map((n) => [n.id, n]));
@@ -136,5 +193,5 @@ CM.DeadCode = (function(){
     return out;
   }
 
-  return {exportsOf, typesUsedInFile, entryFiles, analyze};
+  return {exportsOf, typesUsedInFile, entryFiles, analyze, analyzeJs, analyzePy, pyCode};
 })();
