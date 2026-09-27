@@ -134,6 +134,15 @@ describe('extractDeps per język', () => {
     assert.deepEqual(d, [['sass:math', 'system', 'import', false], ['config', 'bare', 'import', false], ['theme', 'bare', 'import', false],
       ['mixins', 'bare', 'import', true], ['vars', 'bare', 'import', true], ['legacy', 'bare', 'import', false], ['img.png', 'bare', 'reference', false]]);
   });
+  test('ścieżki z ?zapytaniem albo #kotwicą rozwiązują się do pliku (stempel wersji w <script src>, Vite ?raw / ?worker)', () => {
+    const G = new CM.Graph.Graph().build([
+      { path: 'index.html', content: '<script src="js/util.js?v=20260927a"></script><link href="css/a.css#x">', size: 80 },
+      { path: 'js/util.js', content: 'var a = 1;', size: 10 }, { path: 'css/a.css', content: 'a{}', size: 3 },
+      { path: 'src/m.js', content: "import raw from './a.svg?raw';\nimport W from './w.js?worker';", size: 60 },
+      { path: 'src/a.svg', content: '<svg/>', size: 6 }, { path: 'src/w.js', content: 'onmessage=()=>{}', size: 16 }], { name: 't' });
+    const e = host(G.edges.filter((x) => x.type !== 'contains').map((x) => x.source + '>' + x.target).sort());
+    assert.deepEqual(e, ['index.html>css/a.css', 'index.html>js/util.js', 'src/m.js>src/a.svg', 'src/m.js>src/w.js']);
+  });
   test('HTML: src/href jako referencje', () => {
     const d = A.extractDeps('<link href="a.css"><script src="b.js"></script><a href="#top">x</a>', 'html');
     assert.deepEqual(host(d.map((x) => [x.spec, x.etype]).sort()), [['a.css', 'reference'], ['b.js', 'reference']]);

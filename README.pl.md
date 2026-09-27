@@ -159,6 +159,12 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   kartotekę pliku — rozmiar, złożoność, zmiany i autorów z git, testy i pokrycie, zależne pliki — i ponumerowane
   fragmenty najdłuższych funkcji, a odpowiada w czterech stałych sekcjach: diagnoza, 3–5 małych kroków z cytatami
   kodu `[n]`, testy do dopisania przed zmianą, ryzyko. Tylko modele lokalne (kod nie wychodzi z komputera).
+- **🧭 Trasy po kodzie** (Projekt → *Trasa po kodzie…*) — uporządkowana ścieżka po plikach z notatką przy każdym
+  kroku, dla nowej osoby w projekcie: tworzona automatycznie z mapy (opis → punkty wejścia → rdzeń, od którego zależy
+  najwięcej plików → hotspot → testy) albo układana przez model **tylko ze struktury** (ścieżki, metryki, zależności,
+  nazwy symboli — więc działa też z modelem w chmurze). Odtwarzana na mapie: karta kroku, ponumerowane kroki ze
+  strzałkami, ← / → / Esc; notatki można edytować, trasa zapisuje się w mapie, idzie linkiem (`#tour=…`, sama albo
+  z `#repo=`) i do / z **VS Code CodeTour** (`.tour`).
 - **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
 - Do modeli w chmurze trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików; fragmenty
   kodu (tryb 📚, podgląd załączników) dostają tylko modele **lokalne** — WebLLM i Ollama.
@@ -264,6 +270,7 @@ js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, d
 js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi Ollamy (IndexedDB), kontekst z cytatami
 js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSearch, readFile, dependents…), tool_calls albo JSON w treści
 js/doctor.js  js/doctor-ui.js   # Doktor hotspotów: kartoteka pliku + prompt (czyste), sekcja w panelu pliku i akcja hotspotDoctor
+js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
 js/gl-layer.js             # warstwa WebGL2 pod mapą: krawędzie i figury na GPU (instancje, kamera jako uniform)

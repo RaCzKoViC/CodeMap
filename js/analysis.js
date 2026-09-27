@@ -628,7 +628,8 @@ CM.Analysis = (function(){
       }
       case 'rust-use': return rustUse(file, spec, idx);
       case 'rel': {
-        const base = joinPath(dir, spec);
+        // `?v=…` (stempel wersji w <script src>), `?raw` / `?worker` (Vite), `#x` — nie są częścią ścieżki pliku
+        const base = joinPath(dir, spec.replace(/[?#].*$/, '') || spec);
         const hit = tryExact(idx.byPath, expand(base, fam));
         if(!hit && fam === 'sh') return tryExact(idx.byPath, [normPath(spec)]);   // skrypty często `source`'ują od korzenia repo
         return hit;

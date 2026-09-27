@@ -598,6 +598,7 @@
     else if(h.startsWith('#v=')) setTimeout(()=>{ A.restoreView().catch(()=>{}); },150);
     // deep-linki #repo= / #gist= / #share= (links.js + deeplink.js); błąd sieci = toast, start aplikacji bez zmian
     else if(/^#(repo|gist|share)=/.test(h) && A.openDeepLink) setTimeout(()=>{ A.openDeepLink(h).catch(()=>{}); },150);
+    // #tour=… samo obsługuje tour-ui.js (po przywróceniu sesji)
     autoTutorial();
   }
   // First launch of the INSTALLED app (also after a re-install) → start the tutorial automatically.

@@ -6,6 +6,16 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 ## [Unreleased]
 
 ### Dodane — Faza 7 (agent z narzędziami)
+- **🧭 Trasy po kodzie** (`js/tour.js`, `js/tour-ui.js`; Projekt → „Trasa po kodzie…"): trasa automatyczna ze struktury
+  (opis → punkty wejścia — importy przychodzące liczone tylko z kodu → rdzeń wg liczby zależnych → hotspot → testy
+  rdzenia; bez importów po jednym pliku z największych folderów) albo ułożona przez model z samej struktury (ścieżki,
+  metryki, zależności, nazwy symboli — także model w chmurze; odpowiedź JSON walidowana, zła → trasa automatyczna).
+  Odtwarzacz: karta kroku z notatką i kropkami, kamera na pliku, podświetlenie trasy, ponumerowane kroki ze strzałkami
+  (dekorator — działa też na GPU), ← / → / Esc, klik w ścieżkę otwiera plik. Notatki edytowalne w oknie trasy; trasa
+  zapisuje się w mapie (`graph.tour`), eksport / import **VS Code CodeTour** (`.tour`), link `#tour=…` (deflate +
+  base64url; sam — na bieżącą mapę, albo z `#repo=` / `#gist=` / `#share=` — po wczytaniu mapy; limit hasha 8192).
+  Akcja ChatBota `codeTour {action}`. Na qwen3:8b trasa z AI dla CodeMap: 9 kroków w 22 s. 6 testów + 1 deep-linków,
+  krok smoke.
 - **🩺 Doktor hotspotów** (`js/doctor.js`, `js/doctor-ui.js`): plan refaktoryzacji jednego pliku liczony modelem
   lokalnym. Kartoteka pliku (linie, złożoność, liczba funkcji, miejsce w rankingu ryzyka — z git częstość zmian ×
   złożoność, bez git rozmiar × zależne × złożoność — zmiany i autorzy, testy i pokrycie, pliki zależne bezpośrednio
@@ -56,6 +66,10 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   rasteryzacją dla obu backendów, `--json`, `--summary`, `--max-frame`; krok informacyjny w CI z artefaktem.
 - Kroki smoke: demo wymuszone na GPU — piksel w środku węzła ma kolor węzła, hit-test i eksport PNG działają;
   pamięć analizy — drugie wczytanie bez analizy i bez workerów, zmieniony plik od nowa, graf identyczny.
+
+### Poprawione
+- Analiza: ścieżka z `?zapytaniem` albo `#kotwicą` (`<script src="js/a.js?v=…">`, Vite `./a.svg?raw`, `?worker`) nie
+  rozwiązywała się do pliku — w samym CodeMap 48 skryptów z `index.html` było fałszywie „osieroconych" (teraz 1: `sw.js`).
 
 ### Zmienione
 - Kamera: `toScreen` bez sklejania klucza z liczb i bez `DOMPoint` (`cam.xf()` = współczynniki jako liczby),

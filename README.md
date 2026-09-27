@@ -159,6 +159,12 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
   size, complexity, git changes and owners, tests and coverage, dependent files — and numbered excerpts of its longest
   functions, and answers in four fixed sections: diagnosis, 3–5 small steps citing the code `[n]`, tests to add before
   the change, risk. Local models only (the code never leaves your computer).
+- **🧭 Code tours** (Project → *Code tour…*) — an ordered path through the files with a note per step, for someone
+  new to the project: created automatically from the map (overview → entry points → core modules the most files
+  depend on → hotspot → tests) or planned by a model from the **structure only** (paths, metrics, dependencies, symbol
+  names — so cloud models work too). Played on the map: a step card, numbered steps with arrows, ← / → / Esc; notes
+  are editable, the tour is saved with the map, shared as a link (`#tour=…`, alone or with `#repo=`), and exported /
+  imported as **VS Code CodeTour** (`.tour`).
 - **Runner** — a sandbox (`iframe` without `allow-same-origin`) for running generated HTML/SVG/CSS/JS/PHP.
 - Cloud models only ever receive the project's **structure** (names, numbers), never file contents; code
   snippets (📚 mode, attachment previews) go to **local** models only — WebLLM and Ollama.
@@ -265,6 +271,7 @@ js/git-local.js  js/git-worker.js   # local .git reader (objects, packs, deltas,
 js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddings (IndexedDB), context with citations
 js/agent.js                # agent loop: read-only tools (codeSearch, readFile, dependents…), native tool_calls or JSON in text
 js/doctor.js  js/doctor-ui.js   # hotspot doctor: file record + prompt (pure), file-panel section and hotspotDoctor action
+js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators
 js/gl-layer.js             # WebGL2 layer under the map: edges and shapes on the GPU (instanced, camera as a uniform)

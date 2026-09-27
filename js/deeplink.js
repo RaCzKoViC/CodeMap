@@ -11,7 +11,7 @@
 CM.DeepLink = (function(){
   const MAX_MAP_BYTES = 25*1024*1024;   // mapa z Gista / publicznego linku
   const MAX_NODES = 500000;
-  const MAX_HASH = 2048;
+  const MAX_HASH = 8192;   // hash nie trafia do serwera; trasa po kodzie (&tour=, skompresowana) potrafi mieć ~1–3 kB
   const GIST_API = 'https://api.github.com/gists/';
   const GIST_RAW_HOST = 'gist.githubusercontent.com';
   const HOSTS = {'github.com':'github','www.github.com':'github','gitlab.com':'gitlab','www.gitlab.com':'gitlab',
@@ -30,7 +30,7 @@ CM.DeepLink = (function(){
 
   const isGistId=(s)=>typeof s==='string' && RE_GIST.test(s);
   const isShareId=(s)=>typeof s==='string' && RE_SHARE.test(s);
-  const isDeepLink=(h)=>/^#(repo|gist|share)=/.test(String(h||''));
+  const isDeepLink=(h)=>/^#(repo|gist|share|tour)=/.test(String(h||''));
 
   // nazwa gałęzi/tagu wg reguł git-check-ref-format + bez znaków, które zmieniają znaczenie adresu (% ? # itd.)
   function validRef(r){
@@ -113,19 +113,23 @@ CM.DeepLink = (function(){
     if(!h) return null;
     if(h==='demo') return {kind:'demo'};
     if(h.startsWith('v=')) return {kind:'view'};
-    const k0=/^(repo|gist|share)=/.exec(h); if(!k0) return null;
+    const k0=/^(repo|gist|share|tour)=/.exec(h); if(!k0) return null;
     const type=k0[1], bad=(reason)=>({kind:'error', type, reason});
     if(h.length>MAX_HASH) return bad('toolong');
     const p=parseParams(h); if(!p) return bad('encoding');
     const v=(p.get(type)||'').trim();
-    if(type==='gist'){ const id=v.toLowerCase(); return isGistId(id) ? {kind:'gist', id} : bad('id'); }
-    if(type==='share') return isShareId(v) ? {kind:'share', id:v} : bad('id');
+    // &tour=… (tour.js, zakodowana trasa po kodzie) — sama: na bieżącą mapę; przy źródle mapy: po jej wczytaniu
+    const tv=(p.get('tour')||'').trim(), tour=/^[zj][A-Za-z0-9_-]{4,}$/.test(tv)?tv:'';
+    const T=(o)=>tour?Object.assign(o, {tour}):o;
+    if(type==='tour') return tour ? {kind:'tour', tour} : bad('tour');
+    if(type==='gist'){ const id=v.toLowerCase(); return isGistId(id) ? T({kind:'gist', id}) : bad('id'); }
+    if(type==='share') return isShareId(v) ? T({kind:'share', id:v}) : bad('id');
     let spec=parseRepoSpec(v); if(!spec) return bad('source');
     if(p.has('branch')){ const b=p.get('branch').trim(); if(b){ if(!validRef(b)) return bad('branch'); spec=Object.assign({}, spec, {branch:b}); } }
     if(p.has('path')){ const s=normSub(p.get('path').trim()); if(!validSub(s)) return bad('path'); spec=Object.assign({}, spec, {sub:s}); }
     const ly=(p.get('layout')||'').trim();
     const prs=(p.get('pr')||'').trim(), pr=/^[1-9]\d{0,6}$/.test(prs)?+prs:0;   // &pr=N → mapa wpływu PR (pr.js)
-    return {kind:'repo', spec, layout:RE_LAYOUT.test(ly)?ly:'', pr};   // nieznany układ = zignorowany (sprawdzany też z listą układów)
+    return T({kind:'repo', spec, layout:RE_LAYOUT.test(ly)?ly:'', pr});   // nieznany układ = zignorowany (sprawdzany też z listą układów)
   }
 
   // ---------------- mapa z niezaufanego źródła ----------------

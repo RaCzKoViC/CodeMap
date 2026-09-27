@@ -243,6 +243,25 @@ const docRes = await evalJs(`(async()=>{ try{
   return {path:d&&d.path, facts:d&&d.facts.length, sources:d&&d.sources.length, btn:!!sec, act:String(act), title:c&&c.title, localOnly};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// trasa po kodzie (faza 7) bez modelu: automatyczna na demo, odtwarzacz (karta, ←/→, Esc), zapis w mapie, link
+// #tour= w obie strony (zmiana hasha nakłada trasę na bieżącą mapę), eksport CodeTour, akcja codeTour
+const tourRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); CMApp.loadDemo(); await sleep(900);
+  const tr=CM.TourUI.makeAuto(true); await sleep(200);
+  const card=!!document.getElementById('tour-card'), first=CM.App.renderer.selected&&CM.App.renderer.selected.id;
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})); await sleep(150);
+  const i1=CM.TourUI.state().i;
+  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); await sleep(100);
+  const closed=!CM.TourUI.state().on && !document.getElementById('tour-card');
+  const saved=!!(CM.Graph.Graph.fromJSON(JSON.parse(JSON.stringify(CMApp.graph.toJSON()))).tour||{}).steps;
+  const url=await CM.TourUI.link(); const hash=url.split('#')[1];
+  CMApp.graph.tour=null; location.hash=hash; await sleep(900);
+  const st=CM.TourUI.state(), back=!!st.tour && st.tour.steps.length===tr.steps.length && st.on;
+  CM.TourUI.stop(); history.replaceState(null,'',location.pathname+location.search);
+  const ct=CM.Tour.toCodeTour(st.tour), act=await CMApp.exec('codeTour',{action:'stop'});
+  return {steps:tr.steps.length, kinds:tr.steps.map(s=>s.kind).join(','), card, first, i1, closed, saved, hashHead:hash.slice(0,6), back, ct:ct.steps.length, act};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 // pamięć analizy w OPFS (faza 6): 80 plików wczytanych dwa razy z tymi samymi datami → drugi raz bez analizy
 // i bez workerów; zmieniony plik analizowany na nowo; te same daty inne, treść ta sama → trafienia po skrócie;
 // graf identyczny jak po pełnej analizie; „wyczyść" usuwa pamięć
@@ -373,6 +392,9 @@ check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexH
 check(docRes && !docRes.error && docRes.path === 'src/store/reducer.js' && docRes.facts >= 2 && docRes.sources >= 1 && docRes.btn
   && /reducer\.js/.test(docRes.act) && /🩺/.test(docRes.title || '') && docRes.localOnly,
   `Doktor hotspotów: kartoteka, przycisk w panelu, akcja, tylko modele lokalne: ${JSON.stringify(docRes)}`);
+check(tourRes && !tourRes.error && tourRes.steps >= 4 && /^readme,entry/.test(tourRes.kinds) && tourRes.card && tourRes.first === 'README.md'
+  && tourRes.i1 === 1 && tourRes.closed && tourRes.saved && /^tour=[zj]/.test(tourRes.hashHead) && tourRes.back && tourRes.ct === tourRes.steps,
+  `trasa po kodzie: automatyczna, odtwarzacz, zapis w mapie, link #tour=, CodeTour: ${JSON.stringify(tourRes)}`);
 check(cacheRes && !cacheRes.error && cacheRes.a1 === 0 && cacheRes.a2[0] === 80 && cacheRes.a2[1] === 0 && cacheRes.same2
   && cacheRes.a3 === 79 && cacheRes.changed && cacheRes.a4 === 79 && cacheRes.same4 && cacheRes.cleared,
   `pamięć analizy (OPFS): ponowne wczytanie bez analizy, zmieniony plik od nowa, trafienia po skrócie: ${JSON.stringify(cacheRes)}`);

@@ -361,7 +361,7 @@ CM.Graph = (function(){
       }
       return {
         format:'codemap', version:2, meta:this.meta,
-        gitInfo:this.gitInfo||undefined, testInfo:this.testInfo||undefined, prInfo:this.prInfo||undefined,
+        gitInfo:this.gitInfo||undefined, testInfo:this.testInfo||undefined, prInfo:this.prInfo||undefined, tour:this.tour||undefined,
         nodes, edges:this.edges.filter(e=>e.type!=='contains').map(e=>({source:e.source,target:e.target,type:e.type})),
       };
     }
@@ -399,7 +399,7 @@ CM.Graph = (function(){
       g._computeImportDegrees();
       g._restoreSymbols();
       g.computeAggregates();
-      g.gitInfo=obj.gitInfo||null; g.testInfo=obj.testInfo||null; g.prInfo=obj.prInfo||null;
+      g.gitInfo=obj.gitInfo||null; g.testInfo=obj.testInfo||null; g.prInfo=obj.prInfo||null; g.tour=(obj.tour && Array.isArray(obj.tour.steps))?obj.tour:null;
       return g;
     }
 

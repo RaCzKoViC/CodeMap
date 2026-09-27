@@ -140,10 +140,11 @@
     const r=DL.parseHash(hash==null ? location.hash : hash);
     if(!r || r.kind==='demo' || r.kind==='view') return false;
     if(r.kind==='error'){ U.toast(T('dl.bad.'+r.type),'error',8000); return false; }
+    if(r.kind==='tour') return CM.TourUI ? CM.TourUI.openEncoded(r.tour) : false;   // trasa na już wczytaną mapę
     if(opts.confirmReplace && state.counts.nodes>0 && !confirm(T('dl.confirmReplace','Otworzyć mapę z linku? Zastąpi bieżącą mapę (ostatnia sesja jest zapisana automatycznie).'))) return false;
-    if(r.kind==='gist') return openGist(r.id, opts);
-    if(r.kind==='share') return openShare(r.id, opts);
-    return openRepoLink(r.spec, r.layout, r.pr);
+    const ok=r.kind==='gist' ? await openGist(r.id, opts) : r.kind==='share' ? await openShare(r.id, opts) : await openRepoLink(r.spec, r.layout, r.pr);
+    if(ok && r.tour && CM.TourUI) setTimeout(()=>{ CM.TourUI.openEncoded(r.tour); }, 400);
+    return ok;
   }
   // link wklejony w pasek adresu otwartej już aplikacji (zmienia się tylko hash — bez przeładowania strony)
   window.addEventListener('hashchange', ()=>{ if(DL.isDeepLink(location.hash)) openDeepLink(location.hash, {confirmReplace:true}).catch(()=>{}); });

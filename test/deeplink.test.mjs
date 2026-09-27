@@ -101,10 +101,11 @@ describe('parseHash', () => {
     assert.deepEqual(e('#repo=o/r&path=../etc'), { kind: 'error', type: 'repo', reason: 'path' });
     assert.deepEqual(e('#repo=o/r&path=a%2F..%2F..'), { kind: 'error', type: 'repo', reason: 'path' });
     assert.deepEqual(e('#repo=%E0%A4%A'), { kind: 'error', type: 'repo', reason: 'encoding' });
-    assert.deepEqual(e('#repo=o/r&x=' + 'a'.repeat(3000)), { kind: 'error', type: 'repo', reason: 'toolong' });
+    assert.deepEqual(e('#repo=o/r&x=' + 'a'.repeat(9000)), { kind: 'error', type: 'repo', reason: 'toolong' });
   });
   test('#gist= — tylko [0-9a-f]{20,40}, wielkie litery normalizowane', () => {
     assert.deepEqual(host(DL.parseHash('#gist=' + GID)), { kind: 'gist', id: GID });
+    assert.deepEqual(host(DL.parseHash('#gist=' + GID + '&tour=zAbC_-12')), { kind: 'gist', id: GID, tour: 'zAbC_-12' });
     assert.deepEqual(host(DL.parseHash('#gist=' + GID.toUpperCase())), { kind: 'gist', id: GID });
     assert.deepEqual(host(DL.parseHash('#gist=0123456789abcdef0123')), { kind: 'gist', id: '0123456789abcdef0123' });
     for (const v of ['abc', 'a'.repeat(41), '0123456789abcdefghij', 'javascript:alert(1)', '../../x', GID + '/x', GID + '%00', ''])
@@ -307,5 +308,16 @@ describe('parseHash — &pr= (mapa wpływu PR)', () => {
     assert.equal(DL.parseHash('#repo=gitlab.com/g/p&branch=dev&pr=7').pr, 7);
     for (const bad of ['0', 'abc', '12a', '-3', '12345678']) assert.equal(DL.parseHash('#repo=o/r&pr=' + bad).pr, 0, bad);
     assert.equal(DL.parseHash('#repo=o/r').pr, 0);
+  });
+});
+
+describe('#tour= (trasa po kodzie)', () => {
+  test('sama trasa, trasa przy repozytorium, śmieci odrzucone albo zignorowane', () => {
+    assert.deepEqual(host(DL.parseHash('#tour=zAbCdEf_-9')), { kind: 'tour', tour: 'zAbCdEf_-9' });
+    assert.deepEqual(host(DL.parseHash('#tour=<script>')), { kind: 'error', type: 'tour', reason: 'tour' });
+    const r = host(DL.parseHash('#repo=o/r&branch=dev&tour=jeyJ0IjoiVCJ9'));
+    assert.equal(r.kind, 'repo'); assert.equal(r.tour, 'jeyJ0IjoiVCJ9'); assert.equal(r.spec.branch, 'dev');
+    assert.equal(host(DL.parseHash('#repo=o/r&tour=x!')).tour, undefined);
+    assert.ok(DL.isDeepLink('#tour=zabc'));
   });
 });

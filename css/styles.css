@@ -2192,6 +2192,27 @@ body.light .set-ai-prov{background:rgba(20,30,45,.08)}
 .st-live-dot.paused{background:#94a3b8;animation:none}
 .st-live-btn{background:none;border:0;color:inherit;cursor:pointer;font-size:11px;padding:0 3px;opacity:.8}
 .st-live-btn:hover{opacity:1}
+body.tour-on #toast-wrap{bottom:190px}
+.tour-card{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:60;width:min(560px,calc(100vw - 32px));padding:10px 12px 10px;border-radius:14px;
+  background:rgba(var(--glass-rgb,14,19,28),.92);border:1px solid rgba(250,204,21,.45);box-shadow:0 10px 40px rgba(0,0,0,.45);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--text,#e2e8f0)}
+.tour-head{display:flex;align-items:center;gap:8px;font-size:12px}
+.tour-title{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tour-count{color:#facc15;font:600 11px var(--mono)}
+.tour-x{background:none;border:0;color:inherit;cursor:pointer;opacity:.7;font-size:13px}
+.tour-x:hover{opacity:1}
+.tour-file{display:block;margin:6px 0 2px;padding:0;background:none;border:0;color:var(--accent,#22d3ee);font:600 12.5px var(--mono);cursor:pointer;text-align:left;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tour-file:hover{text-decoration:underline}
+.tour-note{font-size:13px;line-height:1.45;margin:2px 0 8px;white-space:pre-wrap}
+.tour-nav{display:flex;align-items:center;gap:8px}
+.tour-dots{flex:1;display:flex;gap:5px;justify-content:center;flex-wrap:wrap}
+.tour-dot{width:9px;height:9px;border-radius:50%;border:1.5px solid #facc15;background:transparent;padding:0;cursor:pointer}
+.tour-dot.on{background:#facc15}
+.tour-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.tour-h{margin:10px 0 4px;font-size:13px}
+.tour-list{margin:0;padding-left:20px;max-height:46vh;overflow:auto}
+.tour-list li{margin:0 0 8px}
+.tour-list .tour-note{margin:2px 0 0;padding:3px 6px;border-radius:6px;border:1px dashed transparent;font-size:12.5px}
+.tour-list .tour-note:hover,.tour-list .tour-note:focus{border-color:rgba(148,163,184,.4);outline:none}
 .det-doctor .tag{margin-right:6px}
 .det-doctor .doc-hot{background:rgba(248,113,113,.16);color:#f87171}
 .det-doctor .doc-btn{margin:6px 0 4px}

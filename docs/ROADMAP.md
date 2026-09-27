@@ -122,8 +122,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Embeddingi w przeglądarce (WebLLM) — semantyczny RAG bez Ollamy.
 - [x] „Doktor hotspotów" (`js/doctor.js`): plan refaktoryzacji pliku z czołówki hotspotów — kartoteka (metryki, git,
   testy, zależne) + fragmenty najdłuższych funkcji, cztery sekcje z cytatami; przycisk w panelu pliku i `hotspotDoctor`.
-- Trasy po kodzie (onboarding): uporządkowana ścieżka po plikach z notatkami, generowana przez model
-  i udostępniana linkiem.
+- [x] Trasy po kodzie (`js/tour.js`): automatyczne albo z modelu (tylko struktura), odtwarzacz na mapie, zapis w mapie,
+  link `#tour=`, eksport / import VS Code CodeTour.
 
 ## Faza 8 — jakość własna i społeczność
 
