@@ -16,6 +16,7 @@ import { strings, countOf, CliError } from './strings.mjs';
 import { loadCodeMap } from './runtime.mjs';
 import { changedFiles, prReport, baseline, diffFindings, prMarkdown } from './pr.mjs';
 import { healthHistory, historyTable, historyMarkdown } from './history.mjs';
+import { architectureMarkdown } from './architecture.mjs';
 
 const SEV_ALIAS = { high: 'high', error: 'high', critical: 'high', med: 'med', medium: 'med', warning: 'med',
   low: 'low', note: 'low', info: 'info' };
@@ -35,7 +36,7 @@ export function parseArgs(argv, RULES) {
   const o = { cmd: null, dir: null, lang, json: null, md: null, sarif: null, map: null, export: null, out: null,
     minScore: null, failOn: [], maxFindings: null, git: DEFAULTS.git, gitMax: DEFAULTS.gitMax, coverage: [], noCoverage: false,
     exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false,
-    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null, osv: false };
+    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null, osv: false, architecture: null };
   const num = (flag, v) => { const n = Number(v); if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw new CliError(tr('eNum', { o: flag, v })); return n; };
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i], val = null;
@@ -78,6 +79,7 @@ export function parseArgs(argv, RULES) {
       case '--exclude': o.exclude.push(need()); break;
       case '--max-content': o.maxContent = Math.floor(num(a, need())); break;
       case '--osv': o.osv = true; break;
+      case '--architecture': o.architecture = need(); break;
       case '--history': o.history = Math.max(1, Math.min(200, Math.floor(num(a, need())))); break;
       case '-q': case '--quiet': o.quiet = true; break;
       case '--color': o.color = true; break;
@@ -91,7 +93,7 @@ export function parseArgs(argv, RULES) {
   }
   if (o.out && !o.export) throw new CliError(tr('eOutNoExport'));
   if ((o.baseline || o.prMd || o.maxScoreDrop != null) && !o.base) throw new CliError(tr('eBaselineNoBase'));
-  const toStdout = [o.json, o.md, o.sarif, o.map, o.prMd].filter((x) => x === '-').length + (o.export && (!o.out || o.out === '-') ? 1 : 0);
+  const toStdout = [o.json, o.md, o.sarif, o.map, o.prMd, o.architecture].filter((x) => x === '-').length + (o.export && (!o.out || o.out === '-') ? 1 : 0);
   if (toStdout > 1) throw new CliError(tr('eStdout'));
   o.stdoutUsed = toStdout > 0;
   return o;
@@ -145,7 +147,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 
     const aOpts = { lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
-      maxContent: o.maxContent, exclude: o.exclude, osv: o.osv };
+      maxContent: o.maxContent, exclude: o.exclude, osv: o.osv, modules: o.architecture ? ['testgen'] : [] };   // konwencja testów w ARCHITECTURE.md
     const res = await runAnalysis(o.dir || '.', aOpts);
     const { CM, graph, report } = res;
     // przegląd zmian: pliki z git diff <base>...HEAD → ryzyko (CM.PRCore), opcjonalnie wynik bazowy
@@ -176,6 +178,7 @@ export async function main(argv = process.argv.slice(2)) {
     const written = [];
     if (o.json) { writeOut(o.json, JSON.stringify(report, null, 2) + '\n'); written.push(['JSON', o.json]); }
     if (o.md) { writeOut(o.md, res.markdown); written.push(['Markdown', o.md]); }
+    if (o.architecture) { writeOut(o.architecture, architectureMarkdown(CM, graph, report, { lang, version: CM.VERSION })); written.push(['ARCHITECTURE.md', o.architecture]); }
     if (o.sarif) { writeOut(o.sarif, JSON.stringify(res.sarif, null, 2) + '\n'); written.push(['SARIF', o.sarif]); }
     if (o.export) {   // pełny graf (przed mapą: mapJSON zwija duże grafy)
       const ex = CM.Export.build(graph, null, o.export);

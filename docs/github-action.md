@@ -111,6 +111,7 @@ Bez niego zapisz SARIF jako artefakt (`actions/upload-artifact`) i otwórz go w 
 | `max-findings` | — | Porażka, gdy znalezisk łącznie jest więcej niż N. |
 | `sarif` | `codemap.sarif` | Plik SARIF 2.1.0; puste = bez SARIF. |
 | `markdown` | — | Plik z raportem Markdown (raport i tak trafia do podsumowania kroku). |
+| `architecture` | — | Plik `ARCHITECTURE.md` wygenerowany z mapy (warstwy, pakiety, punkty wejścia, rdzeń, hotspoty, własność, testy, reguły, cykle) — np. jako artefakt albo do commita przez osobny krok. |
 | `lang` | `pl` | Język raportów: `pl` \| `en`. |
 | `git` | `true` | Historia git z `.git` (hotspoty zmian, wiedza w jednej głowie, bus factor). |
 | `args` | — | Dodatkowe argumenty CLI rozdzielone spacjami (bez cudzysłowów), np. `--coverage coverage/lcov.info --exclude docs/**`. |
@@ -140,6 +141,7 @@ npm link && codemap analyze .                         # polecenie `codemap` w PA
 | `--json <plik>` | Pełny raport JSON: `score`, `files`, `stats` (pliki, linie, języki), `totals`, `findings` (reguła, ważność, tytuł, opis, liczba, pozycje ze ścieżkami), `hotspots`, `git`, `tests`, `timing`, `warnings`. |
 | `--md <plik>` | Raport Markdown (jak eksport „Analiza statyczna" w aplikacji + podsumowanie). |
 | `--sarif <plik>` | SARIF 2.1.0. |
+| `--architecture <plik>` | `ARCHITECTURE.md` z mapy: foldery w kolejności zależności (⚠ cykl przy zależności pod prąd), pakiety (od 2), punkty wejścia, rdzeń, hotspoty z właścicielami, własność folderów, testy i ich konwencja, reguły architektury, cykle, ukryte sprzężenia. Bez daty — deterministyczny. |
 | `--map <plik>` | Mapa `.codemap.json` (z historią git i pokryciem) do otwarcia w aplikacji: Wczytaj → Plik. |
 | `--export dot\|mermaid\|graphml` | Graf (Graphviz / Mermaid / yEd); z `--out <plik>`, bez niego na stdout. |
 | `--no-git`, `--git-max N` | Bez historii git / najwyżej N commitów (domyślnie 3000, jak w aplikacji). |

@@ -411,7 +411,14 @@ CM.languages = (function(){
 
   function catColor(cat){ return CAT[cat] || CAT.other; }
 
-  return {lookup, catColor, CAT, glyph};
+  // nazwy typów bez odpowiednika w nazwie języka programowania są po polsku (klucze w zapisanych mapach) — po angielsku do wyświetlenia
+  const EN = {Tekst:'Text', Dokument:'Document', Obraz:'Image', Binarka:'Binary', Plik:'File'};
+  function label(name, lang){
+    const l = lang || (CM.i18n && CM.i18n.getLang ? CM.i18n.getLang() : 'pl');
+    return l === 'en' && EN[name] ? EN[name] : name;
+  }
+
+  return {lookup, catColor, CAT, glyph, label};
 
   // small letter glyph for a node icon
   function glyph(info){

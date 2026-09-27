@@ -14,6 +14,12 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   `change_coupling`, `ask_map`, `test_skeleton`; `--osv` dodaje `vulnerable_dependencies`. Teksty narzędzi domyślnie po
   angielsku (odbiorcą jest agent). `loadCodeMap({modules})` / `runAnalysis({modules})` doładowują moduły MCP; paczka npm
   je zawiera, a `npm-pack` sprawdza zainstalowany `codemap mcp`.
+- **Generowany `ARCHITECTURE.md`** (`cli/architecture.mjs`): CLI `--architecture <plik>`, wejście akcji `architecture`,
+  narzędzie MCP `architecture`. Foldery pierwszego poziomu w kolejności z macierzy zależności (najpierw dostawcy;
+  zależność pod prąd = ⚠ cykl), pakiety przy ≥ 2, punkty wejścia (importują, nikt ich nie importuje), rdzeń
+  (najczęściej importowane), hotspoty z właścicielami, własność folderów z historii git, testy z konwencją
+  (`CM.TestGen`), `.codemap.rules.json` z liczbą naruszeń, cykle plików i pakietów, ukryte sprzężenia. Bez daty —
+  deterministyczny; PL/EN. CI publikuje `ARCHITECTURE.md` samego CodeMap w artefakcie `codemap-report`.
 
 
 ### Zmienione — Faza 13 (wydajność)

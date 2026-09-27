@@ -94,7 +94,7 @@ function fmt(CM, lang) {
   const langs = (r, k = 6) => {   // po nazwie (js + mjs = „JavaScript")
     const m = new Map(); for (const l of r.stats.languages) m.set(l.name, (m.get(l.name) || 0) + l.files);
     const a = [...m].sort((x, y) => y[1] - x[1]);
-    return a.slice(0, k).map(([n, c]) => `${n} ${num(c)}`).join(' · ') + (a.length > k ? ' · …' : '');
+    return a.slice(0, k).map(([n, c]) => `${CM.languages.label(n, lang)} ${num(c)}`).join(' · ') + (a.length > k ? ' · …' : '');
   };
   const sevs = (r) => SEVS.filter((s) => r.totals[s]).map((s) => `${t('sev.' + s)} ${num(r.totals[s])}`).join(' · ');
   const filesVal = (r) => tr('filesVal', { n: num(r.stats.files), c: num(r.stats.contentFiles),

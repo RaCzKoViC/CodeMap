@@ -234,6 +234,10 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
 - `--osv` — vulnerable dependencies from api.osv.dev (package names and versions only) as findings in every report.
+- `--architecture ARCHITECTURE.md` — an architecture overview generated from the map: first-level folders in dependency
+  order (providers first, a dependency against that order is marked as a cycle), packages, entry points, core modules,
+  hotspots, ownership, test conventions, architecture rules and cycles. Deterministic (no date), so it can be committed
+  or rebuilt in CI — this repository's CI publishes CodeMap's own `ARCHITECTURE.md` as an artifact.
 - **Health trend**: `--history N` — N commits spread evenly over the history (HEAD first parent), each tree read
   straight from `.git` (no checkout, no git binary) and analyzed like the folder, without git-history rules and coverage
   so the points are comparable; a table in the summary, `history` in `--json`, a section with per-rule changes in `--md`.
@@ -250,7 +254,7 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   the same analysis as read-only tools: `project_overview`, `find_files`, `code_search` (BM25), `file_info`,
   `dependencies`, `dependents`, `change_impact` (paths or a git `base` — risk with reasons, impacted files, reviewers),
   `hotspots`, `findings`, `cycles`, `owners`, `tests`, `change_coupling`, `ask_map` (natural-language questions),
-  `test_skeleton` and `refresh`; `--osv` adds `vulnerable_dependencies` (only package names and versions go to OSV.dev).
+  `test_skeleton`, `architecture` (the same `ARCHITECTURE.md`) and `refresh`; `--osv` adds `vulnerable_dependencies` (only package names and versions go to OSV.dev).
 - Claude Code: `claude mcp add codemap -- node /path/to/CodeMap/cli/codemap.mjs mcp /path/to/project`; other clients
   (`.mcp.json`): `{"mcpServers": {"codemap": {"command": "node", "args": ["/path/to/CodeMap/cli/codemap.mjs", "mcp", "."]}}}`.
 

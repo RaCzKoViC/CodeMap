@@ -27,6 +27,7 @@ Analiza:
   --exclude <glob>       pomiń pliki/katalogi pasujące do globu (względem ścieżki; można powtórzyć)
   --max-content <N>      limit plików z czytaną treścią (domyślnie {max}, jak w przeglądarce)
   --osv                  podatne zależności z api.osv.dev (wysyłane są tylko nazwy i wersje pakietów)
+  --architecture <plik>  ARCHITECTURE.md z mapy: warstwy, pakiety, punkty wejścia, rdzeń, hotspoty, własność, testy, cykle
   --history <N>          trend zdrowia: N commitów rozłożonych równo na historii (pierwszy rodzic HEAD),
                          drzewa czytane wprost z .git; tabela w podsumowaniu, pole „history" w --json, sekcja w --md
 
@@ -116,6 +117,7 @@ Analysis:
   --exclude <glob>       skip files/folders matching the glob (relative to the path; repeatable)
   --max-content <N>      cap on files whose content is read (default {max}, as in the browser)
   --osv                  vulnerable dependencies from api.osv.dev (only package names and versions are sent)
+  --architecture <file>  ARCHITECTURE.md from the map: layers, packages, entry points, core, hotspots, ownership, tests, cycles
   --history <N>          health trend: N commits spread evenly over history (HEAD first parent), trees read
                          straight from .git; table in the summary, "history" field in --json, section in --md
 

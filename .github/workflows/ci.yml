@@ -147,6 +147,7 @@ jobs:
         with:
           sarif: codemap.sarif
           markdown: codemap.md
+          architecture: ARCHITECTURE.md   # architektura samego CodeMap z mapy — artefakt przy każdym przebiegu
           args: --exclude .claude
           min-score: 35          # zapas: reguły git (hotspoty) zmieniają się z każdym commitem; w PR pilnuje max-score-drop
           max-score-drop: 0       # działa tylko z bazą, czyli w PR (na push baza jest pusta)
@@ -161,4 +162,5 @@ jobs:
           path: |
             codemap.sarif
             codemap.md
+            ARCHITECTURE.md
           if-no-files-found: warn

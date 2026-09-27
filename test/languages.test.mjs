@@ -75,3 +75,13 @@ describe('kolory kategorii i glify', () => {
     assert.equal(L.glyph({ cat: 'code' }), '?');
   });
 });
+
+describe('label: nazwy do wyświetlenia', () => {
+  test('polskie nazwy typów po angielsku tylko w en; nazwy języków bez zmian; domyślnie język interfejsu', () => {
+    assert.equal(L.label(L.lookup('app.exe').name, 'en'), 'Binary');
+    assert.equal(L.label(L.lookup('notes.txt').name, 'en'), 'Text');
+    assert.equal(L.label(L.lookup('notes.txt').name, 'pl'), 'Tekst');
+    assert.equal(L.label('JavaScript', 'en'), 'JavaScript');
+    assert.equal(L.label('Binarka'), CM.i18n.getLang() === 'en' ? 'Binary' : 'Binarka');
+  });
+});

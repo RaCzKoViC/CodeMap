@@ -34,6 +34,10 @@ inputs:
     description: 'Ścieżka pliku z raportem Markdown (raport i tak trafia do podsumowania kroku). Puste = plik tymczasowy.'
     required: false
     default: ''
+  architecture:
+    description: 'Ścieżka, pod którą zapisać ARCHITECTURE.md wygenerowany z mapy (warstwy, pakiety, rdzeń, hotspoty, testy, cykle). Puste = bez.'
+    required: false
+    default: ''
   lang:
     description: 'Język raportów: pl | en.'
     required: false
@@ -108,6 +112,7 @@ runs:
         CM_FAIL_ON: ${{ inputs.fail-on }}
         CM_MAX_FINDINGS: ${{ inputs.max-findings }}
         CM_SARIF: ${{ inputs.sarif }}
+        CM_ARCH: ${{ inputs.architecture }}
         CM_MARKDOWN: ${{ inputs.markdown }}
         CM_LANG: ${{ inputs.lang }}
         CM_GIT: ${{ inputs.git }}
@@ -131,6 +136,7 @@ runs:
         json="$tmp/codemap.json"
         args=(analyze "$CM_PATH" --lang "$CM_LANG" --json "$json" --md "$md")
         [ -n "$CM_SARIF" ] && args+=(--sarif "$CM_SARIF")
+        [ -n "$CM_ARCH" ] && args+=(--architecture "$CM_ARCH")
         [ -n "$CM_MIN_SCORE" ] && args+=(--min-score "$CM_MIN_SCORE")
         [ -n "$CM_FAIL_ON" ] && args+=(--fail-on "$CM_FAIL_ON")
         [ -n "$CM_MAX_FINDINGS" ] && args+=(--max-findings "$CM_MAX_FINDINGS")

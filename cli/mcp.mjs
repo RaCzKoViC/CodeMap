@@ -7,6 +7,7 @@
 import readline from 'node:readline';
 import { runAnalysis } from './analyze.mjs';
 import { MCP_MODULES } from './runtime.mjs';
+import { architectureMarkdown } from './architecture.mjs';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const S = (props = {}, required = []) => ({ type: 'object', properties: props, required });
@@ -29,6 +30,7 @@ export const TOOLS = [
   { name: 'change_coupling', description: 'Files changed together in git history (degree and shared commits); marks pairs without an import between them (hidden dependency). Without a path: the strongest pairs.', inputSchema: S({ path: str('file path') }) },
   { name: 'ask_map', description: 'Natural-language question about the map answered from the graph, e.g. "untested files with complexity over 50 in src", "top 5 most changed files", "files in cycles".', inputSchema: S({ question: str('the question') }, ['question']) },
   { name: 'test_skeleton', description: 'Test file skeleton for a code file following the project conventions (framework, location, imports, cases ordered by complexity).', inputSchema: S({ path: str('file path') }, ['path']) },
+  { name: 'architecture', description: 'ARCHITECTURE.md of the project generated from the map: layers in dependency order (with upstream dependencies = cycles), packages, entry points, core modules, hotspots, ownership, test conventions, rules and cycles.', inputSchema: S() },
   { name: 'refresh', description: 'Re-run the analysis after files changed on disk.', inputSchema: S() },
 ];
 const OSV_TOOL = { name: 'vulnerable_dependencies', description: 'Known vulnerabilities of the project dependencies from OSV.dev (lockfile / manifest versions; only package names and versions are sent).', inputSchema: S() };
@@ -63,7 +65,7 @@ export function createServer(opts = {}) {
     const { report: r, graph: g, CM } = st, L = [];
     L.push(`${r.project.name}: ${r.stats.files} files, ${r.stats.lines} lines · health score ${r.score}/100`);
     const byLang = new Map(); for (const x of r.stats.languages || []) byLang.set(x.name, (byLang.get(x.name) || 0) + x.files);   // .js i .mjs to jeden język
-    L.push('languages: ' + [...byLang].sort((p, q) => q[1] - p[1]).slice(0, 6).map(([k, v]) => `${k} ${v}`).join(', '));
+    L.push('languages: ' + [...byLang].sort((p, q) => q[1] - p[1]).slice(0, 6).map(([k, v]) => `${st.CM.languages.label(k, 'en')} ${v}`).join(', '));
     L.push(`findings: ${r.totals.findings} (high ${r.totals.high}, med ${r.totals.med}, low ${r.totals.low})` + (r.findings.length ? ' — ' + r.findings.slice(0, 10).map((f) => `${f.rule} ${f.count}`).join(', ') : ''));
     const pk = g.packages || [];
     if (pk.length >= 2) { const pc = CM.DSM.packageCycles(g); L.push(`packages: ${pk.length} (${pk.slice(0, 8).map((p) => p.name).join(', ')}${pk.length > 8 ? ', …' : ''})` + (pc.length ? ` · package cycles: ${pc.map((c) => c.map((u) => u.name).join(' ↔ ')).join('; ')}` : '')); }
@@ -146,6 +148,7 @@ export function createServer(opts = {}) {
       case 'change_coupling': return coupling(st, a);
       case 'ask_map': { const Q = st.CM.MapQuery, p = Q.parse(a.question, st.graph), r = Q.run(st.graph, p.spec); return Q.describe(r, p.spec, lang === 'pl' ? 'pl' : 'en'); }
       case 'test_skeleton': { const r = st.CM.TestGen.generate(st.graph, fileNode(st, a.path), { lang: lang === 'pl' ? 'pl' : 'en' }); return `proposed file: ${r.path}${r.framework ? ' (' + r.framework + ')' : ''}\n\`\`\`\n${r.code}\`\`\``; }
+      case 'architecture': return architectureMarkdown(st.CM, st.graph, st.report, { lang: lang === 'pl' ? 'pl' : 'en', version: opts.version || st.CM.VERSION });
       case 'refresh': { const s2 = await analyze(); return `re-analysed: ${s2.report.stats.files} files, health score ${s2.report.score}/100`; }
       case 'vulnerable_dependencies': {
         if (!opts.osv) throw new Error('start the server with --osv to query OSV.dev');
