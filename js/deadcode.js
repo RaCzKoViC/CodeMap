@@ -8,7 +8,10 @@
 // importowane (także z JSDoc `import('./x').T`); ambientowe nie mają importujących. Eksporty CommonJS — nie (tylko ESM).
 CM.DeadCode = (function(){
   const CODE = /\.(m?[jt]sx?|c[jt]s)$/, EXTS =['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'];
-  const lineAt = (s, i) => { let n = 1; for(let k = 0; k < i; k++) if(s.charCodeAt(k) === 10) n++; return n; };
+  // numer linii (1…) pozycji: indeks początków linii raz na tekst + wyszukiwanie binarne (plik z setkami eksportów
+  // nie liczy od początku dla każdego)
+  const lineIndex = (s) => { const st = [0]; for(let k = s.indexOf('\n'); k >= 0; k = s.indexOf('\n', k + 1)) st.push(k + 1);
+    return (i) => { let lo = 0, hi = st.length - 1; while(lo < hi){ const mid = (lo + hi + 1) >> 1; if(st[mid] <= i) lo = mid; else hi = mid - 1; } return lo + 1; }; };
 
   // treść napisów → spacje (nowe linie zostają): `"export const X"` w stringu to nie eksport; ' i " kończą się na
   // końcu linii (regex z cudzysłowem nie zje reszty pliku), szablon `…` może mieć wiele linii
@@ -36,8 +39,8 @@ CM.DeadCode = (function(){
   // eksporty ESM pliku: [{name, line, type}] (type = tylko typ TS: interface / type); bez eksportów CommonJS
   function exportsOf(src){
     if(!src) return [];
-    const c = blankStrings(CM.Analysis.stripNonCode(src, 'ts')), out = [], seen = new Set();
-    const push = (name, i, type) => { if(name && !seen.has(name)){ seen.add(name); out.push({name, line: lineAt(c, i), type: !!type, pos: i}); } };
+    const c = blankStrings(CM.Analysis.stripNonCode(src, 'ts')), out = [], seen = new Set(), lineAt = lineIndex(c);
+    const push = (name, i, type) => { if(name && !seen.has(name)){ seen.add(name); out.push({name, line: lineAt(i), type: !!type, pos: i}); } };
     let m;
     const reDef = /\bexport\s+default\b/g;
     while((m = reDef.exec(c))) push('default', m.index);
@@ -98,49 +101,58 @@ CM.DeadCode = (function(){
   // atrybutach i w `__all__`; docstringi i napisy wygaszone (f-stringi zostają — wyrażenia w nich to użycia).
   // Nazwy dunder (`__getattr__` modułu itp.) pomijane: wywołuje je sam Python.
   function pyCode(src){
-    let out = '', i = 0; const c = src;
+    // kawałki: niezmienione odcinki kopiowane w całości (django: 650 tys. linii — doklejanie znak po znaku było wąskim gardłem)
+    const c = src, parts = []; let i = 0, from = 0;
+    const blank = (s) => s.replace(/[^\n]/g, ' ');
     while(i < c.length){
       const ch = c[i];
-      if(ch === '#'){ while(i < c.length && c[i] !== '\n'){ out += ' '; i++; } continue; }
-      if(ch !== '"' && ch !== "'"){ out += ch; i++; continue; }
-      const pre = /[rRbBuU]*[fF][rRbB]*$/.test(out.slice(-3).match(/[A-Za-z]*$/)[0]) ? 'f' : '';
-      const tri = c.slice(i, i + 3) === ch.repeat(3), q = tri ? ch.repeat(3) : ch;
+      if(ch === '#'){ const e = c.indexOf('\n', i), end = e < 0 ? c.length : e; parts.push(c.slice(from, i), ' '.repeat(end - i)); i = from = end; continue; }
+      if(ch !== '"' && ch !== "'"){ i++; continue; }
+      const pre = /[rRbBuU]*[fF][rRbB]*$/.test(c.slice(Math.max(0, i - 3), i).match(/[A-Za-z]*$/)[0]) ? 'f' : '';
+      const tri = c.startsWith(ch + ch + ch, i), q = tri ? ch + ch + ch : ch;
       let j = i + q.length;
-      while(j < c.length && c.slice(j, j + q.length) !== q && (tri || c[j] !== '\n')) j += c[j] === '\\' ? 2 : 1;
-      const end = Math.min(c.length, j + q.length), body = c.slice(i, end);
-      out += pre ? body : body.replace(/[^\n]/g, ' ');
-      i = end;
+      while(j < c.length && !c.startsWith(q, j) && (tri || c[j] !== '\n')) j += c[j] === '\\' ? 2 : 1;
+      const end = Math.min(c.length, j + q.length);
+      parts.push(c.slice(from, i), pre ? c.slice(i, end) : blank(c.slice(i, end)));
+      i = from = end;
     }
-    return out;
+    parts.push(c.slice(from));
+    return parts.join('');
   }
   function analyzePy(graph){
     const files = [];
     for(const n of graph.nodes.values()) if(n.type === 'file' && /\.pyi?$/.test(n.path || '') && n.preview && !n.isTest) files.push(n);
-    const uses = new Map(), defs = [];
-    const bump = (name, k) => uses.set(name, (uses.get(name) || 0) + k);
+    // przejście 1: kod bez komentarzy / napisów / importów, definicje (każdy poziom), API z __init__.py i __all__;
+    // przejście 2: wystąpienia tylko nazw-kandydatów (definicje najwyższego poziomu) — bez licznika dla każdego tokenu
+    const api = new Set(), defsCount = new Map(), defs = [], codes = [];
+    const blank = (s) => s.replace(/[^\n]/g, ' ');
     for(const n of files){
       // import to nie użycie (jak vulture), ale nazwy importowane w __init__.py to API pakietu — nie są martwe
-      const init = /(^|\/)__init__\.pyi?$/.test(n.path), blank = (s) => s.replace(/[^\n]/g, ' ');
-      const src = n.preview, code = pyCode(src)
+      const init = /(^|\/)__init__\.pyi?$/.test(n.path), src = n.preview;
+      const code = pyCode(src)
         .replace(/^[ \t]*from[ \t]+[\w.]+[ \t]+import[ \t]+(\([^)]*\)|[^\n]*)/gm, (s, list) => {
-          if(init) for(const x of list.replace(/[()\\]/g, ' ').split(',')){ const nm = x.trim().split(/\s+as\s+/)[0]; if(/^[A-Za-z_]\w*$/.test(nm)) bump(nm, 1); }
+          if(init) for(const x of list.replace(/[()\\]/g, ' ').split(',')){ const nm = x.trim().split(/\s+as\s+/)[0]; if(/^[A-Za-z_]\w*$/.test(nm)) api.add(nm); }
           return blank(s);
         })
         .replace(/^[ \t]*import[ \t]+[^\n]*/gm, blank);
+      codes.push(code);
       let m; const reAll = /^__all__\s*\+?=\s*[[(]([^\])]*)[\])]/gm;
-      while((m = reAll.exec(src))) for(const x of m[1].match(/['"]([A-Za-z_]\w*)['"]/g) || []) bump(x.slice(1, -1), 1);
-      const reTok = /[A-Za-z_]\w*/g;
-      while((m = reTok.exec(code))) bump(m[0], 1);
+      while((m = reAll.exec(src))) for(const x of m[1].match(/['"]([A-Za-z_]\w*)['"]/g) || []) api.add(x.slice(1, -1));
       const reDef = /^([ \t]*)(?:async[ \t]+)?(def|class)[ \t]+([A-Za-z_]\w*)/gm;
+      let line = 1, at = 0;
       while((m = reDef.exec(code))){
-        bump(m[3], -1);                                   // definicja to nie użycie
+        defsCount.set(m[3], (defsCount.get(m[3]) || 0) + 1);   // definicja to nie użycie
+        if(m[1] || /^__\w+__$/.test(m[3])) continue;
         // z dekoratorem (@app.route, @click.command, @pytest.fixture…) rejestruje ją framework — nie zgłaszamy
-        const decorated = /(^|\n)[ \t]*@[^\n]*\n\s*$/.test(code.slice(Math.max(0, m.index - 300), m.index));
-        if(!m[1] && !decorated && !/^__\w+__$/.test(m[3])) defs.push({n, name: m[3], line: lineAt(code, m.index), kind: m[2]});
+        if(/(^|\n)[ \t]*@[^\n]*\n\s*$/.test(code.slice(Math.max(0, m.index - 300), m.index))) continue;
+        for(; at < m.index; at++) if(code.charCodeAt(at) === 10) line++;
+        defs.push({n, name: m[3], line, kind: m[2]});
       }
     }
+    const cand = new Set(defs.filter((d) => !api.has(d.name)).map((d) => d.name)), seen = new Map();
+    for(const code of codes){ const re = /[A-Za-z_]\w*/g; let m; while((m = re.exec(code))) if(cand.has(m[0])) seen.set(m[0], (seen.get(m[0]) || 0) + 1); }
     const byFile = new Map();
-    for(const d of defs) if((uses.get(d.name) || 0) <= 0){
+    for(const d of defs) if(cand.has(d.name) && (seen.get(d.name) || 0) - (defsCount.get(d.name) || 0) <= 0){
       if(!byFile.has(d.n.id)) byFile.set(d.n.id, {id: d.n.id, path: d.n.path, exports: []});
       byFile.get(d.n.id).exports.push({name: d.name, line: d.line, type: false});
     }

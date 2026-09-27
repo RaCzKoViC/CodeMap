@@ -89,15 +89,18 @@ jobs:
           if-no-files-found: ignore
       # pełna analiza CLI na dużych repozytoriach (django, vite): regres = ponad 1,5× wyniku ostatniego zielonego main
       # i więcej niż 1 s (tools/bench-cli.mjs); poprzedni wynik z artefaktu `bench-cli`
-      - name: Poprzedni wynik benchmarku analizy (ostatni zielony przebieg main)
+      # baza = mediana 3 ostatnich zielonych przebiegów — runnery różnią się nawet o 1,5× dla tego samego kodu
+      - name: Poprzednie wyniki benchmarku analizy (3 ostatnie zielone przebiegi main)
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          id=$(gh run list -R "$GITHUB_REPOSITORY" -w CI -b main -s success -L 1 --json databaseId -q '.[0].databaseId')
-          if [ -n "$id" ]; then gh run download "$id" -R "$GITHUB_REPOSITORY" -n bench-cli -D bench-cli-base; fi
-      - name: Benchmark analizy na dużych repozytoriach (próg regresji 1,5×)
-        run: node tools/bench-cli.mjs --json bench-cli.json --summary --baseline bench-cli-base/bench-cli.json --tolerance 1.5
+          i=0
+          for id in $(gh run list -R "$GITHUB_REPOSITORY" -w CI -b main -s success -L 3 --json databaseId -q '.[].databaseId'); do
+            i=$((i+1)); gh run download "$id" -R "$GITHUB_REPOSITORY" -n bench-cli -D "bench-cli-base/$i" || true
+          done
+      - name: Benchmark analizy na dużych repozytoriach (próg regresji 1,5× mediany)
+        run: node tools/bench-cli.mjs --json bench-cli.json --summary --baseline "$(ls bench-cli-base/*/bench-cli.json 2>/dev/null | paste -sd, -)" --tolerance 1.5
       - uses: actions/upload-artifact@v4
         with:
           name: bench-cli

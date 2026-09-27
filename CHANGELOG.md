@@ -13,6 +13,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Serwer nie obcina metadanych albumu** (`server/vault.js`): zaszyfrowany opis sejfu / ulubionych ponad 8 KB był po
   cichu ucinany — zapisany JSON był uszkodzony, a kolejne wysyłki plików kończyły się błędem „plain". Limit 1 MB
   (`MAX_VAULT_META_BYTES`), ponad nim 413 `toobig` bez zmiany zapisu; aplikacja pokazuje czytelny komunikat.
+- **Martwy kod w Pythonie szybciej** (django: 267 → 167 ms): dwa przejścia (liczniki tylko dla nazw-kandydatów),
+  wygaszanie napisów kawałkami zamiast znak po znaku, numery linii przyrostowo; w JS indeks początków linii zamiast
+  liczenia od początku pliku dla każdego eksportu.
+- **Bramka benchmarku analizy w CI porównuje z medianą 3 ostatnich zielonych przebiegów** (`--baseline a,b,c`): ten sam
+  kod dawał na runnerach 2,3–3,4 s (django), więc jeden szczęśliwie szybki przebieg jako baza fałszywie zatrzymywał CI.
 
 ## [1.6.0] — 2026-09-27
 

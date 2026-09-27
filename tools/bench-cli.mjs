@@ -2,7 +2,8 @@
 // historia git, analiza statyczna) na przypiętych wydaniach — czasy etapów, pliki, linie i pamięć. Dwa przebiegi,
 // liczy się szybszy (pierwszy grzeje dysk i JIT). Próg regresji jak w tools/bench.mjs: wolniej niż poprzedni wynik ×
 // tolerancja I o więcej niż 1 s — kod wyjścia 1; brak poprzedniego wyniku = bez porównania.
-//   node tools/bench-cli.mjs [--only django] [--json out.json] [--baseline prev.json] [--tolerance 1.5] [--summary]
+//   node tools/bench-cli.mjs [--only django] [--json out.json] [--baseline prev.json[,prev2.json…]] [--tolerance 1.5] [--summary]
+//   (kilka plików bazowych → mediana: odporność na rozrzut runnerów CI)
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -44,11 +45,16 @@ for (const r of REPOS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
 
 const cmp = [];
 if (BASE) {
-  let base = null; try { base = JSON.parse(readFileSync(BASE, 'utf8')); } catch { console.log(`– brak poprzedniego wyniku (${BASE}) — bez porównania`); }
+  // baza = mediana z kilku poprzednich przebiegów (`--baseline a.json,b.json,c.json`): runnery CI różnią się nawet
+  // o 1,5× dla tego samego kodu (django 2,3–3,4 s), jeden szczęśliwie szybki przebieg nie może być progiem dla kolejnych
+  const bases = [];
+  for (const f of BASE.split(',').filter(Boolean)) { try { bases.push(JSON.parse(readFileSync(f, 'utf8'))); } catch { /* brak pliku — pomijamy */ } }
+  if (!bases.length) console.log(`– brak poprzedniego wyniku (${BASE}) — bez porównania`);
+  const median = (xs) => { const s = xs.filter((x) => x > 0).sort((a, b) => a - b); return s.length ? s[(s.length - 1) >> 1] : 0; };
   for (const r of results) {
-    const b = base && (base.results || []).find((x) => x.id === r.id && x.ref === r.ref); if (!b) continue;
+    const bs = bases.map((b) => (b.results || []).find((x) => x.id === r.id && x.ref === r.ref)).filter(Boolean); if (!bs.length) continue;
     for (const k of ['totalMs', 'inspectMs', 'buildMs']) {
-      const now = r[k], was = b[k]; if (!(was > 0)) continue;
+      const now = r[k], was = median(bs.map((b) => b[k])); if (!(was > 0)) continue;
       cmp.push({ id: r.id, k, now, was, ratio: now / was, bad: now > was * TOL && now - was > 1000 });
     }
   }
