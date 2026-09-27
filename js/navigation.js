@@ -25,7 +25,7 @@
     const items=[];
     if(node){
       // pozycje od integracji (vscode-bridge.js: „Otwórz w edytorze") — w przeglądarce A.ctxExtra nie istnieje
-      const extra=[]; for(const f of (A.ctxExtra||[])){ try{ const it=f(node); if(it) extra.push(it); }catch(e){} }
+      const extra=[]; for(const f of (A.ctxExtra||[])){ try{ const it=f(node); if(it) extra.push(it); }catch(e){ console.warn('[CodeMap] menu kontekstowe: pozycja integracji', e); } }
       if(extra.length) items.push(...extra, {sep:true});
       items.push({ic:'crosshair',label:I.t('ca.ctxCenter','Wyśrodkuj widok'),action:()=>A.focusNode(node.id)});
       items.push({ic:'eye',label:I.t('ca.ctxHighlightNeighbors','Podświetl sąsiadów'),action:()=>{ A.select(node); }});
@@ -148,11 +148,9 @@
     cv.width=S*dpr; cv.height=S*dpr; cv.style.width=S+'px'; cv.style.height=S+'px';
     const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,S,S);
     const nodes=state.vis.nodes, edges=state.vis.edges; hoodHits=[]; if(!nodes.length) return;
-    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    for(const n of nodes){ minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x);maxY=Math.max(maxY,n.y); }
-    const bw=Math.max(1,maxX-minX), bh=Math.max(1,maxY-minY);
-    const pad=46, cx=S/2+hoodState.ox, cy=S/2+hoodState.oy;
-    const baseSc=Math.min((S-pad*2)/bw,(S-pad*2)/bh)*hoodState.zoom;
+    const {minX, minY, maxX, maxY, sc}=CM.Renderer.fitPoints(nodes, S, S, 46);   // jak minimapa: środki węzłów w kole
+    const cx=S/2+hoodState.ox, cy=S/2+hoodState.oy;
+    const baseSc=sc*hoodState.zoom;
     const wx=(minX+maxX)/2, wy=(minY+maxY)/2;
     const cos=Math.cos(hoodState.rot), sin=Math.sin(hoodState.rot), sy=1-hoodState.tilt;
     const proj=(x,y)=>{ let dx=(x-wx)*baseSc, dy=(y-wy)*baseSc; const rx=dx*cos-dy*sin, ry=(dx*sin+dy*cos)*sy; return {x:cx+rx, y:cy+ry}; };
@@ -210,7 +208,7 @@
     // the welcome card's height settles after async content (fonts, "restore last map" button) — observe
     // it so the minimap re-centres whenever the card's box changes, not just on the first frame.
     const card=$('.empty-card');
-    if(card && window.ResizeObserver){ try{ new ResizeObserver(()=>A.positionMinimap()).observe(card); }catch(e){} }
+    if(card && window.ResizeObserver){ try{ new ResizeObserver(()=>A.positionMinimap()).observe(card); }catch(e){ /* bez obserwatora — pozycja z resize okna */ } }
     // start minimized (no project yet) and wait for a file structure; expand only once one loads
     if(state.counts.nodes===0) wrap.classList.add('mm-collapsed');
     A.positionMinimap(); setTimeout(A.positionMinimap,150); setTimeout(A.positionMinimap,650);
@@ -336,10 +334,10 @@
       const hud=$('#fly-hud'); if(hud) hud.classList.toggle('hidden', !on);
       cv.classList.toggle('fly-active', on);
       if(on){ document.addEventListener('mousemove', onLookMove);
-        if(cv.requestPointerLock){ try{ cv.requestPointerLock(); }catch(e){} }
+        if(cv.requestPointerLock){ try{ cv.requestPointerLock(); }catch(e){ /* pointer lock zablokowany (iframe/webview) — tryb działa bez niego */ } }
         U.toast && U.toast(I.t('ca.flyOn','Tryb nawigacji: WASD ruch · mysz obrót · Spacja/Shift zoom · Esc/G wyjście'),'',2600);
       } else { document.removeEventListener('mousemove', onLookMove); held.clear();
-        if(document.pointerLockElement===cv && document.exitPointerLock){ try{ document.exitPointerLock(); }catch(e){} } }
+        if(document.pointerLockElement===cv && document.exitPointerLock){ try{ document.exitPointerLock(); }catch(e){ /* blokada już zwolniona */ } } }
     }
     function toggleFly(){ setFly(!flyMode); }
     document.addEventListener('pointerlockchange',()=>{ if(document.pointerLockElement!==cv && flyMode) setFly(false); });

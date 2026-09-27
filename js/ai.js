@@ -8,7 +8,7 @@
    są zgodne), 'anthropic' (messages + SSE content_block_delta), 'gemini' (generateContent + SSE).
    Wszystko z przeglądarki, bezpośrednio do dostawcy — klucze nigdy nie idą na serwer CodeMap. */
 CM.AI = (function(){
-  const I=CM.i18n;
+  const I=CM.i18n, U=CM.util;
   const STORE='codemap_ai_keys';
   const LEGACY_SLOTS='codemap_mistral_keys', LEGACY_ONE='codemap_mistral_key', LEGACY_MODEL='codemap_mistral_model';
 
@@ -60,7 +60,7 @@ CM.AI = (function(){
   const uid=()=>'k'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-3);
   function load(){
     if(_cache) return _cache;
-    let arr=null; try{ arr=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
+    let arr=U.lsJSON(STORE, null);
     if(!Array.isArray(arr)){ arr=migrate(); }
     _cache=arr.filter(e=>e&&typeof e==='object').map(e=>({
       id:e.id||uid(), key:String(e.key||'').trim(), provider:PROVIDERS[e.provider]?e.provider:null,
@@ -69,22 +69,23 @@ CM.AI = (function(){
   }
   // stare 4 sloty Mistral (i pojedynczy klucz) → wpisy z dostawcą 'mistral' i dotychczasowym modelem
   function migrate(){
-    let slots=[]; try{ slots=JSON.parse(localStorage.getItem(LEGACY_SLOTS)||'[]'); }catch(e){}
+    let slots=U.lsJSON(LEGACY_SLOTS, []);
     if(!Array.isArray(slots)) slots=[];
     const one=(localStorage.getItem(LEGACY_ONE)||'').trim();
     const model=localStorage.getItem(LEGACY_MODEL)||null;
     const seen=new Set(); const out=[];
     for(const k of slots.concat([one])){ const key=String(k||'').trim(); if(!key||seen.has(key)) continue; seen.add(key);
       out.push({id:uid(), key, provider:'mistral', model, status:null, models:null, label:''}); }
-    if(out.length){ try{ localStorage.setItem(STORE, JSON.stringify(out)); }catch(e){} }
+    if(out.length) U.lsSet(STORE, JSON.stringify(out));
     return out;
   }
   function save(list){
     _cache=list;
-    try{ localStorage.setItem(STORE, JSON.stringify(list)); }catch(e){}
+    U.lsSet(STORE, JSON.stringify(list));
     // lustro dla starszych ścieżek (mistralKeySlots): działające klucze Mistral w dawnych slotach
     try{ const m=list.filter(e=>e.provider==='mistral'&&e.key).map(e=>e.key).slice(0,4); while(m.length<4) m.push('');
-      localStorage.setItem(LEGACY_SLOTS, JSON.stringify(m)); localStorage.setItem(LEGACY_ONE, m.find(Boolean)||''); }catch(e){}
+      localStorage.setItem(LEGACY_SLOTS, JSON.stringify(m)); localStorage.setItem(LEGACY_ONE, m.find(Boolean)||''); }
+    catch(e){ /* tryb prywatny/pełny limit — lustro tylko w tej sesji */ }
     fire();
   }
   const keys=()=>load().slice();
@@ -94,7 +95,7 @@ CM.AI = (function(){
   function remove(id){ save(load().filter(e=>e.id!==id)); }
   const listeners=new Set();
   const onChange=(fn)=>{ listeners.add(fn); return ()=>listeners.delete(fn); };
-  const fire=()=>{ for(const fn of listeners){ try{ fn(); }catch(e){} } };
+  const fire=()=>{ for(const fn of listeners){ try{ fn(); }catch(e){ console.warn('[CodeMap] AI: odbiorca zmiany kluczy', e); } } };
 
   // klucze zdatne do użycia: przetestowane OK albo jeszcze nietestowane z rozpoznanym dostawcą
   const usable=()=>load().filter(e=>e.key&&e.provider&&(!e.status||e.status.ok!==false));
@@ -213,7 +214,7 @@ CM.AI = (function(){
           if(onData(j)===false) return;
         }
       }
-    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){} }
+    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){ /* strumień już zamknięty — zwalniamy połączenie best-effort */ } }
   }
 
   async function chatOpenAI(e, model, messages, opts){

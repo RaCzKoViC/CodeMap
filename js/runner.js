@@ -17,7 +17,7 @@ CM.Runner = (function(){
   const RUNNER_URL='runner.html';
   let frameReady=false, pending=null, posted=0;
   const tabs=new Map();   // okno karty → {html, title} (wysyłane po jego „ready")
-  const post=(w, html, title)=>{ try{ w.postMessage({type:'codemap-runner', html, title}, '*'); posted++; }catch(e){} };
+  const post=(w, html, title)=>{ try{ w.postMessage({type:'codemap-runner', html, title}, '*'); posted++; }catch(e){ /* karta podglądu zamknięta */ } };
   window.addEventListener('message', (e)=>{
     const d=e.data; if(!d || d.type!=='codemap-runner-ready') return;
     if(frame && e.source===frame.contentWindow){ frameReady=true; if(pending){ post(frame.contentWindow, pending.html, pending.title); pending=null; } return; }
@@ -114,7 +114,7 @@ CM.Runner = (function(){
     head.addEventListener('pointerdown',(e)=>{
       if(e.target.closest('button')) return;
       const r=win.getBoundingClientRect(); const ox=e.clientX-r.left, oy=e.clientY-r.top;
-      try{ head.setPointerCapture(e.pointerId); }catch(err){}
+      try{ head.setPointerCapture(e.pointerId); }catch(err){ /* wskaźnik już zwolniony */ }
       const move=(ev)=>{ win.style.left=Math.max(4,Math.min(ev.clientX-ox,Math.max(4,innerWidth-120)))+'px';
         win.style.top=Math.max(4,Math.min(ev.clientY-oy,Math.max(4,innerHeight-60)))+'px'; win.style.right='auto'; win.style.bottom='auto'; };
       const up=()=>{ head.removeEventListener('pointermove',move); head.removeEventListener('pointerup',up); };

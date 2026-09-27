@@ -59,13 +59,7 @@ CM.Agent = (function(){
   }
 
   // ---------------- wykonanie narzędzi (graf bieżącego projektu, tylko odczyt) ----------------
-  function pathMatch(g, q){
-    q=String(q||'').replace(/\\/g,'/').replace(/^\.?\//,'').trim().toLowerCase(); if(!q) return null;
-    let best=null, bs=-1;
-    for(const n of g.nodes.values()){ if(n.type!=='file'||!n.path) continue; const p=n.path.toLowerCase(), nm=(n.name||'').toLowerCase();
-      const s=p===q?100:p.endsWith('/'+q)?90:nm===q?80:p.includes(q)?50:-1; if(s>bs){ bs=s; best=n; } }
-    return best;
-  }
+  function pathMatch(g, q){ return CM.util.matchPath([...g.nodes.values()].filter(n=>n.type==='file'&&n.path), q); }
   // plik albo folder (dla owners / tests)
   function anyMatch(g, q){
     const s=String(q||'').replace(/\\/g,'/').replace(/^\.?\//,'').replace(/\/+$/,'').trim().toLowerCase(); if(!s) return null;

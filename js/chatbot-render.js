@@ -30,7 +30,7 @@ CM.ChatBotRender = (function(){
     const s=code.trim();
     if(/^<svg[\s>]/i.test(s)) return 'svg';
     if(/^<!doctype|^<html|^<(div|body|head|section|main|p|h[1-6]|table|form|button|span)[\s>]/i.test(s)) return 'html';
-    if(/^[{\[][\s\S]*[}\]]$/.test(s)){ try{ JSON.parse(s); return 'json'; }catch(e){} }
+    if(/^[{\[][\s\S]*[}\]]$/.test(s)){ try{ JSON.parse(s); return 'json'; }catch(e){ /* nie JSON — sprawdzamy dalej */ } }
     if(/^<\?php/i.test(s)) return 'php';
     return '';
   }
@@ -148,7 +148,7 @@ CM.ChatBotRender = (function(){
       tb.appendChild(up); tb.appendChild(dn);
       tb.appendChild(el('button',{class:'cb-mt',title:t('regen'),html:ic.svg('refresh',{size:13}),onclick:()=>o.onRegen(m.id)}));
     }
-    tb.appendChild(el('button',{class:'cb-mt',title:t('copy'),html:ic.svg('copy',{size:13}),onclick:()=>{ try{ navigator.clipboard.writeText(m.content); U.toast(t('copied'),'success'); }catch(e){} }}));
+    tb.appendChild(el('button',{class:'cb-mt',title:t('copy'),html:ic.svg('copy',{size:13}),onclick:()=>{ try{ navigator.clipboard.writeText(m.content); U.toast(t('copied'),'success'); }catch(e){ /* brak API schowka (http) */ } }}));
     wrap.appendChild(tb);
     row.appendChild(wrap);
     return row;
@@ -212,7 +212,7 @@ CM.ChatBotRender = (function(){
     head.addEventListener('pointerdown',(e)=>{
       if(e.button!==0 || e.target.closest('button,select,input')) return;
       const r=panel.getBoundingClientRect(); const ox=e.clientX-r.left, oy=e.clientY-r.top;
-      try{ head.setPointerCapture(e.pointerId); }catch(err){}
+      try{ head.setPointerCapture(e.pointerId); }catch(err){ /* wskaźnik już zwolniony */ }
       panel.classList.add('cb-dragging');
       const move=(ev)=>{
         const L=Math.max(4, Math.min(ev.clientX-ox, Math.max(4, innerWidth-r.width-4)));
@@ -222,19 +222,19 @@ CM.ChatBotRender = (function(){
       const up=()=>{ head.removeEventListener('pointermove',move); head.removeEventListener('pointerup',up);
         head.removeEventListener('pointercancel',up); head.removeEventListener('lostpointercapture',up);
         panel.classList.remove('cb-dragging');
-        if(panel.style.left) try{ localStorage.setItem('codemap_chatbot_pos',
-          JSON.stringify({l:parseInt(panel.style.left)||0, t:parseInt(panel.style.top)||0})); }catch(err){} };
+        if(panel.style.left) U.lsSet('codemap_chatbot_pos',
+          JSON.stringify({l:parseInt(panel.style.left)||0, t:parseInt(panel.style.top)||0})); };
       head.addEventListener('pointermove',move); head.addEventListener('pointerup',up);
       head.addEventListener('pointercancel',up); head.addEventListener('lostpointercapture',up);   // gesture aborted → clean up (no stuck drag / listener leak)
     });
     head.addEventListener('dblclick',(e)=>{ if(e.target.closest('button,select,input')) return;
       panel.style.left=panel.style.top=panel.style.right=panel.style.bottom='';
-      try{ localStorage.removeItem('codemap_chatbot_pos'); }catch(err){} });
+      U.lsDel('codemap_chatbot_pos'); });
     applySavedPos(panel);
   }
   function applySavedPos(panel){
     if(!panel) return;
-    let p=null; try{ p=JSON.parse(localStorage.getItem('codemap_chatbot_pos')||'null'); }catch(e){}
+    const p=U.lsJSON('codemap_chatbot_pos', null);
     if(!p) return;
     const L=Math.min(Math.max(p.l,4), Math.max(4,innerWidth-320)), T=Math.min(Math.max(p.t,4), Math.max(4,innerHeight-120));
     panel.style.left=L+'px'; panel.style.top=T+'px'; panel.style.right='auto'; panel.style.bottom='auto';
@@ -245,7 +245,7 @@ CM.ChatBotRender = (function(){
       const h=el('div',{class:'cb-rz cb-rz-'+dir,title:t('resize')});
       h.addEventListener('pointerdown',(e)=>{
         if(e.button!==0) return; e.preventDefault(); e.stopPropagation();
-        try{ h.setPointerCapture(e.pointerId); }catch(err){}
+        try{ h.setPointerCapture(e.pointerId); }catch(err){ /* wskaźnik już zwolniony */ }
         const r=panel.getBoundingClientRect(); const x0=e.clientX, y0=e.clientY;
         const L0=r.left, T0=r.top, W0=r.width, H0=r.height; const MINW=320, MINH=300;
         panel.classList.add('cb-resizing');
@@ -259,12 +259,13 @@ CM.ChatBotRender = (function(){
         const up=()=>{ h.removeEventListener('pointermove',move); h.removeEventListener('pointerup',up); h.removeEventListener('pointercancel',up);
           panel.classList.remove('cb-resizing');
           try{ localStorage.setItem('codemap_chatbot_size', JSON.stringify({w:panel.offsetWidth, h:panel.offsetHeight}));
-            localStorage.setItem('codemap_chatbot_pos', JSON.stringify({l:parseInt(panel.style.left)||0, t:parseInt(panel.style.top)||0})); }catch(err){} };
+            localStorage.setItem('codemap_chatbot_pos', JSON.stringify({l:parseInt(panel.style.left)||0, t:parseInt(panel.style.top)||0})); }
+          catch(err){ /* tryb prywatny/pełny limit — rozmiar do końca sesji */ } };
         h.addEventListener('pointermove',move); h.addEventListener('pointerup',up); h.addEventListener('pointercancel',up);
       });
       panel.appendChild(h);
     }
-    try{ const sz=JSON.parse(localStorage.getItem('codemap_chatbot_size')||'null'); if(sz&&sz.w&&sz.h){ panel.style.width=Math.min(sz.w, innerWidth-8)+'px'; panel.style.height=Math.min(sz.h, innerHeight-8)+'px'; } }catch(e){}
+    const sz=U.lsJSON('codemap_chatbot_size', null); if(sz&&sz.w&&sz.h){ panel.style.width=Math.min(sz.w, innerWidth-8)+'px'; panel.style.height=Math.min(sz.h, innerHeight-8)+'px'; }
   }
 
   /* ---------------- cytaty [n] → źródła (tryb „📚 kod”, Doktor hotspotów, agent) ---------------- */

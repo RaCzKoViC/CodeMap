@@ -456,9 +456,9 @@ CM.i18n = (function(){
   function setLang(l){
     if(l !== 'pl' && l !== 'en') return;
     lang = l;
-    try{ localStorage.setItem('codemap_lang', l); }catch(e){}
+    U.lsSet('codemap_lang', l);
     apply();
-    listeners.forEach(fn=>{ try{ fn(lang); }catch(e){} });
+    listeners.forEach(fn=>{ try{ fn(lang); }catch(e){ console.warn('[CodeMap] i18n: odbiorca zmiany języka', e); } });
   }
   function getLang(){ return lang; }
   function onChange(fn){ listeners.push(fn); }
@@ -466,7 +466,7 @@ CM.i18n = (function(){
   function extend(l, obj){ if(DICT[l] && obj) Object.assign(DICT[l], obj); }
 
   // restore persisted language at load time
-  try{ const s = localStorage.getItem('codemap_lang'); if(s==='pl'||s==='en') lang = s; }catch(e){}
+  try{ const s = localStorage.getItem('codemap_lang'); if(s==='pl'||s==='en') lang = s; }catch(e){ /* brak localStorage — język domyślny */ }
 
   return { t, apply, setLang, getLang, onChange, extend, langs:['pl','en'] };
 })();

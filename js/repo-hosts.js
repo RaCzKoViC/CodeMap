@@ -166,14 +166,14 @@
     return '#v='+encodeURIComponent(JSON.stringify(o));
   }
   function updateHash(){ clearTimeout(_hashT); _hashT=setTimeout(()=>{
-    const h=serializeView(); if(h && h!==location.hash){ try{ history.replaceState(null,'',h); }catch(e){} }
+    const h=serializeView(); if(h && h!==location.hash){ try{ history.replaceState(null,'',h); }catch(e){ /* replaceState zablokowane (file://, sandbox) */ } }
   },450); }
   // „Kopiuj link do widoku" pokrywa też „link do repozytorium": #v= niesie źródło (repo@gałąź/podkatalog albo
   // gist/publiczny link), układ, kamerę i zaznaczenie. Mapa lokalna (folder, plik) nie ma źródła do odtworzenia.
   function copyViewLink(){
     const h=serializeView(); if(!h){ U.toast(I.t('ca.noViewYet','Najpierw wczytaj projekt, aby udostępnić widok.'),'error'); return; }
     const url=location.origin+location.pathname+h;
-    let o={}; try{ o=JSON.parse(decodeURIComponent(h.slice(3))); }catch(e){}
+    let o={}; try{ o=JSON.parse(decodeURIComponent(h.slice(3))); }catch(e){ /* nieczytelny #v= → ogólny komunikat */ }
     const msg=(o.src||o.gist||o.share) ? I.t('ca.linkCopied','🔗 Skopiowano link do tego widoku.')
       : I.t('dl.localView','🔗 Skopiowano link do widoku. Uwaga: mapa jest lokalna — link przenosi tylko widok; aby udostępnić samą mapę, użyj Gista albo publicznego linku.');
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(
@@ -201,7 +201,7 @@
         if(o.cam && A.renderer.cam){ const c=A.renderer.cam, a=o.cam; c.x=a[0]; c.y=a[1]; c.zoom=a[2]; c.rot=a[3]||0; c.tilt=a[4]||0; c._k=''; }
         if(o.sel){ const n=A.graph.nodes.get(o.sel); if(n){ A.renderer.setSelected(n); UI.renderDetails(n, A.graph, handlers); A.applyImpact(); } }
         A.renderer.onChange(); A.renderer.kick();
-      }catch(e){}
+      }catch(e){ /* link z danymi z zewnątrz (np. węzeł już nie istnieje) — domyślny widok */ }
     };
     // mapa z Gista / publicznego linku (links.js): kamera po wczytaniu (układ zapisany w mapie)
     if(o.gist!=null && A.openGist) return A.openGist(String(o.gist), {onLoaded:applyCam});
@@ -218,7 +218,7 @@
       // restore the camera when the layout SETTLES (onSettle) instead of on a fixed timer that lost the race
       state._pendingViewRestore=applyCam;
       try{ await A.ingest((p,s)=>Loaders.fromRepoURL(spec.url, {branch:br||spec.branch||undefined, sub:sub||spec.sub||undefined, fetchContent:true}, p, s), I.t('ca.connectingToRepo','Łączenie z repozytorium…')); }
-      catch(e){}
+      catch(e){ /* błąd wczytania pokazuje już ingest() */ }
       A._restoring=false;
       // fallback for static layouts (no physics settle → onSettle may not fire): apply if still pending
       setTimeout(()=>{ if(state._pendingViewRestore===applyCam){ state._pendingViewRestore=null; state._fitOnSettle=false; applyCam(); } }, 600);
@@ -234,7 +234,7 @@
     if(!meta || !meta.html) return;
     let list=recentRepos().filter(r=>r.url!==meta.html);
     list.unshift({url:meta.html, name:meta.name||meta.repo||meta.html, host:meta.host||meta.kind||'github'});
-    try{ localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0,6))); }catch(e){}
+    U.lsSet(RECENT_KEY, JSON.stringify(list.slice(0,6)));
   }
   function renderRecentRepos(){
     const wrap=$('#gh-recent'); if(!wrap) return;
@@ -299,7 +299,7 @@
       if(meta.html && /^(github|gitlab|bitbucket)$/.test(meta.kind||'')) pushRecentRepo(meta);
       UI.renderDiff(diff, {label:refA, signature:sigA}, {label:refB, signature:sigB}); A.openModal('modal-diff');
       U.toast(I.t('ca.cmpDone','Porównano ')+refA+' ↔ '+refB+'  (+'+diff.added.length+' / −'+diff.removed.length+' / ~'+diff.modified.length+')','success',6000);
-    }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
+    }catch(e){ if(gen!==A._ingestGen) return; A.loadError(e, 6500); }
     if(gen===A._ingestGen) A.hideLoading();
   }
 
@@ -318,12 +318,12 @@
       if(CM.DeepLink && CM.DeepLink.isGistId(id)){
         // link …/#gist=<id> otwiera mapę prosto w CodeMap (links.js) — to on trafia do schowka, URL gista obok
         const link=location.origin+location.pathname+'#gist='+id;
-        let copied=false; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(link); copied=true; } }catch(e){}
+        let copied=false; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(link); copied=true; } }catch(e){ /* brak zgody na schowek — sam link */ }
         const a=(href,txt)=>'<a href="'+escapeHtml(href)+'" target="_blank" rel="noopener">'+escapeHtml(txt)+'</a>';
         U.toast(escapeHtml(copied ? I.t('ca.gistDoneLink','✅ Gist utworzony — skopiowano link otwierający mapę w CodeMap:') : I.t('ca.gistDoneLinkNoClip','✅ Gist utworzony — link otwierający mapę w CodeMap:'))
           +'<br>'+a(link, link)+(gistUrl ? ' · '+a(gistUrl, I.t('ca.gistView','zobacz gist')) : ''), {html:true, kind:'success'}, 12000);
       } else {
-        try{ navigator.clipboard&&navigator.clipboard.writeText(res.url); }catch(e){}
+        try{ navigator.clipboard&&navigator.clipboard.writeText(res.url); }catch(e){ /* brak API schowka — gist i tak otwieramy */ }
         U.toast(I.t('ca.gistDone','✅ Gist utworzony (URL skopiowany).'),'success',6000);
         if(gistUrl) window.open(gistUrl,'_blank','noopener');
       }

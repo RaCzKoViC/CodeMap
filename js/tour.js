@@ -114,7 +114,7 @@ CM.Tour = (function(){
     const s=String(text||'').replace(/<think>[\s\S]*?<\/think>/gi, '');
     const cands=[]; const fence=/```(?:json)?\s*([\s\S]*?)```/g; let m; while((m=fence.exec(s))) cands.push(m[1]);
     const a=s.indexOf('{'), b=s.lastIndexOf('}'); if(a>=0 && b>a) cands.push(s.slice(a, b+1));
-    for(const c of cands){ try{ const j=JSON.parse(c.trim()); if(j && Array.isArray(j.steps)) return j; if(Array.isArray(j)) return {steps:j}; }catch(e){} }
+    for(const c of cands){ try{ const j=JSON.parse(c.trim()); if(j && Array.isArray(j.steps)) return j; if(Array.isArray(j)) return {steps:j}; }catch(e){ /* nie JSON — następny kandydat */ } }
     return null;
   }
 

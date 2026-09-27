@@ -235,41 +235,15 @@ CM.MindMap = (function(){
     });
   }
 
-  // anchor point on a card's edge facing the connected node (for tidy connectors)
-  function edgePt(a, dir){ // dir: 'r','l','t','b','c'
-    const cx=a.x+a.w/2, cy=a.y+30, h=60;
-    if(dir==='r') return {x:a.x+a.w, y:cy}; if(dir==='l') return {x:a.x, y:cy};
-    if(dir==='t') return {x:cx, y:a.y}; if(dir==='b') return {x:cx, y:a.y+h};
-    return {x:cx, y:cy};
-  }
+  // łączniki: drzewo rodzic → dziecko (zakotwiczone wg układu) + wolne krawędzie — geometria z CM.MindMapLayout
+  // (ta sama co w eksporcie SVG); na ekranie karta liczy się jako 60 px wysokości, punkty świat → ekran
   function drawEdges(){
     const r=canvas.getBoundingClientRect();
     svg.setAttribute('width', r.width); svg.setAttribute('height', r.height);
     const curved=state.line==='curved';
     let s='';
-    const link=(a,b,col,wide,from,to)=>{
-      const pa=worldToScreen(from.x,from.y), pb=worldToScreen(to.x,to.y);
-      let d;
-      if(curved){ const dx=Math.abs(pb.x-pa.x)*0.5; const horiz=Math.abs(pb.x-pa.x)>Math.abs(pb.y-pa.y);
-        d = horiz ? `M${pa.x} ${pa.y} C ${pa.x+dx} ${pa.y}, ${pb.x-dx} ${pb.y}, ${pb.x} ${pb.y}`
-                  : `M${pa.x} ${pa.y} C ${pa.x} ${(pa.y+pb.y)/2}, ${pb.x} ${(pa.y+pb.y)/2}, ${pb.x} ${pb.y}`; }
-      else { const mx=(pa.x+pb.x)/2; d=`M${pa.x} ${pa.y} H ${mx} V ${pb.y} H ${pb.x}`; }
-      s+=`<path d="${d}" stroke="${col}" stroke-width="${wide?2.6:2}" fill="none" opacity="0.8" stroke-linejoin="round" stroke-linecap="round"/>`;
-    };
-    // parent -> child (tree) connectors, anchored by layout direction
-    for(const n of state.nodes){ if(n.parent==null) continue; const p=nodeById(n.parent); if(!p) continue;
-      if(hiddenByCollapse(n)||hiddenByCollapse(p)) continue;
-      const dir=state.layout; let pd='r', cd='l';
-      if(dir==='radial'){ pd='c'; cd='c'; }
-      else if(dir==='left'){ pd='l'; cd='r'; } else if(dir==='down'){ pd='b'; cd='t'; } else if(dir==='up'){ pd='t'; cd='b'; }
-      else if(dir==='leftright'){ const left=(n.x+n.w/2)<(p.x+p.w/2); pd=left?'l':'r'; cd=left?'r':'l'; }
-      else if(dir==='free'){ const horiz=Math.abs((n.x+n.w/2)-(p.x+p.w/2))>=Math.abs(n.y-p.y); pd=horiz?((n.x>p.x)?'r':'l'):((n.y>p.y)?'b':'t'); cd=horiz?((n.x>p.x)?'l':'r'):((n.y>p.y)?'t':'b'); }
-      link(p,n, n.color||p.color, true, edgePt(p,pd), edgePt(n,cd));
-    }
-    // free cross-connections
-    for(const e of state.edges){ const a=nodeById(e.from), b=nodeById(e.to); if(!a||!b) continue;
-      if(hiddenByCollapse(a)||hiddenByCollapse(b)) continue;
-      link(a,b, '#94a3b8', false, edgePt(a,'c'), edgePt(b,'c')); }
+    L.eachConnector(state, ()=>60, hiddenByCollapse, (from,to,col,wide)=>{
+      s+=L.connectorSvg(worldToScreen(from.x,from.y), worldToScreen(to.x,to.y), curved, col, wide); });
     svg.innerHTML=s;
   }
 
@@ -408,8 +382,7 @@ CM.MindMap = (function(){
   }
   function fitView(){
     if(!state.nodes.length){ cam={x:canvas.clientWidth/2,y:canvas.clientHeight/2,zoom:1}; applyCam(); drawEdges(); return; }
-    let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
-    for(const n of state.nodes){ minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x+n.w); maxY=Math.max(maxY,n.y+70); }
+    const {minX, minY, maxX, maxY}=L.cardBounds(state.nodes, ()=>70);
     const r=canvas.getBoundingClientRect(); const pad=80;
     const z=U.clamp(Math.min((r.width-pad*2)/(maxX-minX||1),(r.height-pad*2)/(maxY-minY||1)),0.2,1.6);
     cam.zoom=z; cam.x=r.width/2-((minX+maxX)/2)*z; cam.y=r.height/2-((minY+maxY)/2)*z; applyCam(); drawEdges();
@@ -706,11 +679,11 @@ CM.MindMap = (function(){
     renderInspector();                                // right panel rebuilds safely
     if(layoutDlg && layoutDlg.isOpen()) layoutDlg.rerender();
     if(document.body.classList.contains('mode-mindmap') && selected) showSurround(selected);
-  }); }catch(e){}
+  }); }catch(e){ /* bez modułu i18n (testy) — bez przełączania języka */ }
 
   // ---- public state I/O (used by CM.Drive — Sejf / Dysk) ----
   function exportState(){ return JSON.parse(mmSnap()); }
-  function importState(o){ try{ pushUndo(); }catch(e){} mmRestore(typeof o==='string'?o:JSON.stringify(o)); setTimeout(fitView,30); }
+  function importState(o){ try{ pushUndo(); }catch(e){ /* przyciski cofania niezbudowane — import idzie dalej */ } mmRestore(typeof o==='string'?o:JSON.stringify(o)); setTimeout(fitView,30); }
   function mapName(){ return state.name||I.t('cm.defaultMapName','Mapa myśli'); }
   function nodeCount(){ return state.nodes.length; }
 

@@ -38,6 +38,45 @@ describe('util', () => {
     assert.equal(typeof U.debounce(() => {}, 10), 'function');
     assert.equal(typeof U.throttle(() => {}, 10), 'function');
   });
+  test('matchPath: pełna ścieżka > końcówka > nazwa > fragment; ./ i \\ normalizowane; pusto → null', () => {
+    const nodes = [{ path: 'lib/util.js', name: 'util.js' }, { path: 'src/util.js', name: 'util.js' }, { path: 'src/app.js', name: 'app.js' }];
+    assert.equal(U.matchPath(nodes, 'src/util.js').path, 'src/util.js');
+    assert.equal(U.matchPath(nodes, '.\\src\\util.js').path, 'src/util.js');
+    assert.equal(U.matchPath(nodes, 'util.js').path, 'lib/util.js', 'remis → pierwszy w kolejności');
+    assert.equal(U.matchPath(nodes, 'APP').path, 'src/app.js');
+    assert.equal(U.matchPath(nodes, 'brak'), null);
+    assert.equal(U.matchPath(nodes, '  '), null);
+  });
+  test('matchNode: nazwa > początek > fragment > ścieżka; bez __root__/__ext__; only, exactPath, preferFile', () => {
+    const nodes = [{ id: '__root__', name: 'app', type: 'folder' }, { id: 'd', name: 'app', type: 'folder', path: 'app' },
+      { id: 'f', name: 'app', type: 'file', path: 'src/app' }, { id: 's', name: 'apply', type: 'symbol', path: 'src/x.js' },
+      { id: 'u', name: 'myapp.js', type: 'file', path: 'lib/myapp.js' }];
+    assert.equal(U.matchNode(nodes, 'APP ').id, 'd', 'remis → pierwszy (bez __root__)');
+    assert.equal(U.matchNode(nodes, 'app', { preferFile: true }).id, 'f', 'remis → plik');
+    assert.equal(U.matchNode(nodes, 'src/app', { exactPath: 110 }).id, 'f');
+    assert.equal(U.matchNode(nodes, 'appl').id, 's');
+    assert.equal(U.matchNode(nodes, 'appl', { only: (n) => n.type !== 'symbol' }), null);
+    assert.equal(U.matchNode(nodes, 'myapp').id, 'u');
+    assert.equal(U.matchNode(nodes, 'lib/').id, 'u', 'fragment ścieżki');
+    assert.equal(U.matchNode(nodes, ''), null);
+  });
+  test('lsSet / lsDel / lsJSON: zapis, domyślna wartość przy braku klucza i złym JSON, brak wyjątku bez dostępu', () => {
+    assert.equal(U.lsSet('t_ls', JSON.stringify({ a: 1 })), true);
+    assert.deepEqual(host(U.lsJSON('t_ls', null)), { a: 1 });
+    assert.deepEqual(host(U.lsJSON('t_brak', [])), []);
+    U.lsSet('t_zly', '{nie json');
+    assert.equal(U.lsJSON('t_zly', 7), 7);
+    U.lsSet('t_pusty', '');
+    assert.deepEqual(host(U.lsJSON('t_pusty', {})), {});
+    assert.equal(U.lsDel('t_ls'), true);
+    assert.equal(U.lsJSON('t_ls', 'def'), 'def');
+    // tryb prywatny / zablokowane dane witryny: każde wywołanie localStorage rzuca
+    const boom = () => { throw new Error('SecurityError'); };
+    const Ux = loadCM(['util'], { localStorage: { getItem: boom, setItem: boom, removeItem: boom } }).util;
+    assert.equal(Ux.lsSet('k', 'v'), false);
+    assert.equal(Ux.lsDel('k'), false);
+    assert.equal(Ux.lsJSON('k', 3), 3);
+  });
 });
 
 describe('escapowanie HTML (jedno źródło)', () => {

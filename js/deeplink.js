@@ -179,7 +179,7 @@ CM.DeepLink = (function(){
       const r=res.body.getReader(), dec=new TextDecoder(); let n=0, out='';
       for(;;){
         const {done, value}=await r.read(); if(done) break;
-        n+=value.length; if(n>max){ try{ r.cancel(); }catch(e){} throw fail('too-big'); }
+        n+=value.length; if(n>max){ try{ r.cancel(); }catch(e){ /* strumień już zamknięty */ } throw fail('too-big'); }
         out+=dec.decode(value, {stream:true});
       }
       return out+dec.decode();

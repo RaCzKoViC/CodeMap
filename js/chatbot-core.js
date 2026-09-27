@@ -272,11 +272,11 @@ CM.ChatBotCore = (function(){
     let raw=m[1]; if(/(^|[^\\])(\\\\)*\\$/.test(raw)) raw=raw.slice(0,-1);
     try{ return JSON.parse('"'+raw+'"'); }catch(e){ return raw.replace(/\\n/g,'\n').replace(/\\"/g,'"'); } }
   function parseStructured(s){ s=stripThink(String(s)).trim(); let o=null;
-    try{ o=JSON.parse(s); }catch(e){ const m=s.match(/\{[\s\S]*\}/); if(m){ try{ o=JSON.parse(m[0]); }catch(_){} } }
+    try{ o=JSON.parse(s); }catch(e){ const m=s.match(/\{[\s\S]*\}/); if(m){ try{ o=JSON.parse(m[0]); }catch(_){ /* niedomknięty JSON — ratunek niżej */ } } }
     if(!o||typeof o!=='object'||typeof o.reply!=='string'){
       // niedomknięty JSON (limit tokenów / pętla powtórzeń): wyłuskaj domknięte akcje i początek reply
       const acts=[]; const re=/\{\s*"action"\s*:\s*"([^"]+)"\s*,\s*"args"\s*:\s*(\{[^{}]*\})\s*\}/g; let m;
-      while((m=re.exec(s))){ try{ acts.push(normalizeAction({action:m[1], args:JSON.parse(m[2])})); }catch(e){} }
+      while((m=re.exec(s))){ try{ acts.push(normalizeAction({action:m[1], args:JSON.parse(m[2])})); }catch(e){ /* uszkodzona akcja modelu — pomijamy */ } }
       const pre=jsonReplyPrefix(s).replace(/(.{20,}?)\1{1,}/g,'$1').trim();   // utnij zapętlone powtórki
       if(!acts.length && !pre) return null;
       return {reply:pre||'', actions:acts, partial:true};
@@ -284,7 +284,7 @@ CM.ChatBotCore = (function(){
     const actions=Array.isArray(o.actions)?o.actions.filter(a=>a&&typeof a.action==='string').map(normalizeAction):[];
     return {reply:o.reply.trim(), actions}; }
   function extractActions(text){ const out=[]; const re=/```action\s*([\s\S]*?)```/g; let m;
-    while((m=re.exec(text))){ try{ const o=JSON.parse(m[1].trim()); if(o&&o.action) out.push(o); }catch(e){} } return out; }
+    while((m=re.exec(text))){ try{ const o=JSON.parse(m[1].trim()); if(o&&o.action) out.push(o); }catch(e){ /* uszkodzona akcja modelu — pomijamy */ } } return out; }
   function stripActions(text){ return String(text).replace(/```action\s*[\s\S]*?```/g,'').replace(/\n{3,}/g,'\n\n').trim(); }
 
   /* ---------------- komendy „/" i kontekst promptu ---------------- */

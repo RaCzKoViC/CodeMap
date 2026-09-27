@@ -18,7 +18,7 @@ import { access } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
 import { db, now } from './db.js';
 import { CFG } from './config.js';
-import { storeBuffer, deleteBlob, bumpUsage, blobAbs } from './blobs.js';
+import { storeBuffer, deleteBlob, bumpUsage, blobAbs, deleteRowBlob } from './blobs.js';
 
 export const SHARE_ID_RE = /^[A-Za-z0-9_-]{22,64}$/;
 const DAY = 24 * 3600 * 1000;
@@ -118,12 +118,8 @@ export async function registerShares(app) {
 
   app.delete('/api/shares/:id', auth, async (req, reply) => {
     const id = String(req.params.id || '');
-    const row = SHARE_ID_RE.test(id) ? q.getOwn.get(id, req.user.id) : null;
-    if (!row) return reply.code(404).send({ error: 'notfound' });   // cudzy = nieistniejący
-    q.del.run(id, req.user.id);
-    bumpUsage(req.user.id, -row.size_bytes);
-    await deleteBlob(row.blob_path);
-    return { ok: true };
+    const row = SHARE_ID_RE.test(id) ? q.getOwn.get(id, req.user.id) : null;   // cudzy = nieistniejący (404)
+    return deleteRowBlob(reply, req.user.id, row, () => q.del.run(id, req.user.id));
   });
 
   // PUBLICZNY odczyt — bez sesji, bez ciasteczek, bez CORS

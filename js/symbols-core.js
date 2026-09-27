@@ -173,7 +173,7 @@
         }
         if(hooks.onProgress && (i % 20 === 19 || i === files.length-1)) await hooks.onProgress(i+1, files.length);
       }
-    } finally { try{ parser.delete(); }catch(e){} }
+    } finally { try{ parser.delete(); }catch(e){ /* parser już zwolniony */ } }
     return out;
   }
 

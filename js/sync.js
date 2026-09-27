@@ -37,7 +37,7 @@ CM.Sync = (function(){
 
   const loggedIn=()=> CM.Auth && CM.Auth.isLoggedIn();
   const isAuto=()=> localStorage.getItem(LS_AUTO)!=='0';
-  const setAuto=(on)=>{ try{ localStorage.setItem(LS_AUTO, on?'1':'0'); }catch(e){} };
+  const setAuto=(on)=>{ U.lsSet(LS_AUTO, on?'1':'0'); };
 
   // ---------------- kolejka operacji (IndexedDB, przeżywa restart) ----------------
   let _qdb=null;
@@ -99,9 +99,9 @@ CM.Sync = (function(){
     const rawSet=Storage.prototype.setItem;
     Storage.prototype.setItem=function(k,v){
       rawSet.apply(this,arguments);
-      try{ if(!applyingPull && this===window.localStorage && SYNC_KEYS.includes(k)) onSettingsChanged(); }catch(e){}
+      try{ if(!applyingPull && this===window.localStorage && SYNC_KEYS.includes(k)) onSettingsChanged(); }catch(e){ /* wykrywanie zmian nie psuje zapisu */ }
     };
-  }catch(e){}
+  }catch(e){ /* brak Storage (środowisko bez DOM) — bez wykrywania zmian */ }
 
   // ---------------- push (drenaż kolejki) ----------------
   let pushing=false;
@@ -173,7 +173,7 @@ CM.Sync = (function(){
           for(const k of SYNC_KEYS) if(k in obj) localStorage.setItem(k, obj[k]);
           localStorage.setItem(LS_PULLED_TS, String(s.updatedAt));
           U.toast(t('settingsPulled'));
-        }catch(e){}
+        }catch(e){ console.warn('[CodeMap] Sync: nie zastosowano ustawień z chmury', e); }
         finally{ applyingPull=false; }
       }
     } else if(man.settings){
@@ -201,11 +201,11 @@ CM.Sync = (function(){
           const map=await res.json();
           await CM.Storage.saveSession(map);
           U.toast(t('sessionRestored'),'success',6000);
-        }catch(e){}
+        }catch(e){ console.warn('[CodeMap] Sync: nie pobrano sesji z chmury', e); }
       }
     }
 
-    try{ CM.Auth.refresh(); }catch(e){}
+    try{ CM.Auth.refresh(); }catch(e){ /* licznik konta — refresh() sam łapie błędy sieci */ }
   }
 
   let syncing=false;
@@ -229,7 +229,7 @@ CM.Sync = (function(){
     const remote=await api('/api/vault/'+album);
     if(remote.meta){
       try{ const rm=JSON.parse(remote.meta.json);
-        if(rm.salt && meta.salt && rm.salt!==meta.salt){ U.toast(t('vaultPassDiffers'),'error'); return; } }catch(e){}
+        if(rm.salt && meta.salt && rm.salt!==meta.salt){ U.toast(t('vaultPassDiffers'),'error'); return; } }catch(e){ /* złe meta w chmurze — nadpiszemy lokalnym */ }
     }
     await api('/api/vault/'+album+'/meta',{method:'PUT',json:{json:JSON.stringify(meta), updatedAt:Date.now()}});
     const remoteByName=new Map((remote.files||[]).map(f=>[f.name,f]));
@@ -245,7 +245,7 @@ CM.Sync = (function(){
       sent++;
     }
     U.toast(sent? t('vaultPushed')+sent : t('vaultNothing'),'success');
-    try{ CM.Auth.refresh(); }catch(e){}
+    try{ CM.Auth.refresh(); }catch(e){ /* licznik konta — refresh() sam łapie błędy sieci */ }
   }
 
   async function pullAlbum(album){
@@ -254,7 +254,7 @@ CM.Sync = (function(){
     const remote=await api('/api/vault/'+album);
     if(!remote.meta){ U.toast(t('vaultNothing')); return; }
     const localMeta=await D.getMeta(album);
-    let rMeta=null; try{ rMeta=JSON.parse(remote.meta.json); }catch(e){}
+    let rMeta=null; try{ rMeta=JSON.parse(remote.meta.json); }catch(e){ /* złe meta w chmurze → writeMeta niżej odrzuci */ }
     if(localMeta && localMeta.enc && rMeta && rMeta.salt && localMeta.salt && rMeta.salt!==localMeta.salt){
       U.toast(t('vaultPassDiffers'),'error'); return;
     }
@@ -274,7 +274,7 @@ CM.Sync = (function(){
       got++;
     }
     U.toast(got? t('vaultPulled')+got : t('vaultNothing'),'success');
-    try{ if(CM.Drive.refreshAlbum) CM.Drive.refreshAlbum(album); }catch(e){}
+    try{ if(CM.Drive.refreshAlbum) CM.Drive.refreshAlbum(album); }catch(e){ /* brak modułu Dysku — nic do odświeżenia */ }
   }
 
   // ---------------- start ----------------

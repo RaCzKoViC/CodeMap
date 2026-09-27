@@ -188,7 +188,7 @@ CM.util = (function(){
   // Sloty kluczy Mistral: dokładnie 4, POZYCYJNE (slot #2 = ChatBot). Jedno miejsce odczytu dla
   // app.js (round-robin), chatbot.js i settings.js; migracja z dawnego pojedynczego klucza.
   function mistralKeySlots(){
-    let arr=[]; try{ arr=JSON.parse(localStorage.getItem('codemap_mistral_keys')||'[]'); }catch(e){}
+    let arr=lsJSON('codemap_mistral_keys', []);
     if(!Array.isArray(arr)) arr=[];
     arr=arr.slice(0,4).map(k=>String(k||'').trim());
     const legacy=(localStorage.getItem('codemap_mistral_key')||'').trim();
@@ -203,6 +203,37 @@ CM.util = (function(){
   function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>HTML_ESC[c]); }
   function escapeText(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>HTML_ESC[c]); }
 
+  // plik wskazany zapytaniem (agent, Doktor hotspotów): pełna ścieżka 100 > końcówka „/q” 90 > nazwa 80 > fragment 50;
+  // nodes = węzły z polem path (kolejność rozstrzyga remisy), wynik = najlepszy węzeł albo null
+  function matchPath(nodes, q){
+    q=String(q||'').replace(/\\/g,'/').replace(/^\.?\//,'').trim().toLowerCase(); if(!q) return null;
+    let best=null, bs=-1;
+    for(const n of nodes){ const p=n.path.toLowerCase(), nm=(n.name||'').toLowerCase();
+      const s=p===q?100:p.endsWith('/'+q)?90:nm===q?80:p.includes(q)?50:-1; if(s>bs){ bs=s; best=n; } }
+    return best;
+  }
+
+  // węzeł mapy wskazany nazwą (akcje ChatBota): nazwa dokładnie 100, początek nazwy 70, fragment nazwy 50, fragment ścieżki 30;
+  // pomija sztuczne węzły __root__ / __ext__; o.only(n) = dodatkowy filtr, o.exactPath = wynik za pełną ścieżkę
+  // (git 100 jak nazwa, testy 110 — przed nazwą), o.preferFile = remis wygrywa plik
+  function matchNode(nodes, q, o){
+    o=o||{}; q=String(q||'').toLowerCase().trim(); if(!q) return null;
+    let best=null, bs=-1;
+    for(const n of nodes){ if(n.id==='__root__'||n.id==='__ext__'||(o.only&&!o.only(n))) continue;
+      const nm=(n.name||'').toLowerCase(), pt=(n.path||'').toLowerCase();
+      const s=(o.exactPath&&pt===q)?o.exactPath:nm===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1)));
+      if(s>bs || (o.preferFile && s===bs && s>=0 && best.type!=='file' && n.type==='file')){ bs=s; best=n; } }
+    return best;
+  }
+
+  // localStorage bez wyjątków (jedno miejsce zamiast pustych catch w modułach): tryb prywatny, zablokowane
+  // dane witryny albo pełny limit (QuotaExceededError) — ustawienie żyje wtedy tylko do końca sesji.
+  // lsSet/lsDel → true, gdy się udało; lsJSON → wartość z JSON albo `def` (brak klucza, zły JSON, brak dostępu).
+  function lsSet(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
+  function lsDel(k){ try{ localStorage.removeItem(k); return true; }catch(e){ return false; } }
+  function lsJSON(k, def){ try{ const v=localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
+
   return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,escapeHtml,escapeText,
-          clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera,mistralKeySlots};
+          clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera,mistralKeySlots,
+          matchPath,matchNode,lsSet,lsDel,lsJSON};
 })();

@@ -42,7 +42,7 @@ const sweep = await evalJs(`(async()=>{
     ['openSettings',{tab:'ai'}],['setMode',{mode:'mindmap'}],['setMode',{mode:'codemap'}],['resetAppearance',{}],['setLang',{lang:'en'}],['setLang',{lang:'pl'}]);
   const fails=[]; let ran=0;
   for(const [a,args] of A){ try{ CMApp.exec(a,args); ran++; }catch(e){ fails.push(a+' '+JSON.stringify(args)+': '+(e&&e.message||e)); } await sleep(40); }
-  try{ if(CM.Settings&&CM.Settings.close) CM.Settings.close(); }catch(e){}
+  try{ if(CM.Settings&&CM.Settings.close) CM.Settings.close(); }catch(e){ /* okno ustawień już zamknięte */ }
   await sleep(300);
   return {ran, total:A.length, fails, nodesAfter:CMApp.graph.nodes.size, visible:CMApp.renderer()? (CMApp.renderer().nodes||[]).length : -1};
 })()`);
@@ -373,7 +373,7 @@ const prRes = await evalJs(`(async()=>{ try{
 // nowy plik → poll: nowe węzły i krawędzie, pozycje zachowane, node_modules pominięte, znacznik NA ŻYWO; stop
 const liveRes = await evalJs(`(async()=>{ try{
   const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
-  const root=await navigator.storage.getDirectory(); try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){}
+  const root=await navigator.storage.getDirectory(); try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){ /* resztki poprzedniego przebiegu — zwykle brak */ }
   const d=await root.getDirectoryHandle('smoke-live',{create:true});
   const write=async(path,text)=>{ let h=d; const parts=path.split('/'); for(const p of parts.slice(0,-1)) h=await h.getDirectoryHandle(p,{create:true});
     const fh=await h.getFileHandle(parts[parts.length-1],{create:true}); const w=await fh.createWritable(); await w.write(text); await w.close(); };
@@ -397,7 +397,7 @@ const liveRes = await evalJs(`(async()=>{ try{
   const resumed=CM.Live.state().on && !document.getElementById('st-live-resume') && !!CMApp.graph.nodes.get('src/c.js');
   CM.Live.stop(); await sleep(100); const forgot=!(await CM.Live.remembered());
   const off=!CM.Live.state().on && !document.getElementById('st-live');
-  try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){}
+  try{ await root.removeEntry('smoke-live',{recursive:true}); }catch(e){ /* sprzątanie best-effort — wynik testu już znany */ }
   return {ok, skipped, added:res&&res.added, changed:res&&res.changed, kept, edge, badge, off, mem, offered, pill:!!pill, resumed, forgot};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 

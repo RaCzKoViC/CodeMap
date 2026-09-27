@@ -56,14 +56,14 @@
   async function gitFiles(gitDir){
     const out=[];
     const walk=async(d, prefix)=>{ for await (const [name, h] of d.entries()){ const p=prefix?prefix+'/'+name:name;
-      if(h.kind==='directory'){ if(name!=='hooks') await walk(h, p); } else if(!/\.lock$/.test(name)){ try{ out.push({path:p, file:await h.getFile()}); }catch(e){} } } };
+      if(h.kind==='directory'){ if(name!=='hooks') await walk(h, p); } else if(!/\.lock$/.test(name)){ try{ out.push({path:p, file:await h.getFile()}); }catch(e){ /* plik .git w trakcie zapisu — pominięty */ } } } };
     await walk(gitDir, '');
     return out;
   }
   async function readRecord(path, e, textBudget){
     const rec={path, size:e.size, mtime:e.mtime, content:null};
     if(textBudget.left>0 && L.isTextFile(path.split('/').pop(), e.size)){
-      try{ rec.content=await (await e.handle.getFile()).text(); textBudget.left--; }catch(err){}
+      try{ rec.content=await (await e.handle.getFile()).text(); textBudget.left--; }catch(err){ /* plik zniknął/zablokowany — bez treści */ }
     }
     return rec;
   }
@@ -101,7 +101,7 @@
   }
   async function start(dir, opts){
     opts=opts||{};
-    try{ if(dir.queryPermission && (await dir.queryPermission({mode:'read'}))!=='granted' && (await dir.requestPermission({mode:'read'}))!=='granted'){ U.toast(T('live.denied','Brak uprawnień do odczytu folderu.'),'error'); return false; } }catch(e){}
+    try{ if(dir.queryPermission && (await dir.queryPermission({mode:'read'}))!=='granted' && (await dir.requestPermission({mode:'read'}))!=='granted'){ U.toast(T('live.denied','Brak uprawnień do odczytu folderu.'),'error'); return false; } }catch(e){ /* brak API uprawnień — próbujemy czytać */ }
     stop(true, true);
     const my=++S.gen;
     const ok=await A.ingest(async (onProgress, onStatus)=>{
@@ -112,7 +112,7 @@
       S.files=new Map(files.map(f=>[f.path, f])); S.gitStamp=sc.gitStamp;
       const side={git:null, gitHandle:sc.gitHandle, gitFile:null, coverage:[], gitEntry:null, coverageEntries:[]};
       if(sc.gitHandle) side.git=await gitFiles(sc.gitHandle);
-      for(const c of sc.coverage){ try{ side.coverage.push({path:c.path, file:await c.handle.getFile()}); }catch(e){} }
+      for(const c of sc.coverage){ try{ side.coverage.push({path:c.path, file:await c.handle.getFile()}); }catch(e){ /* raport pokrycia zniknął — pomijamy */ } }
       return {files, meta:{name:dir.name, source:'live: '+dir.name, kind:'local', live:true, createdAt:Date.now()}, side};
     }, T('live.reading','Czytanie folderu…'));
     if(!ok || my!==S.gen) return false;
@@ -127,7 +127,7 @@
     const was=S.on; S.on=false; S.paused=false; S.gen++;
     if(was && !keep) forget();
     clearTimeout(S.timer); S.timer=0;
-    if(S.observer){ try{ S.observer.disconnect(); }catch(e){} S.observer=null; }
+    if(S.observer){ try{ S.observer.disconnect(); }catch(e){ /* obserwator już odłączony */ } S.observer=null; }
     S.dir=null; S.files=new Map(); S.pre=new Map(); S.pulses.clear(); renderBadge();
     if(was && !silent) U.toast(T('live.stopped','Zakończono obserwację folderu.'));
   }
@@ -196,7 +196,7 @@
     if(old.testInfo && old.testInfo.coverage){ g.testInfo=Object.assign({}, old.testInfo); }
     const selId=A.renderer.selected&&A.renderer.selected.id;
     A.graph=g; rememberPre();
-    if(CM.TestMap) try{ CM.TestMap.mapTests(g); }catch(e){}
+    if(CM.TestMap) try{ CM.TestMap.mapTests(g); }catch(e){ console.warn('[CodeMap] Live: mapa testów', e); }
     A.countsInit();
     A.refreshView();
     if(selId && g.nodes.has(selId)) A.select(g.nodes.get(selId)); else if(selId) A.select(null);
@@ -205,7 +205,8 @@
   }
   async function rerunGit(){
     if(!S.dir || !CM.Git) return;
-    try{ const gd=await S.dir.getDirectoryHandle('.git'); if(state.side) { state.side.git=await gitFiles(gd); } U.toast(T('live.gitRerun','Nowy commit — odświeżam historię git…'),'',3000); CM.Git.run({auto:true}); }catch(e){}
+    try{ const gd=await S.dir.getDirectoryHandle('.git'); if(state.side) { state.side.git=await gitFiles(gd); } U.toast(T('live.gitRerun','Nowy commit — odświeżam historię git…'),'',3000); CM.Git.run({auto:true}); }
+    catch(e){ if(!e || e.name!=='NotFoundError') console.warn('[CodeMap] Live: odświeżenie historii git', e); }   // brak .git = norma
   }
 
   // ---------------- zmiany świecą na mapie (3 s) ----------------

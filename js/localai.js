@@ -40,7 +40,7 @@ CM.LocalAI = (function(){
   ];
   const EXTRA_KEY='codemap_local_models_extra';   // id-y wybrane z pełnej listy silnika (poza MODELS)
   const extraIds=()=>{ try{ const a=JSON.parse(localStorage.getItem(EXTRA_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } };
-  const addExtraId=(id)=>{ const a=extraIds(); if(!a.includes(id)){ a.push(id); try{ localStorage.setItem(EXTRA_KEY, JSON.stringify(a.slice(-20))); }catch(e){} } };
+  const addExtraId=(id)=>{ const a=extraIds(); if(!a.includes(id)){ a.push(id); U.lsSet(EXTRA_KEY, JSON.stringify(a.slice(-20))); } };
   const known=(id)=>MODELS.some(m=>m.id===id)||extraIds().includes(id);
   const isThinking=(id)=>{ id=id||modelId(); const m=MODELS.find(m=>m.id===id); return m?!!m.think:/R1|Reason|Think/i.test(id); };
 
@@ -59,21 +59,23 @@ CM.LocalAI = (function(){
   let _curSig=null;        // AbortSignal generacji AKTYWNEJ w tej chwili (właściciel silnika)
   let _genActive=false;
   let _engineGoneRes=null; // rozstrzyga wiszący strumień, gdy silnik został zwolniony pod spodem
+  // sprzątanie best-effort (terminate workera, revokeObjectURL, interruptGenerate, resolvery anulowania)
+  const quiet=(f)=>{ try{ f(); }catch(e){ /* obiekt mógł już zniknąć — stan i tak zerujemy */ } };
 
   const hasWebGPU=()=>!!navigator.gpu;
   // trzej dostawcy: 'mistral' (API, klucz) | 'local' (WebLLM w przeglądarce) | 'ollama' (natywny serwer)
   const provider=()=>{ const v=localStorage.getItem(PROV_KEY); return v==='local'?'local':(v==='ollama'?'ollama':'mistral'); };
-  const setProvider=(p)=>{ try{ localStorage.setItem(PROV_KEY, (p==='local'||p==='ollama')?p:'mistral'); }catch(e){} };
+  const setProvider=(p)=>{ U.lsSet(PROV_KEY, (p==='local'||p==='ollama')?p:'mistral'); };
   // SANITYZACJA: id zapisany przez starszą wersję może wskazywać model usunięty z listy
   // (np. dawny DeepSeek-1.5B / Gemma) — wtedy każdy czat umierał na resolveId. Heal-write do domyślnego.
   const DEFAULT_ID='Llama-3.2-1B-Instruct-q4f16_1-MLC';
   const modelId=()=>{
     const v=localStorage.getItem(MODEL_KEY);
     if(v && known(v)) return v;
-    if(v) try{ localStorage.setItem(MODEL_KEY, DEFAULT_ID); }catch(e){}
+    if(v) U.lsSet(MODEL_KEY, DEFAULT_ID);
     return DEFAULT_ID;
   };
-  const setModel=(id)=>{ if(id && !MODELS.some(m=>m.id===id)) addExtraId(id); try{ localStorage.setItem(MODEL_KEY,id); }catch(e){} };
+  const setModel=(id)=>{ if(id && !MODELS.some(m=>m.id===id)) addExtraId(id); U.lsSet(MODEL_KEY,id); };
   const status=()=>engine&&loadedModel===modelId()?'ready':(loading?'loading':'unloaded');
   const busy=()=>!!loading||_genActive;
   const loadedId=()=>loadedModel;
@@ -128,14 +130,14 @@ CM.LocalAI = (function(){
     // usuwanie modelu ładowanego/załadowanego: najpierw pełny unload (anuluje też pobieranie),
     // potem poczekaj aż in-flight promise się rozstrzygnie — dopiero wtedy bezpiecznie kasuj cache
     if(loadedModel===id || (loading&&loadingId===id)) await unload();
-    if(loading){ try{ await loading; }catch(e){} }
+    if(loading){ try{ await loading; }catch(e){ /* błąd ładowania dostaje jego wywołujący — tu tylko czekamy */ } }
     try{ const L=await ensureLib(); const cfg=await appCfg();
       await L.deleteModelAllInfoInCache(await resolveId(id), cfg); return true; }catch(e){ return false; }
   }
   const onProgress=(fn)=>{ progressCbs.add(fn); return ()=>progressCbs.delete(fn); };
   function emitProgress(rep){
     progress={text:rep.text||'', pct:Math.round((rep.progress||0)*100)};
-    for(const fn of progressCbs){ try{ fn(progress); }catch(e){} }
+    for(const fn of progressCbs){ try{ fn(progress); }catch(e){ /* błąd odbiorcy UI nie przerywa ładowania */ } }
   }
   const abortErr=()=>Object.assign(new Error(I.t('lai.cancelled','Przerwano.')),{name:'AbortError'});
 
@@ -156,7 +158,7 @@ CM.LocalAI = (function(){
         try{
           await ensureLib();
           // PERSISTENT storage — bez tego przeglądarka może po cichu wyewiktować pobrane wagi
-          try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
+          try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist(); }catch(e){ /* tylko prośba — odmowa nie blokuje */ }
           const id=loadingId;
           emitProgress({text:I.t('lai.starting','Uruchamiam silnik…'), progress:0});
           await unload();                     // zwalnia poprzedni silnik; bumpuje epokę PRZED my
@@ -169,7 +171,7 @@ CM.LocalAI = (function(){
           let eng=null, w=null, wurl=null;
           const cancelP=new Promise((_,rej)=>{ _loadCancel=()=>rej(abortErr()); });
           cancelP.catch(()=>{});               // uzbrojony rejection nie może być "unhandled"
-          const cleanup=()=>{ try{ if(w) w.terminate(); }catch(e){} try{ if(wurl) URL.revokeObjectURL(wurl); }catch(e){}
+          const cleanup=()=>{ quiet(()=>{ if(w) w.terminate(); }); quiet(()=>{ if(wurl) URL.revokeObjectURL(wurl); });
             if(curWorker===w) curWorker=null; if(curWurl===wurl) curWurl=null; };
           try{
             // SILNIK W WEB WORKERZE: JS modelu poza głównym wątkiem — UI nie zamarza, Stop działa.
@@ -195,7 +197,7 @@ CM.LocalAI = (function(){
               cancelP
             ]);
           }
-          if(my!==epoch){ try{ await eng.unload(); }catch(e){} cleanup(); throw abortErr(); }
+          if(my!==epoch){ try{ await eng.unload(); }catch(e){ /* osierocony silnik — i tak przerywamy */ } cleanup(); throw abortErr(); }
           engine=eng; loadedModel=id;
           emitProgress({text:I.t('lai.ready','Model gotowy.'), progress:1});
           return engine;
@@ -285,9 +287,9 @@ CM.LocalAI = (function(){
           const step=await Promise.race(races);
           clearTimeout(timer);
           if(step.__gone) throw abortErr();
-          if(step.__abort){ try{ eng.interruptGenerate(); }catch(e){}
+          if(step.__abort){ quiet(()=>eng.interruptGenerate());
             throw abortErr(); }
-          if(step.__stall){ try{ eng.interruptGenerate(); }catch(e){}
+          if(step.__stall){ quiet(()=>eng.interruptGenerate());
             throw new Error(I.t('lai.stalled','Model przestał odpowiadać (GPU). Spróbuj ponownie lub wybierz mniejszy model.')); }
           if(step.done) break;
           const ch=step.value;
@@ -302,7 +304,7 @@ CM.LocalAI = (function(){
         new Promise(r=>setTimeout(()=>r({__stall:true}), 300000))]); }
       catch(e){ throw mapEngineErr(e); }
       if(res&&res.__gone) throw abortErr();
-      if(res&&res.__stall){ try{ eng.interruptGenerate(); }catch(e){}
+      if(res&&res.__stall){ quiet(()=>eng.interruptGenerate());
         throw new Error(I.t('lai.stalled','Model przestał odpowiadać (GPU). Spróbuj ponownie lub wybierz mniejszy model.')); }
       full=(res.choices&&res.choices[0]&&res.choices[0].message&&res.choices[0].message.content)||'';
       return full;
@@ -311,35 +313,36 @@ CM.LocalAI = (function(){
 
   async function unload(){
     epoch++;                                            // unieważnij każdy in-flight load
-    if(_loadCancel){ try{ _loadCancel(); }catch(e){} _loadCancel=null; }   // przerwij await Create
-    try{ if(engine) engine.interruptGenerate(); }catch(e){}
-    if(_engineGoneRes){ try{ _engineGoneRes({__gone:true}); }catch(e){} }  // uwolnij wiszący strumień
+    if(_loadCancel){ quiet(_loadCancel); _loadCancel=null; }   // przerwij await Create
+    quiet(()=>{ if(engine) engine.interruptGenerate(); });
+    if(_engineGoneRes){ quiet(()=>_engineGoneRes({__gone:true})); }  // uwolnij wiszący strumień
     if(engine){
-      try{ await Promise.race([engine.unload(), new Promise(r=>setTimeout(r,3000))]); }catch(e){}
-      try{ if(engine.__worker) engine.__worker.terminate(); }catch(e){}
-      try{ if(engine.__wurl) URL.revokeObjectURL(engine.__wurl); }catch(e){}
+      try{ await Promise.race([engine.unload(), new Promise(r=>setTimeout(r,3000))]); }catch(e){ /* silnik mógł paść (utrata GPU) — worker i tak ubijamy */ }
+      quiet(()=>{ if(engine.__worker) engine.__worker.terminate(); });
+      quiet(()=>{ if(engine.__wurl) URL.revokeObjectURL(engine.__wurl); });
     }
     // worker z NIEDOKOŃCZONEGO ładowania (jeszcze nie na engine.__worker) — też ubij
-    try{ if(curWorker) curWorker.terminate(); }catch(e){}
-    try{ if(curWurl) URL.revokeObjectURL(curWurl); }catch(e){}
+    quiet(()=>{ if(curWorker) curWorker.terminate(); });
+    quiet(()=>{ if(curWurl) URL.revokeObjectURL(curWurl); });
     curWorker=null; curWurl=null;
     engine=null; loadedModel=null;
   }
   // twardy interrupt dla przycisku Stop — przerywa TYLKO gdy abortowany sygnał jest właścicielem
   // aktywnej generacji (stop czatu nie ubija równoległej „Przeanalizuj strukturę")
   function interrupt(){
-    try{ if(engine && (!_curSig || _curSig.aborted)) engine.interruptGenerate(); }catch(e){}
+    quiet(()=>{ if(engine && (!_curSig || _curSig.aborted)) engine.interruptGenerate(); });
   }
   // usuwa POBRANE wagi z Cache Storage przeglądarki (webllm/* + model-cache starszych wersji)
   async function deleteDownloads(){
     await unload();
-    let n=0; try{ const ks=await caches.keys(); for(const k of ks){ if(/webllm|mlc/i.test(k)){ await caches.delete(k); n++; } } }catch(e){}
+    let n=0; try{ const ks=await caches.keys(); for(const k of ks){ if(/webllm|mlc/i.test(k)){ await caches.delete(k); n++; } } }
+    catch(e){ console.warn('[CodeMap] LocalAI: nie udało się usunąć pobranych wag z Cache Storage', e); }
     return n;
   }
   // przybliżony rozmiar pobranych modeli (liczymy wpisy w cache'ach webllm/*)
   async function downloadedInfo(){
     const out={caches:0, entries:0};
-    try{ const ks=await caches.keys(); for(const k of ks){ if(/webllm|mlc/i.test(k)){ out.caches++; const c=await caches.open(k); out.entries+=(await c.keys()).length; } } }catch(e){}
+    try{ const ks=await caches.keys(); for(const k of ks){ if(/webllm|mlc/i.test(k)){ out.caches++; const c=await caches.open(k); out.entries+=(await c.keys()).length; } } }catch(e){ /* brak Cache API (np. http) = 0 */ }
     return out;
   }
 
@@ -360,12 +363,12 @@ CM.LocalAI = (function(){
     const p=(async()=>{
       await ensureLib(); const cfg=await appCfg();
       await embedUnload();
-      const prog=(r)=>{ if(onProg) try{ onProg({text:r.text||'', pct:Math.round((r.progress||0)*100)}); }catch(e){} };
+      const prog=(r)=>{ if(onProg) try{ onProg({text:r.text||'', pct:Math.round((r.progress||0)*100)}); }catch(e){ /* błąd odbiorcy UI nie przerywa ładowania */ } };
       let eng=null, w=null, wurl=null;
       try{ const src='import {WebWorkerMLCEngineHandler} from "'+CDN+'";const h=new WebWorkerMLCEngineHandler();self.onmessage=(m)=>h.onmessage(m);';
         wurl=URL.createObjectURL(new Blob([src],{type:'text/javascript'})); w=new Worker(wurl,{type:'module'});
         eng=await lib.CreateWebWorkerMLCEngine(w, id, {initProgressCallback:prog, appConfig:cfg}); eng.__worker=w; eng.__wurl=wurl; }
-      catch(e){ try{ if(w) w.terminate(); if(wurl) URL.revokeObjectURL(wurl); }catch(x){}
+      catch(e){ quiet(()=>{ if(w) w.terminate(); if(wurl) URL.revokeObjectURL(wurl); });
         eng=await lib.CreateMLCEngine(id, {initProgressCallback:prog, appConfig:cfg}); }
       embEng=eng; embId=id; return eng;
     })();
@@ -374,7 +377,8 @@ CM.LocalAI = (function(){
   }
   async function embedUnload(){
     const e=embEng; embEng=null; embId='';
-    if(e){ try{ await Promise.race([e.unload(), new Promise(r=>setTimeout(r,3000))]); }catch(x){} try{ if(e.__worker) e.__worker.terminate(); if(e.__wurl) URL.revokeObjectURL(e.__wurl); }catch(x){} }
+    if(e){ try{ await Promise.race([e.unload(), new Promise(r=>setTimeout(r,3000))]); }catch(x){ /* silnik mógł paść — worker i tak ubijamy */ }
+      quiet(()=>{ if(e.__worker) e.__worker.terminate(); if(e.__wurl) URL.revokeObjectURL(e.__wurl); }); }
   }
   // texts → wektory (tablice liczb); model: 'webllm:<id>' albo samo id; opts {signal, onProgress (ładowanie), batch}
   async function embed(texts, opts){

@@ -55,7 +55,7 @@ CM.Loaders = (function(){
       try{
         const raw=compression===0?compressed:compression===8?await _inflate(compressed):null;
         if(raw!=null){ try{ content=dec.decode(raw); }catch(e){ content=null; } }
-      }catch(e){}
+      }catch(e){ /* uszkodzony wpis archiwum → plik bez treści */ }
       files.push({name, size:uncompSz, content});
     }
     return files;
@@ -78,7 +78,7 @@ CM.Loaders = (function(){
       if((type==='0'||type==='\0'||type==='')&&!full.endsWith('/')){
         const fileBytes=data.subarray(dataStart, dataStart+size);
         const info=L.lookup(full); let content=null;
-        if(info.text && size<=TEXT_SIZE_LIMIT){ try{ content=dec.decode(fileBytes); }catch(e){} }
+        if(info.text && size<=TEXT_SIZE_LIMIT){ try{ content=dec.decode(fileBytes); }catch(e){ /* nieczytelny tekst → bez treści */ } }
         files.push({name:full, size, content});
       }
       off=dataStart + Math.ceil(size/512)*512;
@@ -96,7 +96,7 @@ CM.Loaders = (function(){
     if(name.endsWith('.tgz')||name.endsWith('.tar.gz')){ const raw=await _inflate(new Uint8Array(buf),'gzip'); return {entries:_parseTar(raw), base:file.name.replace(/\.(tgz|tar\.gz)$/i,''), flat:false}; }
     if(name.endsWith('.tar')) return {entries:_parseTar(new Uint8Array(buf)), base:file.name.replace(/\.tar$/i,''), flat:false};
     if(name.endsWith('.gz')){ const raw=await _inflate(new Uint8Array(buf),'gzip'); const inner=file.name.replace(/\.gz$/i,'');
-      const info=L.lookup(inner); let content=null; if(info.text&&raw.length<=TEXT_SIZE_LIMIT){ try{ content=new TextDecoder('utf-8').decode(raw); }catch(e){} }
+      const info=L.lookup(inner); let content=null; if(info.text&&raw.length<=TEXT_SIZE_LIMIT){ try{ content=new TextDecoder('utf-8').decode(raw); }catch(e){ /* nieczytelny tekst → bez treści */ } }
       return {entries:[{name:inner,size:raw.length,content}], base:inner, flat:true}; }
     throw new Error('unsupported archive');
   }
@@ -152,7 +152,7 @@ CM.Loaders = (function(){
       const start=m.index+m[0].length; const end=S.indexOf('endstream', start); if(end<0) continue;
       const raw=bytes.subarray(start, end);
       try{ out+=_latin1(await _inflate(raw,'deflate')); count++; }
-      catch(e){ try{ out+=_latin1(await _inflate(raw,'deflate-raw')); count++; }catch(e2){} }
+      catch(e){ try{ out+=_latin1(await _inflate(raw,'deflate-raw')); count++; }catch(e2){ /* strumień nie do rozpakowania — pomijamy */ } }
     }
     return out;
   }
@@ -160,13 +160,15 @@ CM.Loaders = (function(){
     const bytes=new Uint8Array(buf); const S=_latin1(bytes);
     const objs=new Map(); const re=/(\d+)\s+\d+\s+obj\b([\s\S]*?)\bendobj/g; let m, guard=0;
     while((m=re.exec(S)) && guard++<200000){ if(!objs.has(+m[1])) objs.set(+m[1], m[2]); }
-    let tree=null; try{ tree=_pdfOutline(objs); }catch(e){}
-    let pages=0; try{ pages=_pdfPageCount(S); }catch(e){}
+    // PDF to nieufne dane: każdy krok to heurystyka — błąd = brak tej części struktury, nie błąd wczytania
+    const soft=(f, d)=>{ try{ return f(); }catch(e){ return d; } };
+    let tree=soft(()=>_pdfOutline(objs), null);
+    let pages=soft(()=>_pdfPageCount(S), 0);
     let flat=null;
     if(!tree || !tree.length){
-      let extra=''; try{ extra=await _pdfDecompress(S, bytes, 140); }catch(e){}
-      if(extra){ try{ const p2=_pdfPageCount(extra); if(p2>pages) pages=p2; }catch(e){}
-        try{ const t=[]; const r2=/\/Title\s*(\([\s\S]*?\)|<[0-9A-Fa-f\s]*>)/g; let mm, g2=0; while((mm=r2.exec(extra))&&g2++<8000){ const v=_cleanTitle(_pdfDecodeStr(mm[1])); if(v) t.push(v); } flat=t; }catch(e){} }
+      let extra=''; try{ extra=await _pdfDecompress(S, bytes, 140); }catch(e){ /* j.w.: bez rozpakowanych strumieni */ }
+      if(extra){ const p2=soft(()=>_pdfPageCount(extra), 0); if(p2>pages) pages=p2;
+        flat=soft(()=>{ const t=[]; const r2=/\/Title\s*(\([\s\S]*?\)|<[0-9A-Fa-f\s]*>)/g; let mm, g2=0; while((mm=r2.exec(extra))&&g2++<8000){ const v=_cleanTitle(_pdfDecodeStr(mm[1])); if(v) t.push(v); } return t; }, null); }
     }
     const base=fileName.replace(/\.pdf$/i,'');
     const files=[]; const add=(p)=>files.push({path:p, size:0, content:null, mtime:null});
@@ -450,7 +452,7 @@ CM.Loaders = (function(){
             const raw=`https://raw.githubusercontent.com/${src.owner}/${src.repo}/${branch}/${src.sub?src.sub.replace(/\/$/,'')+'/':''}${f.path}`;
             const r=await fetch(raw); if(r.ok) f.content=await r.text();
           }
-        }catch(e){}
+        }catch(e){ /* treść opcjonalna — plik zostaje w drzewie bez podglądu */ }
         done++; if(onProgress) onProgress(done, textFiles.length);
       }, opts.token?10:14);
     }
@@ -486,7 +488,7 @@ CM.Loaders = (function(){
     if(opts.fetchContent){
       const tf=files.filter(f=>isTextFile(f.path.split('/').pop(),0)).slice(0,MAX_CONTENT_FILES);
       if(onStatus) onStatus(CM.i18n.t('cl.stFetchContentA','Pobieranie zawartości ')+tf.length+CM.i18n.t('cl.stFetchContentB',' plików…')); let done=0;
-      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/projects/${id}/repository/files/${encodeURIComponent(pre+f.path)}/raw?ref=${encodeURIComponent(branch)}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){} done++; if(onProgress) onProgress(done,tf.length); }, 12);
+      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/projects/${id}/repository/files/${encodeURIComponent(pre+f.path)}/raw?ref=${encodeURIComponent(branch)}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){ /* treść opcjonalna */ } done++; if(onProgress) onProgress(done,tf.length); }, 12);
     }
     const glHtml=proj.web_url||('https://gitlab.com/'+path);
     const glInfo={desc:proj.description||'', stars:proj.star_count, forks:proj.forks_count, issues:proj.open_issues_count,
@@ -524,7 +526,7 @@ CM.Loaders = (function(){
     if(opts.fetchContent){
       const tf=files.filter(f=>isTextFile(f.path.split('/').pop(),0)).slice(0,MAX_CONTENT_FILES);
       if(onStatus) onStatus(CM.i18n.t('cl.stFetchContentA','Pobieranie zawartości ')+tf.length+CM.i18n.t('cl.stFetchContentB',' plików…')); let done=0;
-      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/repositories/${ws}/${repo}/src/${encodeURIComponent(branch)}/${pre+f.path}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){} done++; if(onProgress) onProgress(done,tf.length); }, 10);
+      await U.pMap(tf, async(f)=>{ try{ const r=await fetch(`${api}/repositories/${ws}/${repo}/src/${encodeURIComponent(branch)}/${pre+f.path}`,{headers}); if(r.ok) f.content=await r.text(); }catch(e){ /* treść opcjonalna */ } done++; if(onProgress) onProgress(done,tf.length); }, 10);
     }
     const owner={login:ws, avatar:(info.links&&info.links.avatar&&info.links.avatar.href)||null, url:`https://bitbucket.org/${ws}`, host:'bitbucket'};
     const bbHtml=(info.links&&info.links.html&&info.links.html.href)||`https://bitbucket.org/${ws}/${repo}`;
@@ -640,7 +642,7 @@ CM.Loaders = (function(){
         const data=line.slice(5).trim();
         if(data==='[DONE]') return full;
         try{ const j=JSON.parse(data); const d=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;
-          if(d){ full+=d; if(opts.onToken) opts.onToken(d, full); } }catch(e){}
+          if(d){ full+=d; if(opts.onToken) opts.onToken(d, full); } }catch(e){ /* linia SSE bez poprawnego JSON — pomijamy */ }
       }
     }
     return full;

@@ -6,15 +6,17 @@
    przez AbortSignal fetcha. Modele myślące (deepseek-r1 itp.) emitują <think> — UI czatu już to
    obsługuje niezależnie od dostawcy. */
 CM.Ollama = (function(){
-  const I=CM.i18n;
+  const I=CM.i18n, U=CM.util;
   const BASE_KEY='codemap_ollama_base';
   const MODEL_KEY='codemap_ollama_model';
   const DEF_BASE='http://localhost:11434';
 
   const base=()=>{ const v=(localStorage.getItem(BASE_KEY)||'').trim(); return (v||DEF_BASE).replace(/\/+$/,''); };
-  const setBase=(u)=>{ try{ localStorage.setItem(BASE_KEY,(u||'').trim()); }catch(e){} };
+  const setBase=(u)=>{ U.lsSet(BASE_KEY,(u||'').trim()); };
   const model=()=>localStorage.getItem(MODEL_KEY)||'';
-  const setModel=(m)=>{ try{ localStorage.setItem(MODEL_KEY,m||''); }catch(e){} };
+  const setModel=(m)=>{ U.lsSet(MODEL_KEY,m||''); };
+  // pole `error` z odpowiedzi błędu Ollamy; treść bez JSON → '' (komunikat z kodu HTTP)
+  const errBody=async(r)=>{ try{ return (await r.json()).error||''; }catch(e){ return ''; } };
 
   const offlineErr=()=>new Error(I.t('ol.offline','Ollama nie odpowiada pod ')+base()+I.t('ol.offlineHint',' — uruchom aplikację Ollama (lub `ollama serve`) i spróbuj ponownie.'));
 
@@ -106,7 +108,7 @@ CM.Ollama = (function(){
       if(e&&e.name==='AbortError') throw e;
       throw offlineErr();
     }
-    if(!r.ok){ let d=''; try{ d=(await r.json()).error||''; }catch(e){}
+    if(!r.ok){ const d=await errBody(r);
       throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
     if(!opts.onToken){
       const j=await r.json();
@@ -142,7 +144,7 @@ CM.Ollama = (function(){
       // flush: multi-byte tail + a final line that never got its trailing '\n' (was silently dropped)
       buf+=dec.decode();
       if(buf.trim()) take(buf);
-    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){} }   // free the HTTP connection on early return/throw/abort
+    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){ /* strumień już zamknięty */ } }   // free the HTTP connection on early return/throw/abort
     return full;
   }
 
@@ -153,7 +155,7 @@ CM.Ollama = (function(){
     let r;
     try{ r=await fetch(base()+'/api/pull',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({model:name, stream:true}), signal }); }
     catch(e){ if(e&&e.name==='AbortError') throw e; throw offlineErr(); }
-    if(!r.ok){ let d=''; try{ d=(await r.json()).error||''; }catch(e){} throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
+    if(!r.ok){ const d=await errBody(r); throw new Error('Ollama: '+(d||('HTTP '+r.status))); }
     const reader=r.body.getReader(); const dec=new TextDecoder(); let buf='', last=null;
     try{
       for(;;){ const {done,value}=await reader.read(); if(done) break; buf+=dec.decode(value,{stream:true}); let nl;
@@ -161,8 +163,8 @@ CM.Ollama = (function(){
           let j; try{ j=JSON.parse(line); }catch(e){ continue; }
           if(j.error) throw new Error('Ollama: '+j.error);
           last=j; if(onProgress) onProgress({status:j.status||'', pct:(j.total&&j.completed)?Math.round(j.completed/j.total*100):null, total:j.total||0, completed:j.completed||0}); } }
-    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){} }
-    _models=null; try{ await models(true); }catch(e){}
+    } finally { try{ reader.cancel().catch(()=>{}); }catch(e){ /* strumień już zamknięty */ } }
+    _models=null; try{ await models(true); }catch(e){ /* lista odświeży się przy następnym odczycie */ }
     return last;
   }
   // propozycje do pobrania (nazwa, rozmiar, do czego)

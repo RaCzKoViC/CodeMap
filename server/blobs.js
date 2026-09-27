@@ -49,6 +49,23 @@ export async function deleteBlob(relPath) {
   await rm(blobAbs(relPath), { force: true });
 }
 
+/* GET wiersza z plikiem (mapa, migawka, plik Sejfu): brak wiersza (albo cudzy) → 404, inaczej strumień bloba
+   z nagłówkami head(row). */
+export function sendRowBlob(reply, row, head) {
+  if (!row) return reply.code(404).send({ error: 'notfound' });
+  return sendBlob(reply, row.blob_path, head(row));
+}
+
+/* DELETE wiersza z plikiem (mapa, migawka, plik Sejfu, publiczny link): brak wiersza (albo cudzy) → 404;
+   inaczej del() kasuje wiersz, a miejsce w quocie i sam plik są zwalniane. */
+export async function deleteRowBlob(reply, userId, row, del) {
+  if (!row) return reply.code(404).send({ error: 'notfound' });
+  del();
+  bumpUsage(userId, -row.size_bytes);
+  await deleteBlob(row.blob_path);
+  return { ok: true };
+}
+
 export function sendBlob(reply, relPath, headers = {}) {
   reply.header('content-type', 'application/octet-stream');
   for (const [k, v] of Object.entries(headers)) reply.header(k, v);

@@ -118,7 +118,7 @@
     refreshView();
     if(!info.files){ if(!opts.quiet) U.toast(t('toast.covNone',{n:info.total}),'error',7000); return info; }
     U.toast(t('toast.cov',{pct:fmtPct(info.pct), m:info.matched, n:info.total}),'success',5500);
-    if(opts.show && OV){ try{ OV.set('coverage'); }catch(e){} }
+    if(opts.show && OV){ try{ OV.set('coverage'); }catch(e){ /* nakładka niedostępna — zostaje bieżąca */ } }
     return info;
   }
   // raporty znalezione przy wczytywaniu folderu (loaders.js → side.coverage; upuszczone katalogi coverage/ leniwie)
@@ -196,10 +196,7 @@
   function covBlock(c){
     const wrap=el('div',{});
     const row=(lbl,h,tot)=>{ if(!tot) return; const p=Math.round(h/tot*1000)/10;
-      wrap.appendChild(el('div',{class:'bar-row',title:h+' / '+tot},
-        el('span',{class:'bl',text:lbl}),
-        el('div',{class:'bar-track'}, el('div',{class:'bar-fill',style:'width:'+p+'%;background:'+covColor(p)})),
-        el('span',{class:'bv',text:fmtPct(p)+'%'}))); };
+      wrap.appendChild(CM.UIKit.barRow(lbl, p, covColor(p), fmtPct(p)+'%', {title:h+' / '+tot})); };
     row(t('det.lines'), c.lh, c.lf); row(t('det.branches'), c.bh, c.bf); row(t('det.funcs'), c.fh, c.ff);
     const parts=[t('det.lines')+' '+U.fmtNum(c.lh)+'/'+U.fmtNum(c.lf)];
     if(c.bf) parts.push(t('det.branches')+' '+U.fmtNum(c.bh)+'/'+U.fmtNum(c.bf));
@@ -268,15 +265,7 @@
 
   // ---------------- ChatBot: tests / coverage / loadCoverage ----------------
   function findNode(q){
-    q=String(q||'').toLowerCase().trim(); if(!q) return null;
-    let best=null, bs=-1;
-    for(const n of A.graph.nodes.values()){
-      if(n.id==='__root__' || n.id==='__ext__' || n.type==='external' || n.type==='symbol') continue;
-      const nm=(n.name||'').toLowerCase(), pt=(n.path||'').toLowerCase();
-      const s=pt===q?110:nm===q?100:(nm.indexOf(q)===0?70:(nm.indexOf(q)>=0?50:(pt.indexOf(q)>=0?30:-1)));
-      if(s>bs || (s===bs && s>=0 && best.type!=='file' && n.type==='file')){ bs=s; best=n; }
-    }
-    return bs>=0?best:null;
+    return U.matchNode(A.graph.nodes.values(), q, {only:n=>n.type!=='external' && n.type!=='symbol', exactPath:110, preferFile:true});
   }
   const hi=(ids)=>{ if(A.renderer) A.renderer.setHighlight(ids && ids.size?ids:null); };
   const listOf=(ids, max)=>{ max=max||25; const a=ids.map(id=>{ const n=A.graph.nodes.get(id); return n?(n.path||n.name):id; }); return a.slice(0,max).join(', ')+(a.length>max?' …':''); };

@@ -129,6 +129,50 @@ CM.MindMapLayout = (function(){
     for(const rid of roots){ nodeOf(st,rid).color=pal[0]; for(const k of children.get(rid)){ paint(k, pal[1+(bi++%(pal.length-1))]); } }
   }
 
+  // ---------- łączniki: jedna geometria dla ekranu (mindmap.js) i eksportu SVG (mindmap-io.js) ----------
+  // kierunki zakotwiczenia [rodzic, dziecko] wg układu: r/l/t/b = krawędź karty, c = środek
+  function anchorDirs(layout, n, p){
+    if(layout==='radial') return ['c','c'];
+    if(layout==='left') return ['l','r'];
+    if(layout==='down') return ['b','t'];
+    if(layout==='up') return ['t','b'];
+    if(layout==='leftright'){ const left=(n.x+n.w/2)<(p.x+p.w/2); return left?['l','r']:['r','l']; }
+    if(layout==='free'){ const horiz=Math.abs((n.x+n.w/2)-(p.x+p.w/2))>=Math.abs(n.y-p.y);
+      return horiz ? ((n.x>p.x)?['r','l']:['l','r']) : ((n.y>p.y)?['b','t']:['t','b']); }
+    return ['r','l'];
+  }
+  // punkt na krawędzi karty a (wysokość h) zwrócony w kierunku dir
+  function anchorPoint(a, dir, h){
+    const cx=a.x+a.w/2, cy=a.y+h/2;
+    if(dir==='r') return {x:a.x+a.w, y:cy}; if(dir==='l') return {x:a.x, y:cy};
+    if(dir==='t') return {x:cx, y:a.y}; if(dir==='b') return {x:cx, y:a.y+h};
+    return {x:cx, y:cy};
+  }
+  // widoczne łączniki w kolejności rysowania: drzewo rodzic → dziecko, potem wolne krawędzie;
+  // fn(from, to, kolor, gruba) dostaje punkty świata; heightOf(n) = wysokość karty, hidden(n) = zwinięty
+  function eachConnector(st, heightOf, hidden, fn){
+    const pt=(a, dir)=>anchorPoint(a, dir, heightOf(a));
+    for(const n of st.nodes){ if(n.parent==null||hidden(n)) continue; const p=nodeOf(st,n.parent); if(!p||hidden(p)) continue;
+      const [pd,cd]=anchorDirs(st.layout, n, p); fn(pt(p,pd), pt(n,cd), n.color||p.color, true); }
+    for(const e of st.edges){ const a=nodeOf(st,e.from), b=nodeOf(st,e.to); if(!a||!b||hidden(a)||hidden(b)) continue;
+      fn(pt(a,'c'), pt(b,'c'), '#94a3b8', false); }
+  }
+  // <path> łącznika: krzywa Béziera (poziomo albo pionowo — wg przewagi) lub łamana prostokątna H-V-H
+  function connectorSvg(from, to, curved, col, wide){
+    let d;
+    if(curved){ const dx=Math.abs(to.x-from.x)*0.5; const horiz=Math.abs(to.x-from.x)>Math.abs(to.y-from.y);
+      d = horiz ? `M${from.x} ${from.y} C ${from.x+dx} ${from.y}, ${to.x-dx} ${to.y}, ${to.x} ${to.y}`
+                : `M${from.x} ${from.y} C ${from.x} ${(from.y+to.y)/2}, ${to.x} ${(from.y+to.y)/2}, ${to.x} ${to.y}`; }
+    else { const mx=(from.x+to.x)/2; d=`M${from.x} ${from.y} H ${mx} V ${to.y} H ${to.x}`; }
+    return `<path d="${d}" stroke="${col}" stroke-width="${wide?2.6:2}" fill="none" opacity="0.8" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  // prostokąt obejmujący karty: heightOf(n) = wysokość karty, skip(n) = pomiń (np. zwinięte)
+  function cardBounds(nodes, heightOf, skip){
+    let minX=1e9,minY=1e9,maxX=-1e9,maxY=-1e9;
+    for(const n of nodes){ if(skip && skip(n)) continue; minX=Math.min(minX,n.x); minY=Math.min(minY,n.y); maxX=Math.max(maxX,n.x+n.w); maxY=Math.max(maxY,n.y+heightOf(n)); }
+    return {minX, minY, maxX, maxY};
+  }
+
   // ---------- okno „Schemat układu” ----------
   const DIRS=['up','down','updown','left','right','leftright'];
   // konstrukcje: [k, niezależna od kierunku] — kształt drzewa (część ignoruje kierunek)
@@ -252,5 +296,6 @@ CM.MindMapLayout = (function(){
   }
 
   return { forest, ensureHierarchy, apply, radial, spiral, grid, layers, timeAxis, fishbone, recenter, hierarchyOrder,
-    arrange, paintSchema, DIRS, LINES, dirIndep, choose, previewSVG, createDialog };
+    arrange, paintSchema, anchorDirs, anchorPoint, eachConnector, connectorSvg, cardBounds,
+    DIRS, LINES, dirIndep, choose, previewSVG, createDialog };
 })();

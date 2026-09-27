@@ -136,7 +136,7 @@ void main(){
       if(!gl){ c.remove(); throw new Error('WebGL2 niedostępny'); }
       this.gl=gl; this.lost=false; this.visible=false; this.onLost=null;
       c.addEventListener('webglcontextlost', (e)=>{ e.preventDefault(); this.lost=true; this.show(false); if(this.onLost) this.onLost(); });
-      c.addEventListener('webglcontextrestored', ()=>{ try{ this._init(); this.lost=false; if(this.onLost) this.onLost(); }catch(e){} });
+      c.addEventListener('webglcontextrestored', ()=>{ try{ this._init(); this.lost=false; if(this.onLost) this.onLost(); }catch(e){ console.warn('[CodeMap] WebGL: kontekst nie wrócił — zostaje canvas 2D', e); } });
       this.nodes=new Buf(NODE_F); this.edges=new Buf(EDGE_F); this.xy=new Buf(4); this.gridN=new Buf(NODE_F); this.gridE=new Buf(EDGE_F);
       this._init();
     }
@@ -167,14 +167,14 @@ void main(){
       a[k]=s.x; a[k+1]=s.y; a[k+2]=t.x; a[k+3]=t.y; a[k+4]=c[0]; a[k+5]=c[1]; a[k+6]=c[2]; a[k+7]=c[3]*alpha; a[k+8]=dash; a[k+9]=gap; a[k+10]=curved?1:0; a[k+11]=w; }
 
     _build(R){
-      const RM=CM.Renderer, getCss=RM.getCss, badgeColor=RM.badgeColor, U=CM.util;
+      const RM=CM.Renderer, badgeColor=RM.badgeColor, U=CM.util;
       const o=R.opts, imp=R.impact, dimMode=!!R.highlight||!!imp, cosmic=!!o.cosmic, eo=o.edgeOpacity, scale=o.nodeScale;
       if(cosmic && !R._cosmicLUT) R._buildCosmicLUT();
       const N=this.nodes, E=this.edges; N.reset(); E.reset();
       const nd=[], ed=[];
       const close=(list, buf)=>{ const l=list[list.length-1]; if(l) l.end=buf.n; };
-      const byId=R.nodeById;
-      const vis=(e)=> imp ? (imp.all.has(e.source)&&imp.all.has(e.target)) : (!R.highlight || (R.highlight.has(e.source)&&R.highlight.has(e.target)));
+      const byId=R.nodeById, pal=R.impactPalette();
+      const vis=(e)=>R.edgeVisible(e);   // te same reguły widoczności i kolorów co canvas 2D (renderer.js)
 
       // ----- krawędzie (kolejność jak w canvas 2D) -----
       const curved=o.curvedImports!==false;
@@ -206,7 +206,7 @@ void main(){
             if(!(inSet.has(e.source)||inSet.has(e.target))) continue; const s=byId.get(e.source), t=byId.get(e.target); if(!s||!t) continue;
             this._edge(E, s, t, c, 0.85, 0, 0, curved, 1.6); }
           close(ed, E); };
-        set(getCss('--cm-impact-down')||'#36d0e0', imp.down); set(getCss('--cm-impact-up')||'#ff9d4d', imp.up);
+        set(pal.down, imp.down); set(pal.up, imp.up);
       }
       if(R.cycleEdges && R.cycleEdges.size){ ed.push({start:E.n, curved, add:false}); const c=rgba('#ff3b6b');
         for(const e of R.edges){ if(e.type==='contains' || !R.cycleEdges.has(e.source+'|'+e.target)) continue; const s=byId.get(e.source), t=byId.get(e.target); if(!s||!t) continue;
@@ -216,15 +216,8 @@ void main(){
         if(s&&t){ ed.push({start:E.n, curved:curved&&e.type!=='contains', add:false}); this._edge(E, s, t, rgba('#ffffff'), 1, 0, 0, curved&&e.type!=='contains', 2); close(ed, E); } }
 
       // ----- figury: poświata (cosmic), koła przygaszone, koła jasne, romby przygaszone, romby jasne -----
-      const upCol=imp?(getCss('--cm-impact-up')||'#ff9d4d'):null, downCol=imp?(getCss('--cm-impact-down')||'#36d0e0'):null,
-            focusCol=imp?(getCss('--cm-impact-focus')||'#ffffff'):null;
       const groups=[[],[],[],[]];   // dimC, fullC, dimD, fullD: [node, kolor]
-      for(const n of R.nodes){
-        let col=(R.colorFn&&R.colorFn(n))||(cosmic?R.cosmicColor(n._cosmic):badgeColor(n)), bright;
-        if(imp){ bright=imp.all.has(n.id); if(n.id===imp.focus) col=focusCol; else if(imp.down.has(n.id)) col=downCol; else if(imp.up.has(n.id)) col=upCol; }
-        else bright=!R.highlight||R.highlight.has(n.id);
-        groups[(n.type==='symbol'?2:0)+(bright?1:0)].push(n, col);
-      }
+      for(const n of R.nodes) groups[(n.type==='symbol'?2:0)+(R.nodeBright(n)?1:0)].push(n, R.nodeColor(n, cosmic, pal));
       if(cosmic && groups[1].length){ nd.push({start:N.n, add:true});
         for(let i=0;i<groups[1].length;i+=2){ const n=groups[1][i]; this._node(N, n.x, n.y, n.r*scale, rgba(groups[1][i+1]), 0.14, 3); }
         close(nd, N); }
@@ -243,11 +236,8 @@ void main(){
     _grid(R){
       const G=this.gridE, D=this.gridN; G.reset(); D.reset();
       const z=R.cam.zoom; if(!R.opts.showGrid || z<0.025) return;
-      const getCss=CM.Renderer.getCss, vb=R.worldBounds();
-      let step=40, guard=0; while(step*z<26 && guard++<40) step*=2; guard=0; while(step*z>120 && guard++<40) step/=2;
-      if(!(step>0) || !isFinite(step)) return;
-      const xN=Math.min(2000, Math.ceil((vb.maxX-vb.minX)/step)+2), yN=Math.min(2000, Math.ceil((vb.maxY-vb.minY)/step)+2);
-      const x0=Math.floor(vb.minX/step)*step, y0=Math.floor(vb.minY/step)*step;
+      const getCss=CM.Renderer.getCss, vb=R.worldBounds(), g=CM.Renderer.gridSteps(vb, z); if(!g) return;
+      const {step, xN, yN, x0, y0}=g;
       const cl=rgba(getCss('--grid-line')||'#5a6f88'), cd=rgba(getCss('--grid-dot')||'#7d93ad');
       for(let i=0;i<=xN;i++){ const x=x0+i*step; this._edge(G, {x, y:vb.minY}, {x, y:vb.maxY}, cl, 0.14, 0, 0, false, 1); }
       for(let i=0;i<=yN;i++){ const y=y0+i*step; this._edge(G, {x:vb.minX, y}, {x:vb.maxX, y}, cl, 0.14, 0, 0, false, 1); }
@@ -325,7 +315,7 @@ void main(){
       const density=len/Math.max(1,area);
       return density<=0.6 ? 1 : Math.max(0.02, 0.6/density);
     }
-    destroy(){ try{ const x=this.gl.getExtension('WEBGL_lose_context'); if(x) x.loseContext(); }catch(e){} this.canvas.remove(); }
+    destroy(){ try{ const x=this.gl.getExtension('WEBGL_lose_context'); if(x) x.loseContext(); }catch(e){ /* kontekst już utracony */ } this.canvas.remove(); }
   }
 
   return {supported, Layer, rgba};

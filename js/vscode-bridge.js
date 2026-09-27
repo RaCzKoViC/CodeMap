@@ -9,7 +9,7 @@
   const A=CM.App, U=CM.util, I=CM.i18n;
   I.extend('pl', {'vsc.open':'Otwórz w edytorze', 'vsc.notOnMap':'Tego elementu nie ma na mapie: '});
   I.extend('en', {'vsc.open':'Open in editor', 'vsc.notOnMap':'Not on the map: '});
-  const post=(m)=>{ try{ vscode.postMessage(m); }catch(e){} };
+  const post=(m)=>{ try{ vscode.postMessage(m); }catch(e){ /* panel webview zamknięty — brak odbiorcy */ } };
 
   // węzeł → {path, line?}: plik = jego ścieżka; symbol (tree-sitter) = plik-rodzic + linia definicji
   function target(n){

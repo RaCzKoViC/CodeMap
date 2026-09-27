@@ -27,7 +27,7 @@
   let job=null;
   const PILL=CM.UIKit.pill(T('pr.cancel','Anuluj'), ()=>cancel());
   const pill=(t)=>PILL.show(t), hidePill=()=>PILL.hide();
-  function cancel(){ if(job){ try{ job.ctrl.abort(); }catch(e){} job=null; } hidePill(); }
+  function cancel(){ if(job){ try{ job.ctrl.abort(); }catch(e){ /* analiza już przerwana */ } job=null; } hidePill(); }
   const tokenFor=CM.UIKit.repoToken;
   function stripSub(files, sub){
     const P0=String(sub||'').replace(/^\/+|\/+$/g,''); if(!P0) return files; const pre=P0+'/';
@@ -66,7 +66,7 @@
       risk:res.risk, level:res.level, changed:res.changed, outside:res.outside, impacted:[...res.impacted.entries()], direct:res.direct,
       reviewers:res.reviewers, add:res.add, del:res.del, files, truncated:!!(extra&&extra.truncated), at:Date.now()};
     A.refreshView();
-    try{ OV.set('pr'); }catch(e){}
+    try{ OV.set('pr'); }catch(e){ /* nakładka niedostępna — zostaje bieżąca */ }
     return g.prInfo;
   }
   // historia git doszła (albo zmieniła się) → przelicz ryzyko tego samego PR
@@ -151,9 +151,8 @@
   const PART_ORDER=['churn','complexity','dependents','tests','size','familiarity'];
   function partBars(parts){ const box=el('div',{class:'git-authors'});
     for(const k of PART_ORDER){ if(parts[k]==null) continue; const v=parts[k];
-      box.appendChild(el('div',{class:'bar-row'}, el('span',{class:'bl',text:T('pr.p.'+k,{churn:'częste zmiany', complexity:'złożoność', dependents:'zależni', tests:'słabe testy', size:'rozmiar zmiany', familiarity:'nowy obszar autora'}[k])}),
-        el('div',{class:'bar-track'}, el('div',{class:'bar-fill',style:'width:'+Math.max(3,Math.round(v*100))+'%;background:'+OV.ramp(RISK)(v)})),
-        el('span',{class:'bv',text:Math.round(v*100)+'%'}))); }
+      box.appendChild(CM.UIKit.barRow(T('pr.p.'+k,{churn:'częste zmiany', complexity:'złożoność', dependents:'zależni', tests:'słabe testy', size:'rozmiar zmiany', familiarity:'nowy obszar autora'}[k]),
+        Math.max(3,Math.round(v*100)), OV.ramp(RISK)(v), Math.round(v*100)+'%')); }
     return box; }
   function riskTag(level, risk){ return el('span',{class:'tag pr-risk',style:'border-color:'+LEVEL_COL[level]+';color:'+LEVEL_COL[level],text:T('pr.risk','ryzyko')+' '+levelText(level)+' · '+risk}); }
   function projectCard(g){
@@ -171,10 +170,9 @@
     if(pi.reviewers.length) sec.appendChild(el('div',{class:'git-owner'}, el('span',{class:'muted small',text:T('pr.reviewers','Sugerowani recenzenci')+': '}), el('b',{text:pi.reviewers.slice(0,3).map(r=>r.login?('@'+r.login):r.name).join(', ')})));
     if(pi.changed.length){ sec.appendChild(el('div',{class:'muted small pr-sub',text:T('pr.top','Najbardziej ryzykowne zmiany')}));
       const list=el('div',{class:'git-authors'});
-      for(const c of pi.changed.slice(0,6)) list.appendChild(el('div',{class:'bar-row pr-file',title:c.path,onclick:()=>A.focusNode(c.id)},
+      for(const c of pi.changed.slice(0,6)) list.appendChild(CM.UIKit.barRow(
         el('span',{class:'bl'}, el('span',{class:'pr-st',style:'background:'+ST_COL[c.status],text:c.status}), el('span',{text:c.path.split('/').pop()})),
-        el('div',{class:'bar-track'}, el('div',{class:'bar-fill',style:'width:'+Math.max(3,c.risk)+'%;background:'+OV.ramp(RISK)(c.risk/100)})),
-        el('span',{class:'bv',text:String(c.risk)})));
+        Math.max(3,c.risk), OV.ramp(RISK)(c.risk/100), String(c.risk), {class:'bar-row pr-file',title:c.path,onclick:()=>A.focusNode(c.id)}));
       sec.appendChild(list); }
     const acts=el('div',{class:'git-acts'});
     acts.appendChild(el('button',{class:'tb-btn',text:T('pr.copyMd','Kopiuj raport (Markdown)'),onclick:()=>copy(markdown(g))}));

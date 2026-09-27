@@ -1,6 +1,6 @@
 /* Sejf/Ulubione w chmurze: serwer przechowuje wyłącznie szyfrogram (enc:true wymuszone). */
 import { db, now } from './db.js';
-import { handleUpload, deleteBlob, sendBlob, bumpUsage } from './blobs.js';
+import { handleUpload, sendRowBlob, deleteRowBlob } from './blobs.js';
 import { sha256hex } from './util.js';
 
 const ALBUMS = new Set(['vault', 'fav']);
@@ -44,7 +44,7 @@ export async function registerVault(app) {
     const album = albumOf(req, reply); if (!album) return;
     const { json, updatedAt } = req.body || {};
     let parsed = null;
-    try { parsed = JSON.parse(json); } catch (e) {}
+    try { parsed = JSON.parse(json); } catch (e) { /* nie-JSON → odrzucone niżej jako 'plain' */ }
     // Chmura przyjmuje wyłącznie albumy zaszyfrowane — serwer nigdy nie widzi treści plików.
     if (!parsed || parsed.enc !== true) return reply.code(400).send({ error: 'plain' });
     q.putMeta.run(req.user.id, album, String(json).slice(0, 8192), Number(updatedAt) || now());
@@ -56,7 +56,7 @@ export async function registerVault(app) {
     const name = fileName(req, reply); if (!name) return;
     const meta = q.getMeta.get(req.user.id, album);
     let enc = false;
-    try { enc = JSON.parse(meta?.meta_json || '{}').enc === true; } catch (e) {}
+    try { enc = JSON.parse(meta?.meta_json || '{}').enc === true; } catch (e) { /* uszkodzone meta = nie zaszyfrowany → 400 */ }
     if (!enc) return reply.code(400).send({ error: 'plain' });
     const cur = q.getFile.get(req.user.id, album, name);
     const rel = `${req.user.id}/${album}/${sha256hex(name)}.bin`;
@@ -70,18 +70,13 @@ export async function registerVault(app) {
     const album = albumOf(req, reply); if (!album) return;
     const name = fileName(req, reply); if (!name) return;
     const row = q.getFile.get(req.user.id, album, name);
-    if (!row) return reply.code(404).send({ error: 'notfound' });
-    return sendBlob(reply, row.blob_path, { 'x-cm-mtime': row.mtime });
+    return sendRowBlob(reply, row, (r) => ({ 'x-cm-mtime': r.mtime }));
   });
 
   app.delete('/api/vault/:album/files/:name', auth, async (req, reply) => {
     const album = albumOf(req, reply); if (!album) return;
     const name = fileName(req, reply); if (!name) return;
     const row = q.getFile.get(req.user.id, album, name);
-    if (!row) return reply.code(404).send({ error: 'notfound' });
-    q.delFile.run(req.user.id, album, name);
-    bumpUsage(req.user.id, -row.size_bytes);
-    await deleteBlob(row.blob_path);
-    return { ok: true };
+    return deleteRowBlob(reply, req.user.id, row, () => q.delFile.run(req.user.id, album, name));
   });
 }
