@@ -161,7 +161,9 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - ✅ Trend zdrowia w czasie: `codemap analyze --history N` (`cli/history.mjs`: N commitów równo na historii pierwszego
   rodzica, drzewa z `.git` przez `GitLocal.snapshot` bez checkoutu, analiza bez reguł historii git i pokrycia; tabela,
   `history` w JSON, sekcja w Markdown). Na CodeMap: 44 → 55 w 93 commitach. Zostaje wykres w aplikacji.
-- Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami.
+- ✅ Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami: `js/dsm.js` (jednostki = pakiety z
+  manifestów, `graph.packages` w zapisie mapy, albo foldery; SCC + kolejność dostawcy → konsumenci), okno `js/dsm-ui.js`
+  (Projekt → Macierz zależności, klik w komórkę = pary importów), reguła `pkgcycle` (wysoka), akcja `dependencyMatrix`.
 - CODEOWNERS a rzeczywista własność z git (rozjazdy, pliki bez właściciela).
 - Podatne zależności (OSV.dev, tylko nazwy i wersje pakietów, opcjonalnie).
 

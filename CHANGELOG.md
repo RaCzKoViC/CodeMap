@@ -32,6 +32,12 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   bez checkoutu i bez binarki git), analiza jak dla folderu (te same reguły wczytywania — `acceptPath` w fsload.mjs,
   graf, testy ↔ kod, Inspect) bez reguł historii git i pokrycia, żeby punkty były porównywalne. Tabela z paskami w
   podsumowaniu, `history` w `--json`, sekcja w `--md` z największymi zmianami reguł. Na CodeMap: 44 → 55 (93 commity).
+- **Macierz zależności (DSM) i pakiety monorepo** (`js/dsm.js` + `js/dsm-ui.js`): jednostki = pakiety z manifestów
+  (package.json, Cargo.toml, go.mod, pubspec.yaml i nowo pyproject.toml; plik należy do najgłębszego pakietu; lista w
+  `graph.packages`, zachowywana w zapisie mapy) albo foldery poziomu 1/2; kolejność po silnie spójnych składowych —
+  dostawcy u góry, konsumenci niżej — więc zależności leżą pod przekątną, a komórki nad nią (czerwone) to cykle. Okno
+  Projekt → Macierz zależności: wybór jednostek, klik w komórkę = pary importów + podświetlenie plików, klik w wiersz =
+  pliki jednostki. Reguła Inspect **„cykle między pakietami"** (wysoka, także w CLI/SARIF) i akcja ChatBota `dependencyMatrix`.
 - **Reguła Inspect „ukryte sprzężenie zmian"**: pliki kodu zmieniane razem w ≥ 50 % commitów (min. 5 wspólnych) bez
   importu w żadną stronę; bez testów (test ↔ kod zmieniają się razem z natury). Trafia też do CLI, SARIF i komentarza PR.
 

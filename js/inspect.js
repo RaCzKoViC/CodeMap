@@ -19,6 +19,7 @@ CM.Inspect = (function(){
     'clickHint':'Kliknij pozycję, aby pokazać element na mapie.',
     'and':'…i {n} więcej','loc':'linii','deps':'zależności','ln':'w ok. {n} miejscach',
     'r.cycles':'Cykle zależności','r.cycles.d':'Pliki importujące się nawzajem (bezpośrednio lub przez łańcuch) — utrudniają testowanie i refaktoryzację.',
+    'r.pkgcycle':'Cykle między pakietami','r.pkgcycle.d':'Pakiety monorepo (package.json, Cargo.toml, go.mod, pubspec, pyproject) zależne od siebie nawzajem — nie da się ich wydać, zbudować ani przetestować osobno. Widać je nad przekątną macierzy zależności (Projekt → Macierz zależności).',
     'r.god':'God-file (hub o zbyt wielu połączeniach)','r.god.d':'Plik powiązany z nienaturalnie dużą liczbą innych — zmiana w nim dotyka wszystkiego.',
     'r.fanout':'Zbyt wiele zależności wychodzących','r.fanout.d':'Plik importuje bardzo dużo modułów — prawdopodobnie robi zbyt wiele naraz.',
     'r.unstable':'Niestabilny hub (duży fan-in i fan-out)','r.unstable.d':'Wiele plików od niego zależy, a on sam zależy od wielu — najbardziej ryzykowne miejsce na zmiany.',
@@ -55,6 +56,7 @@ CM.Inspect = (function(){
     'clickHint':'Click an item to reveal it on the map.',
     'and':'…and {n} more','loc':'lines','deps':'deps','ln':'~{n} places',
     'r.cycles':'Dependency cycles','r.cycles.d':'Files importing each other (directly or via a chain) — hard to test and refactor.',
+    'r.pkgcycle':'Cycles between packages','r.pkgcycle.d':'Monorepo packages (package.json, Cargo.toml, go.mod, pubspec, pyproject) depending on each other — they cannot be released, built or tested separately. They show above the diagonal of the dependency matrix (Project → Dependency matrix).',
     'r.god':'God-file (over-connected hub)','r.god.d':'A file linked to an unnaturally high number of others — changing it touches everything.',
     'r.fanout':'Too many outgoing dependencies','r.fanout.d':'The file imports a lot of modules — it probably does too much at once.',
     'r.unstable':'Unstable hub (high fan-in AND fan-out)','r.unstable.d':'Many files depend on it while it depends on many — the riskiest place to change.',
@@ -96,7 +98,7 @@ CM.Inspect = (function(){
   // real programming languages only — manifests/docs/styles being "orphans" is normal, not a smell
   const CODE_RE=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte|py|java|go|rb|php|cs|cpp|cxx|cc|c|h|hpp|rs|kt|kts|swift|scala|dart|lua|pl|r|jl|ex|exs|erl|hs|ml|fs|clj|groovy|zig|nim|v|sol)$/i;
   // kolejność reguł w raporcie (= wszystkie identyfikatory reguł; CLI waliduje nimi --fail-on)
-  const ORDER=['archviolation','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+  const ORDER=['archviolation','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
 
   // returns {findings:[{rule,sev,items:[{id,name,path,detail,sev,related?}],count}], score, files, ms}
   // item.sev = ważność tej pozycji (f.sev = pierwszej; liczy się do wyniku), related = id powiązanych węzłów (SARIF)
@@ -227,6 +229,15 @@ CM.Inspect = (function(){
       }
       if(pairs.length>LIMIT){ const f=F.get('dupcode'); if(f) f.count=pairs.length; }
     }catch(e){} }
+
+    // ---- cykle między pakietami monorepo (CM.DSM: składowe grafu pakietów) ----
+    if(CM.DSM && CM.DSM.packageCycles){ try{
+      for(const c of CM.DSM.packageCycles(graph).slice(0,LIMIT)){
+        const nodeOf=(u)=>graph.nodes.get(u.dir||'__root__')||graph.root;
+        const names=c.slice(0,5).map(u=>u.name).join(' → ')+' → '+c[0].name;
+        add(F,'pkgcycle','high',nodeOf(c[0]), names+(c.length>5?' …':'')+'  ('+c.length+')', c.slice(1).map(u=>nodeOf(u).id));
+      }
+    }catch(e){ /* brak pakietów w starszej mapie — reguła pominięta */ } }
 
     // ---- dependency cycles (reuse the graph's Tarjan) ----
     try{ const res=graph.importCycles();

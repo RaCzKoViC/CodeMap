@@ -74,6 +74,9 @@ Click **“✨ See demo”** or open `index.html#demo`.
   imports become edges. 12 grammars (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsed
   in a Web Worker; double-click a file to expand its symbols — while files are collapsed, calls connect the files.
 - Graph: neighbors, upstream and downstream **dependency impact**, **cycles** (Tarjan SCC), signatures for comparisons.
+- **Dependency matrix (DSM)** — Project → Dependency matrix: monorepo packages (package.json, Cargo.toml, go.mod, pubspec,
+  pyproject) or folders (level 1/2) ordered providers → consumers, so healthy dependencies sit below the diagonal and red
+  cells above it are cycles; a click shows the import pairs and highlights the files. Inspect rule **Cycles between packages**.
 - **Checked against the ecosystems' own tools**: `npm run corpus` compares CodeMap's import edges on pinned releases of
   Express, Preact, ky, petite-vue, Flask and Gin with esbuild (JS/TS), grimp (Python) and `go list` (Go) — precision and
   recall per repository, a CI job fails below 97 %. Today: 100 % / 100 %. TypeScript `import type` edges are marked `typeOnly`.
@@ -291,6 +294,7 @@ js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddi
 js/agent.js                # agent loop: read-only tools (codeSearch, readFile, dependents…), native tool_calls or JSON in text
 js/doctor.js  js/doctor-ui.js   # hotspot doctor: file record + prompt (pure), file-panel section and hotspotDoctor action
 js/cochange.js                  # change coupling (GitCore.coupling): "changes together with" panel section, changeCoupling action
+js/dsm.js  js/dsm-ui.js         # packages and dependency matrix: units, providers → consumers order, cycles (pure) + the DSM window
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

@@ -9,6 +9,7 @@ CM.Graph = (function(){
       this.edges = [];
       this.externals = new Map();
       this.depVersions = new Map();   // dependency name -> {version, source} from manifests
+      this.packages = [];              // pakiety z manifestów (package.json, Cargo.toml, go.mod, pubspec, pyproject) — CM.DSM
       this.langStats = new Map();
       this.meta = {name:'projekt', source:'', createdAt:Date.now()};
       this.root = {id:'__root__', type:'folder', name:'projekt', path:'', parent:null,
@@ -63,6 +64,9 @@ CM.Graph = (function(){
       // import / reference edges (with tsconfig/jsconfig path-alias resolution)
       const all = Array.from(this.nodes.values());
       const {edges, externals} = A.buildEdges(all, manifests);
+      // pakiety (monorepo): nazwa, ekosystem, katalog — jednostki widoku pakietów / macierzy zależności (CM.DSM)
+      this.packages = manifests.filter(m=>m && m.kind==='package' && m.name).map(m=>({name:m.name, eco:m.eco||'npm', dir:A.normPath(m.dir||'')}))
+        .sort((a,b)=>(a.dir<b.dir?-1:a.dir>b.dir?1:0));
       for(const e of edges) this.edges.push(e);
       this.externals = externals;
 
@@ -363,6 +367,7 @@ CM.Graph = (function(){
       return {
         format:'codemap', version:2, meta:this.meta,
         gitInfo:this.gitInfo||undefined, testInfo:this.testInfo||undefined, prInfo:this.prInfo||undefined, tour:this.tour||undefined,
+        packages:this.packages&&this.packages.length?this.packages:undefined,
         nodes, edges:this.edges.filter(e=>e.type!=='contains').map(e=>(e.typeOnly ? {source:e.source,target:e.target,type:e.type,typeOnly:true} : {source:e.source,target:e.target,type:e.type})),
       };
     }
@@ -400,6 +405,7 @@ CM.Graph = (function(){
       g._computeImportDegrees();
       g._restoreSymbols();
       g.computeAggregates();
+      g.packages=Array.isArray(obj.packages)?obj.packages.filter(p=>p&&typeof p.name==='string'&&typeof p.dir==='string').map(p=>({name:p.name, eco:String(p.eco||'npm'), dir:p.dir})):[];
       g.gitInfo=obj.gitInfo||null; g.testInfo=obj.testInfo||null; g.prInfo=obj.prInfo||null; g.tour=(obj.tour && Array.isArray(obj.tour.steps))?obj.tour:null;
       return g;
     }

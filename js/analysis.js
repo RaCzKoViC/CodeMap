@@ -337,6 +337,14 @@ CM.Analysis = (function(){
       if(n === 'pubspec.yaml' || n === 'pubspec.yml'){   // name: app → `package:app/x.dart` → lib/x.dart
         const m = /^name:[ \t]*["']?([\w-]+)/m.exec(content); return m ? {kind:'package', eco:'dart', dir, name:m[1]} : null;
       }
+      if(n === 'pyproject.toml'){   // [project] name = "x" (PEP 621) albo [tool.poetry] name — pakiet dla widoku pakietów
+        let sec = '';
+        for(const line of content.split(/\r?\n/)){ const t = line.trim();
+          if(t.startsWith('[')){ sec = t; continue; }
+          if(sec === '[project]' || sec === '[tool.poetry]'){ const m = /^name[ \t]*=[ \t]*["']([^"']+)["']/.exec(t); if(m) return {kind:'package', eco:'pip', dir, name:m[1]}; }
+        }
+        return null;
+      }
       if(n === 'go.mod'){   // module github.com/a/b → import "github.com/a/b/x" = katalog x obok go.mod
         const m = /^[ \t]*module[ \t]+["']?([^\s"']+)/m.exec(content); return m ? {kind:'package', eco:'go', dir, name:m[1]} : null;
       }

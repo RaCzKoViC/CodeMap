@@ -74,6 +74,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   jako krawędzie. 12 gramatyk (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsowanie
   w Web Workerze; dwuklik na pliku rozwija jego symbole, przy zwiniętych plikach wywołania łączą pliki.
 - Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
+- **Macierz zależności (DSM)** — Projekt → Macierz zależności: pakiety monorepo (package.json, Cargo.toml, go.mod, pubspec,
+  pyproject) albo foldery (poziom 1/2) w kolejności dostawcy → konsumenci, więc zdrowe zależności leżą pod przekątną,
+  a czerwone komórki nad nią to cykle; klik pokazuje pary importów i podświetla pliki. Reguła Inspect **cykle między pakietami**.
 - **Sprawdzane narzędziami samych ekosystemów**: `npm run corpus` porównuje krawędzie importów CodeMap na przypiętych
   wydaniach Express, Preact, ky, petite-vue, Flask i Gin z esbuildem (JS/TS), grimp (Python) i `go list` (Go) — precyzja
   i kompletność per repozytorium, zadanie CI pada poniżej 97 %. Dziś: 100 % / 100 %. Krawędzie z `import type` (TS) mają flagę `typeOnly`.
@@ -290,6 +293,7 @@ js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi O
 js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSearch, readFile, dependents…), tool_calls albo JSON w treści
 js/doctor.js  js/doctor-ui.js   # Doktor hotspotów: kartoteka pliku + prompt (czyste), sekcja w panelu pliku i akcja hotspotDoctor
 js/cochange.js                  # sprzężenie zmian (GitCore.coupling): sekcja „Zmieniany razem z" w panelu, akcja changeCoupling
+js/dsm.js  js/dsm-ui.js         # pakiety i macierz zależności: jednostki, kolejność dostawcy → konsumenci, cykle (czyste) + okno DSM
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

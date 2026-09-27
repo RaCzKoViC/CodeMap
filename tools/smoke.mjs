@@ -492,6 +492,30 @@ const cochangeRes = await evalJs(`(async()=>{ try{
 check(cochangeRes && !cochangeRes.error && cochangeRes.sec && cochangeRes.rows === 2 && cochangeRes.hidden === 1 && cochangeRes.b
   && /b\.js \(100 %, 6, bez importu\)/.test(cochangeRes.chat) && /c\.js \(100 %, 6\)/.test(cochangeRes.chat) && cochangeRes.rule === 2,
   `sprzężenie zmian: panel „Zmieniany razem z", „bez importu", reguła Inspect, akcja ChatBota: ${JSON.stringify(cochangeRes)}`);
+// macierz zależności (faza 10): monorepo z cyklem @m/core ↔ @m/ui → pozycja w menu, okno z macierzą, czerwona komórka
+// nad przekątną, klik → pary importów i podświetlenie; reguła Inspect pkgcycle; akcja ChatBota dependencyMatrix
+const dsmRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const F=(p,c)=>({path:p,size:c.length,content:c,mtime:Date.now()});
+  await CMApp.loadFiles([F('package.json','{"name":"m"}'), F('core/package.json','{"name":"@m/core"}'), F('ui/package.json','{"name":"@m/ui"}'), F('web/package.json','{"name":"@m/web"}'),
+    F('core/a.js',"import { f } from '../ui/f.js';\\nexport const a = 1;\\n"), F('ui/f.js',"import { a } from '../core/a.js';\\nexport const f = a;\\n"),
+    F('web/app.js',"import { a } from '../core/a.js';\\nimport { f } from '../ui/f.js';\\n")], {name:'dsm-demo', source:'smoke'});
+  for(let i=0;i<50;i++){ if(CMApp.graph&&CMApp.graph.meta&&CMApp.graph.meta.name==='dsm-demo'&&CMApp.graph.nodes.size>6) break; await sleep(100); }
+  const menu=!!document.getElementById('btn-dsm');
+  document.getElementById('btn-dsm').click(); await sleep(250);
+  const body=document.getElementById('dsm-body'), rows=body.querySelectorAll('th.dsm-row').length, up=body.querySelectorAll('td.up');
+  if(up[0]) up[0].click(); await sleep(150);
+  const pairs=body.querySelectorAll('.dsm-pair').length, hi=CM.App.renderer.highlight?CM.App.renderer.highlight.size:null;
+  const cyc=body.querySelectorAll('th.dsm-row.cyc').length;
+  document.querySelector('#modal-dsm .modal-x').click();
+  const chat=CMApp.exec('dependencyMatrix',{});
+  const rep=await CM.Inspect.run(CMApp.graph), pc=rep.findings.find(f=>f.rule==='pkgcycle');
+  document.querySelector('#modal-dsm .modal-x').click();
+  return {menu, rows, up:up.length, pairs, hi, cyc, chat:String(chat), rule:pc?pc.count:0};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(dsmRes && !dsmRes.error && dsmRes.menu && dsmRes.rows === 4 && dsmRes.up === 1 && dsmRes.pairs === 1 && dsmRes.hi === 2 && dsmRes.cyc === 2
+  && /@m\/core ↔ @m\/ui/.test(dsmRes.chat) && dsmRes.rule === 1,
+  `macierz zależności: menu, okno, cykl nad przekątną, pary importów, reguła pkgcycle, akcja ChatBota: ${JSON.stringify(dsmRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

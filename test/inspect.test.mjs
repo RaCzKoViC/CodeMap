@@ -59,6 +59,16 @@ describe('Inspect: ryzyko, pliki generowane, cykle', () => {
     assert.equal(c.count, 1);
     assert.ok(['src/a.js', 'src/b.js'].includes(c.items[0].path));
   });
+  test('cykl między pakietami monorepo → „pkgcycle" (wysoka) na folderze pakietu; bez cyklu pakietów — brak', async () => {
+    const pk = [F('p1/package.json', '{ "name": "p1" }'), F('p2/package.json', '{ "name": "p2" }')];
+    const res = await run([...pk, F('p1/a.js', "import { b } from '../p2/b.js';\nexport const a = 1;\n"), F('p2/b.js', "import { a } from '../p1/a.js';\nexport const b = 2;\n")]);
+    const p = rule(res, 'pkgcycle');
+    assert.equal(p.sev, 'high'); assert.equal(p.count, 1);
+    assert.equal(p.items[0].path, 'p1'); assert.deepEqual(p.items[0].related, ['p2']);
+    assert.match(p.items[0].detail, /^p1 → p2 → p1/);
+    const ok = await run([...pk, F('p1/a.js', "import { b } from '../p2/b.js';\n"), F('p2/b.js', 'export const b = 2;\n')]);
+    assert.equal(rule(ok, 'pkgcycle'), undefined);
+  });
 });
 
 describe('Inspect: ukryte sprzężenie zmian', () => {
