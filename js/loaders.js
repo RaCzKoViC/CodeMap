@@ -206,6 +206,56 @@ CM.Loaders = (function(){
     });
   }
 
+  // ---------- pliki „boczne": katalog .git i raporty pokrycia ----------
+  // Nie są częścią mapy (SKIP pomija .git/ i coverage/), ale z nich korzystają historia git (git-local.js)
+  // i nakładka pokrycia testami. Trzymamy tylko uchwyty File — nic nie jest czytane przy wczytywaniu.
+  // side = {git:[{path (względem .git/), file}] | null, gitFile:File|null (.git jako plik = worktree),
+  //         coverage:[{path, file}], gitEntry / coverageEntries (upuszczenie: katalogi czytane leniwie)}
+  const RE_COVERAGE=/(^|\/)(lcov\.info|[\w.-]*\.lcov|coverage-final\.json|coverage-summary\.json|cobertura(-coverage)?\.xml|coverage\.xml|jacoco\.xml|clover\.xml)$/i;
+  function newSide(){ return {git:null, gitFile:null, coverage:[], gitEntry:null, coverageEntries:[]}; }
+  function sideFromFiles(allFiles, stripRoot){
+    const side=newSide();
+    for(const f of allFiles){
+      let rel=f.webkitRelativePath||f.name;
+      if(stripRoot && rel.startsWith(stripRoot)) rel=rel.slice(stripRoot.length);
+      if(rel.startsWith('.git/')){ (side.git||(side.git=[])).push({path:rel.slice(5), file:f}); continue; }
+      if(rel==='.git'){ side.gitFile=f; continue; }
+      if(RE_COVERAGE.test(rel) && !/(^|\/)(node_modules|\.git)\//.test(rel) && rel.split('/').length<=5) side.coverage.push({path:rel, file:f});
+    }
+    return side;
+  }
+  // wszystkie pliki katalogu z upuszczenia (FileSystemDirectoryEntry), ścieżki względem niego
+  async function collectEntryFiles(dirEntry, maxDepth){
+    const out=[];
+    const walk=(entry, prefix, depth)=>new Promise(resolve=>{
+      if(entry.isFile){ entry.file(file=>{ out.push({path:prefix+entry.name, file}); resolve(); }, ()=>resolve()); return; }
+      if(!entry.isDirectory || depth>maxDepth){ resolve(); return; }
+      const reader=entry.createReader(), all=[];
+      const batch=()=>reader.readEntries(async ents=>{
+        if(!ents.length){ for(const e of all) await walk(e, prefix+entry.name+'/', depth+1); resolve(); return; }
+        all.push(...ents); batch();
+      }, ()=>resolve());
+      batch();
+    });
+    const reader=dirEntry.createReader(), top=[];
+    await new Promise(resolve=>{ const batch=()=>reader.readEntries(ents=>{ if(!ents.length){ resolve(); return; } top.push(...ents); batch(); }, ()=>resolve()); batch(); });
+    for(const e of top) await walk(e, '', 1);
+    return out;
+  }
+  // rozwiązuje leniwe katalogi z upuszczenia; wynik zapamiętany w side
+  async function resolveSide(side){
+    if(!side) return newSide();
+    if(side.gitEntry && !side.git){ side.git=await collectEntryFiles(side.gitEntry, 64); side.gitEntry=null; }
+    if(side.coverageEntries && side.coverageEntries.length){
+      for(const ce of side.coverageEntries){
+        const fs=await collectEntryFiles(ce, 4);
+        for(const x of fs){ const p=ce.name+'/'+x.path; if(RE_COVERAGE.test(p)) side.coverage.push({path:p, file:x.file}); }
+      }
+      side.coverageEntries=[];
+    }
+    return side;
+  }
+
   // ---------- from <input> FileList (folder or files) ----------
   const isSpecial=(n)=>RE_ARCHIVE.test(n)||RE_PDF.test(n)||RE_UNSUPPORTED.test(n);
   async function fromFileList(fileList, onProgress){
@@ -246,15 +296,16 @@ CM.Loaders = (function(){
     const {files:specialOut, warnings}=await _expandSpecialFiles(special, ()=>{ if(onProgress) onProgress(++done, total); });
 
     const combined=[...regularOut.filter(Boolean),...specialOut];
-    return {files:combined, meta:{name:projName, source:'local: '+projName, kind:'local', createdAt:Date.now(), warnings}};
+    return {files:combined, meta:{name:projName, source:'local: '+projName, kind:'local', createdAt:Date.now(), warnings}, side:sideFromFiles(allFiles, stripRoot)};
   }
 
   // ---------- from drag & drop: entries/files must be captured SYNCHRONOUSLY by the caller ----------
   async function fromDrop(entries, files, onProgress){
     if(entries && entries.length){
-      const collected=[];
+      const collected=[], side=newSide();
       let rootName = entries.length===1 ? entries[0].name : 'upuszczone';
-      for(const ent of entries) await walkEntry(ent, '', collected, rootName);
+      for(const ent of entries) await walkEntry(ent, '', collected, rootName, side);
+      for(const c of collected) if(RE_COVERAGE.test(c.path)) side.coverage.push({path:c.path, file:c.file});
       const specials=collected.filter(c=>isSpecial(c.file.name));
       const plain=collected.filter(c=>!isSpecial(c.file.name));
       // single PDF dropped alone -> its internal structure as the whole project
@@ -271,7 +322,7 @@ CM.Loaders = (function(){
       const {files:specialOut, warnings}=await _expandSpecialFiles(specials.map(c=>c.file), ()=>{ if(onProgress) onProgress(++done, total); });
       const combined=[...out.filter(Boolean), ...specialOut];
       if(combined.length)
-        return {files:combined, meta:{name:rootName, source:'upuszczone: '+rootName, kind:'local', createdAt:Date.now(), warnings}};
+        return {files:combined, meta:{name:rootName, source:'upuszczone: '+rootName, kind:'local', createdAt:Date.now(), warnings}, side};
     }
     // fallback: plain dropped files (no directory entries available)
     return fromFileList(files||[], onProgress);
@@ -282,20 +333,27 @@ CM.Loaders = (function(){
     const entries=items.map(i=> i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
     return fromDrop(entries, Array.from(dt.files||[]), onProgress);
   }
-  function walkEntry(entry, prefix, out, rootName){
+  function walkEntry(entry, prefix, out, rootName, side){
+    const depth=prefix?prefix.split('/').length:0;   // 1 = bezpośrednio w upuszczonym folderze
     return new Promise(resolve=>{
       if(entry.isFile){
         entry.file(file=>{
           const path = prefix ? prefix+'/'+file.name : file.name;
-          if(!shouldSkip(path)) out.push({path, file});
+          if(side && file.name==='.git' && depth<=1) side.gitFile=file;   // worktree: .git jako plik „gitdir: …"
+          else if(!shouldSkip(path)) out.push({path, file});
           resolve();
         }, ()=>resolve());
       } else if(entry.isDirectory){
-        if(shouldSkip(entry.name)){ resolve(); return; }
+        if(shouldSkip(entry.name)){
+          // .git w korzeniu projektu i katalogi coverage/ — zapamiętane do leniwego odczytu (resolveSide)
+          if(side && entry.name==='.git' && depth<=1 && !side.gitEntry) side.gitEntry=entry;
+          else if(side && /^coverage$/i.test(entry.name) && depth<=3) side.coverageEntries.push(entry);
+          resolve(); return;
+        }
         const reader=entry.createReader(); const all=[];
         const readBatch=()=> reader.readEntries(async ents=>{
           if(!ents.length){
-            for(const e of all) await walkEntry(e, prefix? prefix+'/'+entry.name : entry.name, out, rootName);
+            for(const e of all) await walkEntry(e, prefix? prefix+'/'+entry.name : entry.name, out, rootName, side);
             resolve(); return;
           }
           all.push(...ents); readBatch();
@@ -586,5 +644,5 @@ CM.Loaders = (function(){
     const j=await r.json(); return {url:j.html_url, id:j.id};
   }
 
-  return {fromFileList, fromDrop, fromDataTransfer, fromGitHub, fromGitLab, fromBitbucket, fromRepoURL, repoHost, parseSource, isTextFile, shouldSkip, fetchRefs, fetchTreeSig, ghRateLimit, createGist, mistralChat, mistralStream};
+  return {resolveSide, RE_COVERAGE, fromFileList, fromDrop, fromDataTransfer, fromGitHub, fromGitLab, fromBitbucket, fromRepoURL, repoHost, parseSource, isTextFile, shouldSkip, fetchRefs, fetchTreeSig, ghRateLimit, createGist, mistralChat, mistralStream};
 })();

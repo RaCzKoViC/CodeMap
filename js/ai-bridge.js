@@ -216,6 +216,7 @@
       theme: document.body.classList.contains('light')?'light':'dark',
       lang: I.getLang(),
       impactView: !!A.impactOn,
+      coloring: CM.Overlays?CM.Overlays.current():'lang', colorings: CM.Overlays?CM.Overlays.list().map(o=>o.id):[],
       selected: sel?{name:_pn(sel.name), path:_pn(sel.path)||null, type:sel.type}:null,
       availableLayouts: CB_LAYOUTS,
       mindmap: (CM.MindMap&&CM.MindMap.isActive&&CM.MindMap.isActive())?{nodes:(CM.MindMap.nodeCount?CM.MindMap.nodeCount():0), name:_pn(CM.MindMap.mapName?CM.MindMap.mapName():'')}:null,
@@ -349,8 +350,14 @@
       case 'symbols': { _needProject(); const on=!(args.on===false||args.on==='false'||args.on===0); const cb=$('#show-symbols');
         if(cb){ cb.checked=on; cb.dispatchEvent(new Event('change',{bubbles:true})); }
         return on?I.t('cb.execSymOn','Włączono symbole (tree-sitter) — analiza w tle.'):I.t('cb.execSymOff','Ukryto symbole.'); }
+      case 'colorBy': { _needProject(); const m=String(args.mode||args.by||'').trim();
+        if(!CM.Overlays) throw new Error(I.t('cb.noOverlays','Kolorowanie niedostępne.'));
+        const ids=CM.Overlays.list().map(o=>o.id);
+        if(!m) throw new Error(I.t('cb.needMode','Podaj tryb kolorowania: ')+ids.join(', '));
+        const lbl=CM.Overlays.set(m); return I.t('cb.execColorBy','Kolorowanie: ')+lbl; }
       case 'help': case 'listActions': return I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', ');
-      default: throw new Error(I.t('cb.unknownAction','Nieznana akcja: ')+action+'. '+I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', '));
+      default: if(EXT[action]) return EXT[action](args);
+        throw new Error(I.t('cb.unknownAction','Nieznana akcja: ')+action+'. '+I.t('cb.execHelp','Dostępne akcje: ')+CB_ACTIONS.join(', '));
     }
   }
   // canonical action list — also injected into the ChatBot system prompt so the model knows the full API
@@ -359,11 +366,19 @@
     'openSettings','openDrive','openHistory','openCompare','saveMap','snapshot','exportImage','exportGraph','copyLink','detectCycles',
     'hotspots','inspect','aiAnalyze','setTheme','setPreset','setAccent','setBackground','setGlass','setSpacing','setNodeScale','setFontScale',
     'renderOption','resetAppearance','togglePanel','setLang','startTutorial','mindmap','installPWA','help',
-    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat','symbols'];
+    'stats','topFiles','findText','listLang','dependsOn','dependencies','explain','clearChat','symbols','colorBy'];
+  // akcje dopisywane przez moduły ładowane po ai-bridge (git.js, testmap.js…): wykonanie + wpis w ChatBocie
+  //   A.registerAction({name, run(args)->tekst, sig, desc (EN, dla modelu), descPl, auto, info, required(args)->bool})
+  const EXT={};
+  function registerAction(o){
+    if(!o||!o.name||typeof o.run!=='function') return;
+    EXT[o.name]=o.run; if(CB_ACTIONS.indexOf(o.name)<0) CB_ACTIONS.push(o.name);
+    if(CM.ChatBot&&CM.ChatBot.addTool) CM.ChatBot.addTool(o);
+  }
 
   Object.assign(A, {
     paletteCommands, buildPalette, aiStructureSummary, aiKeyList, aiModel, aiConfigured, aiGuard, aiChat,
     aiAnalyze, aiAsk, aiAskNode, demoFiles, loadDemo, appState, _cb, _needProject,
-    exec,
+    exec, registerAction,
   });
 })();

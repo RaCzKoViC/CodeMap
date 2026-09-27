@@ -348,6 +348,20 @@ body.light .code-preview,body.light .fv-codewrap{background:#0d1320;color:#aebac
 .lang-row .lcount{color:var(--text-mute);font-family:var(--mono);font-size:11px}
 .lang-row.off{opacity:.4}
 .lang-row.off .lname{text-decoration:line-through}
+/* nakładki kolorów (overlays.js): legenda pod „Koloruj węzły wg" */
+.overlay-legend{display:flex;flex-direction:column;gap:2px;margin-top:8px;max-height:260px;overflow:auto}
+.overlay-legend.hidden{display:none}
+.ovl-title{font-size:11px;color:var(--text-mute);margin-bottom:2px}
+.ovl-grad{height:10px;border-radius:5px;margin:2px 2px 0}
+.ovl-grad-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--text-mute);margin:2px 2px 4px}
+.ovl-item{display:flex;align-items:center;gap:8px;padding:3px 6px;border-radius:6px;font-size:12.5px}
+.ovl-item.clickable{cursor:pointer}
+.ovl-item.clickable:hover{background:rgba(255,255,255,.06)}
+.ovl-item.active{background:rgba(34,211,238,.14);outline:1px solid rgba(34,211,238,.35)}
+.ovl-sw{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.ovl-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovl-cnt{color:var(--text-mute);font-family:var(--mono);font-size:11px}
+.ovl-note{margin:4px 2px 0}
 
 /* empty state */
 #empty-state{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:15}

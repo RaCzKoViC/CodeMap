@@ -355,10 +355,12 @@ CM.Graph = (function(){
           collapsed:!!n.collapsed, x:Math.round(n.x*100)/100, y:Math.round(n.y*100)/100,
           preview: n.preview ? n.preview.slice(0,1500) : null,
           kind:n.kind, line:n.line, endLine:n.endLine, symbolCount:n.symbolCount,   // graf symboli (węzły 'symbol' i pliki z symbolami)
+          git:n.git, coverage:n.coverage, isTest:n.isTest,                          // faza 3: historia git, pokrycie, testy
         });
       }
       return {
         format:'codemap', version:2, meta:this.meta,
+        gitInfo:this.gitInfo||undefined, testInfo:this.testInfo||undefined,
         nodes, edges:this.edges.filter(e=>e.type!=='contains').map(e=>({source:e.source,target:e.target,type:e.type})),
       };
     }
@@ -396,6 +398,7 @@ CM.Graph = (function(){
       g._computeImportDegrees();
       g._restoreSymbols();
       g.computeAggregates();
+      g.gitInfo=obj.gitInfo||null; g.testInfo=obj.testInfo||null;
       return g;
     }
 

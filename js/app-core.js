@@ -255,6 +255,7 @@
     const pal=COSMIC_LAYOUTS[state.layout];
     A.renderer.opts.cosmic=!!pal; if(pal){ A.renderer.opts.cosmicPalette=pal; A.renderer._cosmicLUT=null; }
     A.renderer.setData(A.graph, state.vis, state.sim);
+    if(CM.Overlays) CM.Overlays.refresh();   // kolory nakładki liczone dla nowego zestawu węzłów
     UI.renderLangFilters(A.graph, {langsOff:filters.langsOff}, handlers);
     updateStatus();
     A.renderer.drawMinimap($('#minimap'));
@@ -348,6 +349,8 @@
     A.renderer.selected=null; A.renderer.hovered=null; A.renderer.highlight=null;
     UI.tooltip(null); UI.filePreview(null);
     filters.langsOff.clear(); filters.minMetric=0; const mr=$('#rng-minmetric'); if(mr){ mr.value=0; } A.updateMetricLabel();
+    state.side=null;   // .git / raporty pokrycia poprzedniego projektu
+    if(CM.Overlays) CM.Overlays.reset();
     // a shared-view hash describes the PREVIOUS project — drop it (but not while restoring from it)
     if(!A._restoring && location.hash.startsWith('#v=')){ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} }
   }
@@ -393,7 +396,7 @@
     showLoading(statusText);
     try{
       await tick();
-      const {files, meta}=await factory(setProgress, setLoadingText);
+      const {files, meta, side}=await factory(setProgress, setLoadingText);
       if(gen!==A._ingestGen) return;   // superseded / cancelled — discard silently
       if(!files || !files.length){ U.toast(I.t('ca.noMatchingFiles','Nie znaleziono pasujących plików.'),'error'); hideLoading(); return; }
       setLoadingText(I.t('ca.buildingMapPre','Analiza i budowanie mapy (')+files.length+I.t('ca.buildingMapPost',' plików)…')); await tick();
@@ -404,6 +407,7 @@
       if(gen!==A._ingestGen) return;
       resetProjectState();
       A.graph=new Graph(); A.graph.build(files, meta, pre);
+      state.side=side||null;
       state.layout=$('#sel-layout').value; state.displayLayout=state.layout;
       if(A.graph.nodes.size>1400) A.graph.collapseToBudget(2600);   // adaptive: works for deep AND wide-flat repos
       // BIG repos: declutter automatically — no edges, tiny nodes, huge spacing
@@ -418,6 +422,7 @@
       U.toast(I.t('ca.loadedPre','Wczytano <b>')+U.fmtNum(files.length)+I.t('ca.loadedMid','</b> plików — „')+meta.name+I.t('ca.loadedPost','".'),'success');
       // (AI no longer runs automatically on load — view tuning is purely the local heuristic autoTuneView())
       if(filters.symbols) ensureSymbols();   // graf symboli był włączony → policz dla nowego projektu (w tle)
+      runProjectHooks('ingest');
       if(meta.warnings && meta.warnings.length) U.toast(I.t('ca.skippedArchivesPre','Pominięto nieobsługiwane archiwa (RAR/7z itp.): ')+meta.warnings.join(', ')+I.t('ca.skippedArchivesPost','. Rozpakuj je lub użyj ZIP / TAR.'),'',6500);
     }catch(e){ if(gen!==A._ingestGen) return; console.error(e); U.toast(I.t('ca.loadError','Błąd wczytywania: ')+e.message,'error',6500); }
     if(gen===A._ingestGen) hideLoading();
@@ -473,6 +478,7 @@
     resetProjectState();
     state.vis={nodes:[],edges:[]}; state.counts={nodes:0,edges:0};
     A.renderer.setData(A.graph, state.vis, null);
+    if(CM.Overlays) CM.Overlays.refresh();
     A.refreshAuthors();
     UI.renderDetails(null, A.graph, handlers);
     UI.renderLangFilters(A.graph, {langsOff:filters.langsOff}, handlers);
@@ -480,6 +486,7 @@
     refreshProjectLabel();
     $('#search-input').value=''; UI.renderSearch([], handlers);
     updateStatus(); A.renderer.drawMinimap($('#minimap'));
+    runProjectHooks('clear');
     U.toast(I.t('ca.cleared','🧹 Wyczyszczono dane.'),'success');
   }
 
@@ -496,11 +503,21 @@
     // use stored positions, no relayout
     state.vis=A.graph.getVisible(filters);
     A.renderer.setData(A.graph, state.vis, null);
+    if(CM.Overlays) CM.Overlays.refresh();
     UI.renderLangFilters(A.graph, {langsOff:filters.langsOff}, handlers);
     updateStatus(); A.renderer.drawMinimap($('#minimap'));
     requestAnimationFrame(()=>A.renderer.fit());
     U.toast(I.t('ca.mapLoaded','📂 Mapa wczytana z pliku.'),'success');
     if(filters.symbols && !A.graph.symbolsInfo) ensureSymbols();
+    runProjectHooks('json');
+  }
+
+  // ---- hooki „projekt wczytany" (historia git, testy/pokrycie, nakładki) ----
+  // fn({reason:'ingest'|'json'|'clear', graph, side, meta}); side = pliki boczne z loadera (.git, lcov) lub null
+  const projectHooks=[];
+  function onProjectLoaded(fn){ projectHooks.push(fn); }
+  function runProjectHooks(reason){
+    for(const fn of projectHooks){ try{ fn({reason, graph:A.graph, side:state.side||null, meta:A.graph&&A.graph.meta}); }catch(e){ console.warn('project hook', e); } }
   }
 
   // ---------------- go ----------------
@@ -555,5 +572,6 @@
     applyImpact, toggleImpact, toggleCollapse, toggleLang, revealNode, focusNode, biggestInFolder, tick,
     showLoading, setLoadingText, setProgress, hideLoading, hideEmpty, resetProjectState, ingest, autoTuneView,
     countsInit, updateStatus, refreshProjectLabel, clearAll, loadFromJSON, boot, autoTutorial,
+    onProjectLoaded, runProjectHooks,
   });
 })();

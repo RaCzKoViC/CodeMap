@@ -26,6 +26,7 @@ CM.Renderer = (function(){
       this.highlight = null;          // Set of ids to keep bright, or null
       this.impact = null;             // {focus, up:Set, down:Set, all:Set} dependency-impact view, or null
       this.diffMode = false;
+      this.colorFn = null;            // nakładka (CM.Overlays): n -> #hex albo null = kolor języka
       this.opts = {
         showGrid:true, showLabels:true, labelZoom:0.5, dim:0.10,
         edgeOpacity:0.45, curvedImports:true, nodeScale:1, showArrows:true,
@@ -383,7 +384,7 @@ CM.Renderer = (function(){
         const rPx=n.r*scale*z;
         if(sp.x<-rPx-20||sp.x>W+rPx+20||sp.y<-rPx-20||sp.y>H+rPx+20) continue;
         if(rPx<minRPx) continue;
-        let col=cosmic?this.cosmicColor(n._cosmic):badgeColor(n);
+        let col=(this.colorFn&&this.colorFn(n))||(cosmic?this.cosmicColor(n._cosmic):badgeColor(n));
         let bright;
         if(imp){
           bright=imp.all.has(n.id);
@@ -562,7 +563,7 @@ CM.Renderer = (function(){
       const nN=this.nodes.length, nStep=Math.max(1, Math.ceil(nN/8000));
       let lastFill=null;
       for(let i=0;i<nN;i+=nStep){ const n=this.nodes[i];
-        const c=n.type==='folder'?'#3b4d63':((n.langInfo&&n.langInfo.color)||'#7d8aa0');
+        const c=(this.colorFn&&this.colorFn(n))||(n.type==='folder'?'#3b4d63':((n.langInfo&&n.langInfo.color)||'#7d8aa0'));
         if(c!==lastFill){ ctx.fillStyle=c; lastFill=c; }
         ctx.fillRect(n.x*sc+ox-0.8,n.y*sc+oy-0.8,1.8,1.8);
       }

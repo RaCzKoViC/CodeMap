@@ -198,6 +198,7 @@ CM.ChatBot = (function(){
     'mindmap {action:"arrange"|"layout"|"fit"|"save"|"markdown"|"undo"} — MindMap-mode operations',
     'installPWA — trigger the install-app prompt',
     'symbols {on:boolean} — show/hide the tree-sitter symbol graph (functions, classes, methods, calls); first use downloads the parser',
+    'colorBy {mode} — color map nodes by data: lang (default), complexity, mtime, and when available owner/churn/age (git history), coverage/tests (see colorings in state)',
     'help — list all available actions',
     'stats — project statistics: files, folders, languages, biggest files, cycles',
     'topFiles {metric:"lines"|"complexity"|"size"|"deps", n?} — list the top files by a metric and highlight them',
@@ -231,6 +232,7 @@ CM.ChatBot = (function(){
     resetAppearance:'przywróć domyślny wygląd', togglePanel:'zwiń/rozwiń panel boczny', setLang:'zmień język całej aplikacji',
     startTutorial:'uruchom samouczek', mindmap:'operacje trybu MindMap', installPWA:'zainstaluj aplikację',
     symbols:'graf symboli tree-sitter (funkcje, klasy, wywołania)', help:'lista wszystkich narzędzi',
+    colorBy:'koloruj węzły wg danych (złożoność, właściciel, zmiany, pokrycie…)',
     stats:'statystyki projektu: pliki, foldery, języki, największe pliki, cykle', topFiles:'najwięksi według metryki (z podświetleniem)',
     findText:'szukaj frazy w TREŚCI plików', listLang:'pliki jednego języka (z podświetleniem)',
     dependsOn:'co zależy od tego pliku/folderu', dependencies:'od czego zależy ten plik/folder',
@@ -248,7 +250,7 @@ CM.ChatBot = (function(){
     'collapseAll','toggleImpact','toggleMinimap','setFilter','setMetric','toggleLang','openSettings','openHistory',
     'openCompare','detectCycles','hotspots','inspect','runInspection','setTheme','setPreset','setAccent','setBackground',
     'setGlass','setSpacing','setNodeScale','setFontScale','renderOption','togglePanel','help','listActions',
-    'stats','topFiles','findText','listLang','dependsOn','dependencies']);
+    'stats','topFiles','findText','listLang','dependsOn','dependencies','colorBy']);
   function buildSystemPrompt(compact, json){
     const lang=I.getLang()==='en'?'English':'Polish';
     const st=appState();
@@ -374,6 +376,7 @@ CM.ChatBot = (function(){
     setPreset:(a)=>nonEmpty(a.name||a.preset), setAccent:(a)=>isHex(a.color), setBackground:(a)=>isHex(a.color),
     setSpacing:(a)=>isFinite(+a.percent)&&a.percent!=null, setNodeScale:(a)=>isFinite(+a.percent)&&a.percent!=null, setFontScale:(a)=>isFinite(+a.percent)&&a.percent!=null,
     setLang:(a)=>oneOf(a.lang,['pl','en']), toggleLang:(a)=>nonEmpty(a.lang), listLang:(a)=>nonEmpty(a.lang),
+    colorBy:(a)=>nonEmpty(a.mode||a.by),
     togglePanel:(a)=>oneOf(a.side,['left','right']), loadRepo:(a)=>typeof a.url==='string'&&/[\w-]+\/[\w.-]+/.test(a.url),
     mindmap:(a)=>oneOf(a.action,['arrange','layout','fit','save','markdown','undo']),
     setFilter:(a)=>hasBool(a,['folders','files','externals','imports','import','references','reference','contains']),
@@ -1183,7 +1186,19 @@ CM.ChatBot = (function(){
   I.onChange(()=>{ const wasOpen=isOpen; builtLang=null; build();
     if(wasOpen){ panel.classList.remove('hidden'); panel.classList.add('cb-open'); if(launcher) launcher.classList.add('cb-hidden'); } });
 
-  return { init, open, close, toggle, isOpen:()=>isOpen, votes:getVotes, refresh:refreshModelUI, acceptDrop, dragOver, tools:()=>TOOLS.slice(),
+  // narzędzia modułów ładowanych później (git.js, testmap.js) — przez A.registerAction w ai-bridge.js:
+  // wpis do katalogu dla modelu (EN), menu „/" (PL), allowlisty auto-akcji, narzędzi informacyjnych i walidacji
+  function addTool(o){
+    if(!o||!o.name||TOOLS.some(x=>x.name===o.name)) return;
+    ACTION_CATALOG.push(o.name+(o.sig?' '+o.sig:'')+' — '+(o.desc||''));
+    TOOLS.push({name:o.name, sig:o.sig||'', desc:o.desc||''});
+    if(o.descPl) TOOL_PL[o.name]=o.descPl;
+    if(o.auto) AUTO_OK.add(o.name);
+    if(o.info) INFO_TOOLS.add(o.name);
+    if(typeof o.required==='function') REQUIRED[o.name]=o.required;
+  }
+
+  return { init, open, close, toggle, isOpen:()=>isOpen, votes:getVotes, refresh:refreshModelUI, acceptDrop, dragOver, tools:()=>TOOLS.slice(), addTool,
     _check:{validAction, looksLikeCommand, isHelpRequest, friendlyError, parseStructured},   // do testów / smoke
     _newChat:()=>newConversation(), _convs:()=>convs, _thumb:thumb, _exec:(a,g)=>CMApp.exec(a,g) };
 })();

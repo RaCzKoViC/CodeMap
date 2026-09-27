@@ -437,6 +437,7 @@
     bind('edge-contains','contains'); bind('edge-import','import'); bind('edge-reference','reference'); bind('edge-call','call');
     // symbole: pierwsze włączenie dla danego grafu uruchamia analizę tree-sittera (w tle, w workerze)
     { const sc=$('#show-symbols'); if(sc) sc.onchange=(e)=>{ filters.symbols=e.target.checked; A.apply({relayout:false}); if(filters.symbols) A.ensureSymbols(); }; }
+    if(CM.Overlays) CM.Overlays.wire();   // „Kolorowanie": język / złożoność / git / pokrycie
     $('#lang-toggle-all').onclick=()=>{
       const stats=Array.from(A.graph.langStats.keys());
       if(filters.langsOff.size){ filters.langsOff.clear(); } else { stats.forEach(k=>filters.langsOff.add(k)); }
