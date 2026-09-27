@@ -79,7 +79,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   a czerwone komórki nad nią to cykle; klik pokazuje pary importów i podświetla pliki. Reguła Inspect **cykle między pakietami**.
 - **Sprawdzane narzędziami samych ekosystemów**: `npm run corpus` porównuje krawędzie importów CodeMap na przypiętych
   wydaniach Express, Preact, ky, petite-vue, Flask i Gin z esbuildem (JS/TS), grimp (Python) i `go list` (Go) — precyzja
-  i kompletność per repozytorium, zadanie CI pada poniżej 97 %. Dziś: 100 % / 100 %. Krawędzie z `import type` (TS) mają flagę `typeOnly`.
+  i kompletność per repozytorium, zadanie CI pada poniżej 97 %. Monorepo pnpm Preact Signals (16 pakietów) jest
+  porównywane także na poziomie pakietów: lista pakietów i krawędzie pakiet → pakiet, czyli macierz zależności.
+  Dziś: 100 % / 100 %. Krawędzie z `import type` (TS) mają flagę `typeOnly`.
 
 ### Mapa
 - **13 układów**: upakowane koła, drzewo strukturalne, radialny, treemap, icicle, sunburst, siła (force),

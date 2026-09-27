@@ -1,5 +1,5 @@
 /* ===================== gallery.js — galeria przykładowych repozytoriów (faza 8) ===================== */
-// Znane, niewielkie repozytoria (50–320 plików, 7 języków) otwierane jednym kliknięciem przez deep-link #repo= —
+// Znane, niewielkie repozytoria (50–320 plików, 7 języków, jedno monorepo) otwierane jednym kliknięciem przez deep-link #repo= —
 // żeby zobaczyć CodeMap na prawdziwym kodzie bez szukania projektu. „Z trasą" po wczytaniu układa trasę po kodzie
 // (tour-ui.js). Wejścia: przycisk „Przykłady" na ekranie startowym, Wczytaj → „Przykładowe repozytoria…", akcja
 // ChatBota `gallery`. Dane i budowanie linku są czyste (testy w Node); okno i przyciski — tylko w przeglądarce.
@@ -7,6 +7,7 @@ CM.Gallery = (function(){
   const ITEMS = [
     {repo:'expressjs/express', lang:'JavaScript', files:214, pl:'Minimalistyczny framework HTTP dla Node.js — router, middleware, odpowiedzi.', en:'Minimalist HTTP framework for Node.js — router, middleware, responses.'},
     {repo:'preactjs/preact', lang:'JavaScript', files:301, pl:'Lekka alternatywa Reacta: wirtualny DOM, komponenty, hooki.', en:'Lightweight React alternative: virtual DOM, components, hooks.'},
+    {repo:'preactjs/signals', lang:'TypeScript', files:225, pl:'Monorepo pnpm: 13 pakietów (rdzeń, Preact, React, devtools) — pakiety i macierz zależności.', en:'pnpm monorepo: 13 packages (core, Preact, React, devtools) — packages and the dependency matrix.'},
     {repo:'sindresorhus/ky', lang:'TypeScript', files:104, pl:'Klient HTTP na fetch — mały, czytelny kod TypeScript z testami.', en:'HTTP client on top of fetch — small, readable TypeScript with tests.'},
     {repo:'vuejs/petite-vue', lang:'TypeScript', files:53, pl:'Vue w 6 kB: reaktywność i dyrektywy — dobry na pierwszą trasę po kodzie.', en:'Vue in 6 kB: reactivity and directives — a good first code tour.'},
     {repo:'pallets/flask', lang:'Python', files:236, path:'src/flask', pl:'Mikroframework webowy Pythona — aplikacja, konteksty, blueprinty.', en:'Python web microframework — app, contexts, blueprints.'},

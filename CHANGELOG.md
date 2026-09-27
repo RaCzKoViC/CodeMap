@@ -29,6 +29,13 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   narzędzie MCP `staged_check`. `runAnalysis({loaded})` przyjmuje listę plików z pamięci, `applyGitHistory` osobno.
 
 
+### Dodane — Faza 14 (dokładność 2.0)
+- **Monorepo w korpusie referencyjnym**: Preact Signals (pnpm, 16 pakietów, zagnieżdżone `utils`/`runtime`, importy po
+  nazwie przez `paths`) — krawędzie plików jak dotąd plus poziom pakietów: lista pakietów CodeMap (`graph.packages`)
+  vs pliki package.json i krawędzie pakiet → pakiet (to, z czego powstaje macierz zależności) vs importy z metafile
+  esbuilda (rozwiązane pliki i nazwy pakietów workspace'u). Wynik 100 % / 100 %. `paths` z tsconfig repozytorium
+  trafiają do esbuilda (`tsconfigRaw` zastępuje plik). Preact Signals także w galerii przykładów.
+
 ### Zmienione — Faza 13 (wydajność)
 - **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym
   z `vm.constants.DONT_CONTEXTIFY` (Node ≥ 20.18 / 22.8) — globalny obiekt jest zwykłym obiektem, bez interceptorów

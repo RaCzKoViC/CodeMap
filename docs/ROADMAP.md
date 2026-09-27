@@ -211,9 +211,10 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
 - ✅ Trend zdrowia w tle (`js/trend-worker.js` — te same moduły co CLI z atrapami API strony) i z pamięcią punktów
   per commit (sha + wersja CodeMap, ≤ 400); bez workera — w wątku strony jak dotąd.
 
-## Faza 14 — dokładność 2.0
+## Faza 14 — dokładność 2.0 — W TOKU 2026-09-27
 
-- Korpus: prawdziwe monorepo z workspaces (pakiety i macierz zależności na żywym przykładzie).
+- ✅ Korpus: monorepo pnpm Preact Signals (16 pakietów, zagnieżdżone, `paths` z tsconfig) — pliki i poziom pakietów
+  (lista pakietów + krawędzie pakiet → pakiet) vs esbuild i package.json: 100 % / 100 %; w galerii aplikacji.
 - Martwy kod (nieużywane eksporty i pliki) jako reguła, sprawdzany wyrocznią: knip (JS/TS), vulture (Python).
 - Dokładność grafu wywołań: tree-sitter porównany z „znajdź odwołania" kompilatora TypeScript.
 - Propozycja reguł architektury z warstw macierzy zależności — do zatwierdzenia jednym klikiem.

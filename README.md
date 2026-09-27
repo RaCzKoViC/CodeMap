@@ -79,7 +79,8 @@ Click **“✨ See demo”** or open `index.html#demo`.
   cells above it are cycles; a click shows the import pairs and highlights the files. Inspect rule **Cycles between packages**.
 - **Checked against the ecosystems' own tools**: `npm run corpus` compares CodeMap's import edges on pinned releases of
   Express, Preact, ky, petite-vue, Flask and Gin with esbuild (JS/TS), grimp (Python) and `go list` (Go) — precision and
-  recall per repository, a CI job fails below 97 %. Today: 100 % / 100 %. TypeScript `import type` edges are marked `typeOnly`.
+  recall per repository, a CI job fails below 97 %. The pnpm monorepo Preact Signals (16 packages) is also compared at the
+  package level: package list and package → package edges, i.e. the dependency matrix. Today: 100 % / 100 %. TypeScript `import type` edges are marked `typeOnly`.
 
 ### Map
 - **13 layouts**: packed circles, structure tree, radial tree, treemap, icicle, sunburst, force,
