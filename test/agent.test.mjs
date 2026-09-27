@@ -155,3 +155,33 @@ describe('narzędzie widokowe showOnMap', () => {
     await assert.rejects(AG.exec('showOnMap', { paths: ['x.zz'] }, { graph: g, sources: [] }), /no such files/);
   });
 });
+
+describe('WebLLM: JSON wymuszony gramatyką (jsonChat)', () => {
+  // udawany rawChat: kolejne teksty JSON; zapisuje schemat (null = krok bez narzędzi)
+  const raw = (texts) => { const seen = []; let i = 0; return { seen, fn: async (msgs, schema) => { seen.push({ schema, last: msgs[msgs.length - 1].content }); return texts[Math.min(i++, texts.length - 1)]; } }; };
+  test('schemat: narzędzia jako enum + "answer"; protokół wypisuje narzędzia z parametrami', () => {
+    const s = host(AG.jsonSchema());
+    assert.deepEqual(s.required, ['tool']);
+    assert.deepEqual(s.properties.tool.enum, [...AG.TOOLS.map((t) => t.name), 'answer']);
+    assert.match(AG.jsonProtocol(), /- readFile\(path, start\?, end\?\): /);
+  });
+  test('narzędzie → wynik jako wiadomość user (krótszy, maxResult) → {"tool":"answer"} jako zwykła odpowiedź', async () => {
+    const g = build(); const m = raw(['{"tool":"findFiles","args":{"query":"reducer"}}', '{"tool":"answer","answer":"Reducer: src/store/reducer.js."}']);
+    const r = await AG.run({ chat: AG.jsonChat(m.fn), messages: [{ role: 'user', content: 'gdzie jest reducer?' }], ctx: { graph: g }, maxResult: 40 });
+    assert.equal(r.answer, 'Reducer: src/store/reducer.js.');
+    assert.equal(r.native, false);
+    assert.deepEqual(host(r.steps.map((s) => [s.name, s.ok])), [['findFiles', true]]);
+    assert.ok(m.seen[0].schema && m.seen[1].schema, 'każdy krok z narzędziami ma schemat');
+    assert.match(m.seen[1].last, /^Tool result \(findFiles\):\n/);
+    assert.ok(m.seen[1].last.length <= 'Tool result (findFiles):\n'.length + 40, 'wynik przycięty do maxResult');
+  });
+  test('ucięty JSON → tekst jako odpowiedź; limit kroków → ostatnie wywołanie bez schematu (zwykły tekst)', async () => {
+    const g = build();
+    const cut = await AG.run({ chat: AG.jsonChat(raw(['{"tool":"answer","answer":"Niedokończ']).fn), messages: [{ role: 'user', content: 'x' }], ctx: { graph: g } });
+    assert.equal(cut.answer, '{"tool":"answer","answer":"Niedokończ');
+    const loop = raw(['{"tool":"findFiles","args":{"query":"a"}}', '{"tool":"findFiles","args":{"query":"b"}}', 'Odpowiedź końcowa.']);
+    const r = await AG.run({ chat: AG.jsonChat(loop.fn), messages: [{ role: 'user', content: 'y' }], ctx: { graph: g }, maxSteps: 2 });
+    assert.equal(r.answer, 'Odpowiedź końcowa.');
+    assert.equal(loop.seen[2].schema, null);
+  });
+});

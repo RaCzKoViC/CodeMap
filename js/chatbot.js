@@ -608,9 +608,25 @@ CM.ChatBot = (function(){
       const messages=[{role:'system',content:sys}].concat(hist).concat([{role:'user', content:userContent}]);
       const opts={temperature:0.2, signal:abortCtl.signal, maxTokens:prep?(local?1000:1400):(local?600:900),
         onToken:(d,full)=>{ acc=full; const now=performance.now(); if(now-last>=95) paint(); else if(!paintT) paintT=setTimeout(paint,100); }};
+      // kontekst narzędzi agenta (agent.js): graf, RAG, git, testy; widok = podświetlenie + kamera
+      const agentCtx=()=>({graph:CM.App.graph, rag:CM.RAG, gitCore:CM.GitCore, testMap:CM.TestMap, signal:abortCtl.signal,
+        view:(ids)=>{ const R=CM.App.renderer; if(!R) return; R.setHighlight(new Set(ids)); const n=CM.App.graph.nodes.get(ids[0]); if(n&&window.CMApp&&CMApp.focusNode){ CMApp.focusNode(n.id); R.setHighlight(new Set(ids)); } }});
+      const agentDone=(res)=>{ done=true; if(paintT){ clearTimeout(paintT); paintT=null; }
+        finish(stripThink(res.answer)||t('ragNothing'), {sources:res.sources, ragMode:'agent', steps:res.steps.map(s=>({name:s.name, args:s.args, ok:s.ok, summary:s.summary}))}); };
       if(local){
         const off=CM.LocalAI.onProgress(p=>{ if(p&&p.text) setStage(p.text+(p.pct?(' '+p.pct+'%'):'')); });
         if(CM.LocalAI.status()!=='ready') setStage(t('stLoading'));
+        // WebLLM: agent z narzędziami przez JSON wymuszony gramatyką (bez natywnych tool_calls); 3 kroki, krótkie wyniki
+        if(!prep && agentOn() && CM.Agent && CM.Agent.jsonChat){
+          try{
+            const res=await CM.Agent.run({messages:[{role:'system',content:C.ragAgentPrompt(sys)+'\n\n'+CM.Agent.jsonProtocol()}].concat(messages.slice(1)), sources:ctx.sources.slice(),
+              maxSteps:3, maxResult:1400, signal:abortCtl.signal, ctx:agentCtx(),
+              chat:CM.Agent.jsonChat((msgs, schema)=>CM.LocalAI.chat(msgs, {signal:abortCtl.signal, temperature:0.2, maxTokens:schema?700:600,
+                responseFormat:schema?{type:'json_object', schema:JSON.stringify(schema)}:undefined})),
+              onStep:(s)=>setStage('🔧 '+s.name+' '+argText(s.args))});
+            agentDone(res); return;
+          } finally{ off(); updateSub(); }
+        }
         try{ acc=await CM.LocalAI.chat(messages, opts); } finally{ off(); updateSub(); }
       } else {
         // Ollama: agent z narzędziami (agent.js) — model sam dopytuje kod (tylko odczyt), start z tymi samymi fragmentami;
@@ -619,13 +635,10 @@ CM.ChatBot = (function(){
           try{
             const sysA=C.ragAgentPrompt(sys);
             const res=await CM.Agent.run({messages:[{role:'system',content:sysA}].concat(messages.slice(1)), sources:ctx.sources.slice(), maxSteps:5, signal:abortCtl.signal,
-              ctx:{graph:CM.App.graph, rag:CM.RAG, gitCore:CM.GitCore, testMap:CM.TestMap, signal:abortCtl.signal,
-                view:(ids)=>{ const R=CM.App.renderer; if(!R) return; R.setHighlight(new Set(ids)); const n=CM.App.graph.nodes.get(ids[0]); if(n&&window.CMApp&&CMApp.focusNode){ CMApp.focusNode(n.id); R.setHighlight(new Set(ids)); } }},
+              ctx:agentCtx(),
               chat:(msgs, tools)=>CM.Ollama.chatTools(msgs, tools, {signal:abortCtl.signal, think:false, maxTokens:900, temperature:0.2}),
               onStep:(s)=>setStage('🔧 '+s.name+' '+argText(s.args))});
-            done=true; if(paintT){ clearTimeout(paintT); paintT=null; }
-            finish(stripThink(res.answer)||t('ragNothing'), {sources:res.sources, ragMode:'agent', steps:res.steps.map(s=>({name:s.name, args:s.args, ok:s.ok, summary:s.summary}))});
-            return;
+            agentDone(res); return;
           }catch(e){ if(!(e&&e.code==='notools')) throw e; }
         }
         if(quick) opts.think=false;

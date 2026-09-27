@@ -195,7 +195,8 @@ CM.Agent = (function(){
         let out, ok=true; try{ out=await exec(c.name, c.args, ctx); }catch(e){ ok=false; out='error: '+((e&&e.message)||e); }
         const st={name:c.name, args:c.args, ok, key, summary:String(out).split('\n')[0].slice(0,140)}; steps.push(st);
         if(o.onStep) o.onStep(st);
-        msgs.push(nat?{role:'tool', tool_name:c.name, content:String(out).slice(0,6000)}:{role:'user', content:'Tool result ('+c.name+'):\n'+String(out).slice(0,6000)});
+        const cap=o.maxResult||6000;   // małe okno kontekstu (WebLLM 2048 tokenów) — krótsze wyniki narzędzi
+        msgs.push(nat?{role:'tool', tool_name:c.name, content:String(out).slice(0,cap)}:{role:'user', content:'Tool result ('+c.name+'):\n'+String(out).slice(0,cap)});
       }
     }
     // limit kroków — ostatnie pytanie bez narzędzi wymusza odpowiedź
@@ -203,5 +204,26 @@ CM.Agent = (function(){
     return {answer:String(fin.content||'').trim(), steps, sources:ctx.sources, native};
   }
 
-  return {TOOLS, ollamaTools, toolCalls, resolveName, exec, run, pathMatch, anyMatch, MAX_STEPS};
+  // ---------------- WebLLM: JSON wymuszony gramatyką zamiast natywnych narzędzi (faza 11) ----------------
+  // Każdy krok to jeden obiekt {"tool": <narzędzie>|"answer", "args": {…}, "answer": "…"}; schemat ma listę narzędzi jako
+  // enum, więc model nie wymyśli nazwy ani nie przejdzie w prozę w połowie wywołania. Wywołanie idzie dalej jako JSON
+  // w treści (toolCalls), odpowiedź — jako zwykły tekst; ostatni krok bez narzędzi (limit) generuje się bez schematu.
+  // rawChat(messages, schema|null) → tekst (np. CM.LocalAI.chat z responseFormat).
+  function jsonSchema(){ return {type:'object', properties:{tool:{type:'string', enum:TOOLS.map(t=>t.name).concat('answer')}, args:{type:'object'}, answer:{type:'string'}}, required:['tool']}; }
+  function jsonProtocol(){
+    return 'Reply with ONE JSON object and nothing else. To use a tool: {"tool":"<name>","args":{…}}. When you can answer: {"tool":"answer","answer":"<answer, cite snippets as [n]>"}.\nTools:\n'
+      +TOOLS.map(t=>'- '+t.name+'('+Object.keys(t.parameters.properties).map(k=>k+((t.parameters.required||[]).includes(k)?'':'?')).join(', ')+'): '+t.description).join('\n');
+  }
+  function jsonChat(rawChat){
+    return async (msgs, tools)=>{
+      if(!tools) return {content:String(await rawChat(msgs, null)||'')};
+      const txt=String(await rawChat(msgs, jsonSchema())||'');
+      let j=null; try{ j=JSON.parse(txt); }catch(e){ /* ucięty JSON (limit tokenów) — tekst idzie dalej jako odpowiedź */ }
+      if(j && j.tool==='answer') return {content:String(j.answer||'')};
+      if(j && j.tool) return {content:JSON.stringify({tool:j.tool, args:(j.args && typeof j.args==='object')?j.args:{}})};
+      return {content:txt};
+    };
+  }
+
+  return {TOOLS, ollamaTools, toolCalls, resolveName, exec, run, pathMatch, anyMatch, MAX_STEPS, jsonSchema, jsonProtocol, jsonChat};
 })();

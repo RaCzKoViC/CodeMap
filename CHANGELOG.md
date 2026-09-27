@@ -21,6 +21,13 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   porównanie trafia do podsumowania.
 
 ### Dodane — Faza 11 (AI dalej lokalnie)
+- **Agent z narzędziami także dla WebLLM** (model w przeglądarce): `CM.Agent.jsonChat` — każdy krok to jeden obiekt JSON
+  wymuszony gramatyką WebLLM (`response_format` ze schematem: nazwa narzędzia z `enum` albo `"answer"`), więc mały model
+  nie wymyśli narzędzia ani nie przejdzie w prozę w połowie wywołania; wywołanie idzie przez ten sam `toolCalls`, co
+  JSON w treści u Ollamy, `{"tool":"answer"}` staje się zwykłą odpowiedzią, a ostatni krok (limit) generuje się bez
+  schematu. Pod małe okno kontekstu: 3 kroki i wyniki narzędzi przycięte do 1400 znaków (`maxResult`). ChatBot w trybie
+  📚 z WebLLM korzysta teraz z tych samych narzędzi (wyszukiwanie w kodzie, odczyt pliku, zależności, właściciele,
+  testy, hotspoty, pokazanie na mapie) co z Ollamą.
 - **Szkielety testów** (`js/testgen.js`, przycisk „🧪 Szkielet testów" w sekcji Doktora hotspotów pliku bez testów, akcja
   ChatBota `testSkeleton {query?}` — domyślnie najbardziej ryzykowny plik bez testów): bez modelu. Framework z projektu
   (package.json najbliższy plikowi: vitest / jest / mocha / `node --test`, potem importy istniejących testów; pytest z

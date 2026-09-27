@@ -177,7 +177,9 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 
 ## Faza 11 — AI dalej lokalnie — W TOKU 2026-09-27
 
-- Agent z narzędziami dla WebLLM (wymuszony JSON wywołania).
+- ✅ Agent z narzędziami dla WebLLM (wymuszony JSON wywołania): `CM.Agent.jsonChat` — każdy krok to obiekt JSON
+  ze schematem (narzędzia jako enum + „answer") przez gramatykę WebLLM (`responseFormat`), 3 kroki, wyniki przycięte
+  do okna 2048 tokenów; ChatBot w trybie 📚 z WebLLM korzysta z tych samych narzędzi co z Ollamą.
 - ✅ Szkielety testów dla hotspotów bez testów (rozszerzenie Doktora): `js/testgen.js` bez modelu — framework i położenie
   z konwencji projektu (głosowanie par test ↔ kod), JS/TS/Python/Go/Rust/Java; przycisk w sekcji Doktora, akcja `testSkeleton`.
 - Asystent przeglądu PR (mapa wpływu + fragmenty zmian) i porównanie przed/po w aplikacji.

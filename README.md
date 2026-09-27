@@ -176,11 +176,12 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
   `snowflake-arctic-embed`, WebGPU, no Ollama needed) adds semantic search —
   the index is built in Settings → AI, and the vectors are stored in the browser and recomputed only for changed
   snippets. The `/codeSearch` tool shows matches without any model.
-- **Agent with tools (Ollama, 📚 mode)** — when the snippets are not enough, the model looks things up itself
+- **Agent with tools (Ollama and WebLLM, 📚 mode)** — when the snippets are not enough, the model looks things up itself
   before answering: `codeSearch`, `readFile`, `findFiles`, `dependencies`, `dependents`, `fileInfo`,
   `hotspots`, `owners` (git), `tests` — all read-only, running in the browser on the loaded project — plus
   `showOnMap`, which highlights the files the answer is about and moves the camera to them. Works with native tool calls
-  (Llama 3.x, Qwen 3) and with models that write the call as JSON in the text (Qwen 2.5 Coder); tool results are
+  (Llama 3.x, Qwen 3), with models that write the call as JSON in the text (Qwen 2.5 Coder) and — in the browser (WebLLM) —
+  with every step forced into a JSON call by the model's grammar (tool names from an enum); tool results are
   cited as `[n]` like the snippets, and the steps are shown in a collapsible "Agent steps" list. Up to 5 steps,
   then the model has to answer. A file named in the question (`agent.js`) is always included in the context.
   Can be switched off in Settings → AI → Ollama.
