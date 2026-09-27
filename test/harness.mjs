@@ -56,6 +56,7 @@ export function createContext(extra = {}) {
   Object.assign(g, {
     console, performance, setTimeout, clearTimeout, setInterval, clearInterval, queueMicrotask,
     structuredClone, TextEncoder, TextDecoder, URL, URLSearchParams, Blob,
+    DecompressionStream, CompressionStream, AbortController,   // js/git-local.js (zlib, anulowanie)
     crypto: globalThis.crypto,
     localStorage: memStorage(), sessionStorage: memStorage(),
     navigator: { language: 'pl', languages: ['pl'], onLine: true, userAgent: 'node-test', storage: { persist: async () => false } },

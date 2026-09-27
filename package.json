@@ -19,8 +19,9 @@
     "smoke": "node tools/smoke.mjs",
     "bump": "node tools/bump.mjs",
     "serve": "python serve.py",
-    "verify": "npm run check && npm test && npm run lint && npm run symbols-probe",
-    "symbols-probe": "node tools/symbols-probe.mjs"
+    "verify": "npm run check && npm test && npm run lint && npm run symbols-probe && npm run git-probe",
+    "symbols-probe": "node tools/symbols-probe.mjs",
+    "git-probe": "node tools/git-probe.mjs"
   },
   "devDependencies": {
     "eslint": "^9.39.0",

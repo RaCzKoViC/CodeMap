@@ -7,7 +7,7 @@ const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js'
   'js/analysis.js','js/graph.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/renderer.js','js/loaders.js','js/storage.js',
   'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js',
   'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/app.js','js/sim-worker.js','js/analysis-worker.js',
-  'js/symbols-core.js','js/symbols.js','js/symbols-worker.js'];
+  'js/symbols-core.js','js/symbols.js','js/symbols-worker.js','js/git-local.js','js/git-worker.js'];
 
 self.addEventListener('install', (e)=>{
   e.waitUntil((async()=>{
@@ -21,7 +21,7 @@ self.addEventListener('install', (e)=>{
       const html = await (await fetch('index.html', {cache:'no-cache'})).text();
       assets = [...html.matchAll(/(?:src|href)="((?:js|css)\/[^"]+\?v=[^"]+)"/g)].map(m=>m[1]);
       const appV = (html.match(/js\/app\.js\?v=([\w.-]+)/)||[])[1];
-      if(appV){ for(const w of ['sim-worker','analysis-worker','symbols-worker']) assets.push('js/'+w+'.js?v='+appV); }   // worker is loaded by app-core.js at the shared ?v= stamp (read off js/app.js in the HTML)
+      if(appV){ for(const w of ['sim-worker','analysis-worker','symbols-worker','git-worker']) assets.push('js/'+w+'.js?v='+appV); }   // workers are loaded (app-core.js, symbols.js, git-local.js) at the shared ?v= stamp (read off js/app.js in the HTML)
     }catch(_){ }
     if(!assets.length) assets = ASSET_FALLBACK;
     await c.addAll(assets).catch(()=>{});
