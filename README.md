@@ -146,12 +146,21 @@ Drugi tryb pracy: 16 szablonów kart, **34 typy diagramów**, warstwa rysowania 
 Polski i angielski, motyw ciemny/jasny, 8 presetów kolorystycznych, suwaki wyglądu „liquid glass",
 interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainstalowania.
 
+### Przegląd PR — mapa wpływu
+- Projekt → **Przegląd PR** (numer albo adres PR / MR z GitHub, GitLab, Bitbucket) albo link
+  `#repo=owner/nazwa&pr=N`: zmienione pliki (znaczniki A/M/D/R na węzłach), pliki od nich zależne i **ryzyko
+  każdej zmiany** (0–100) z częstości zmian, złożoności, liczby zależnych, testów / pokrycia, rozmiaru zmiany
+  i tego, czy autor zna plik; sugerowani recenzenci z historii git; kolorowanie „Wpływ PR"; raport Markdown.
+- To samo w CI: CLI `--base` / `--baseline` / `--pr-md` i komentarz w PR z GitHub Action
+  (health score przed i po, nowe znaleziska, próg `max-score-drop`) — [docs/github-action.md](docs/github-action.md).
+
 ### CLI i CI
 - `node cli/codemap.mjs analyze [ścieżka]` (albo `npm link` → `codemap`) — ta sama analiza co panel „Analiza
   statyczna", bez przeglądarki i bez zależności npm: historia git z `.git`, testy i pokrycie, reguły architektury.
 - Raporty: terminal, `--json`, `--md`, `--sarif` (GitHub code scanning), `--map` (mapa do otwarcia w aplikacji),
   `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
-  `--max-findings` (kody wyjścia 0 / 1 / 2).
+  `--max-findings` (kody wyjścia 0 / 1 / 2); przegląd zmian: `--base <ref>`, `--baseline`, `--pr-md`,
+  `--max-score-drop`.
 - **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
   z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
 
@@ -238,6 +247,7 @@ js/compare.js              # porównywanie schematów, cykle, historia migawek i
 js/navigation.js           # radar okolicy, minimapa, tarcza obrotu, nawigacja WASD, menu kontekstowe, eksport obrazu
 js/ai-bridge.js            # AI (Mistral/lokalne), most ChatBota (appState/exec, registerAction), paleta Ctrl+K, dane demo
 js/git.js                  # historia git na mapie: uruchamianie, nakładki, panel, awatary, oś czasu, akcje ChatBota
+js/pr-core.js  js/pr.js    # mapa wpływu PR: ryzyko zmian, zależne, recenzenci (bez DOM) + okno, nakładka, panel
 js/tests-ui.js             # testy i pokrycie w aplikacji: nakładki, panel, Inspect, ChatBot, wczytywanie raportów
 js/deeplink.js  js/links.js  # linki #repo= / #gist= / #share= (walidacja, wczytanie), okno publicznych linków
 js/app.js                  # bootstrap: CM.App.boot() + window.CMApp (API dla chatbot/drive/inspect/smoke)

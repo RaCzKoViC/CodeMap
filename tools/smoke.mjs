@@ -282,6 +282,23 @@ const linksRes = await evalJs(`(async()=>{ try{
   } finally { window.fetch=real; }
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// mapa wpływu PR (faza 5) bez sieci: syntetyczny PR na demo → ryzyko, zależne, nakładka „pr", karta w panelu,
+// raport Markdown, link #repo=…&pr=N, akcja ChatBota prRisk
+const prRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); CMApp.loadDemo(); await sleep(900);
+  const g=CMApp.graph; g.meta=Object.assign({}, g.meta, {host:'github', repo:'o/demo', branch:'main'});
+  const files=[{path:'src/utils/format.js', status:'M', add:12, del:3}, {path:'src/store/reducer.js', status:'M', add:4, del:1}, {path:'src/new.js', status:'A', add:30, del:0}];
+  const info=CM.PR.apply(g, {number:12, title:'Demo PR', author:{login:'ala'}}, files);
+  const cur=CM.Overlays.current(); CM.App.select(null); await sleep(150);
+  const card=(document.getElementById('details-body').textContent||'').includes('Demo PR');
+  const md=CM.PR.markdown(g), link=CM.PR.mapLink(g), risk=CMApp.exec('prRisk',{});
+  const round=CM.Graph.Graph.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+  CM.PR.clear(); const cleared=!CMApp.graph.prInfo && CM.Overlays.current()!=='pr';
+  return {changed:info.changed.length, outside:info.outside.length, impacted:info.impacted.length, risk:info.risk, cur, card,
+    md:md.includes('#12') && md.includes('format.js'), link:link.endsWith('#repo=o/demo&branch=main&pr=12'), chat:String(risk).includes('#12'),
+    persisted:!!(round.prInfo && round.prInfo.number===12), cleared};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 let failed = 0;
 const check = (ok, msg) => { console.log(`${ok ? '✔' : '✖'} ${msg}`); if (!ok) failed++; };
 check(nodes >= 28, `demo zbudowane: ${nodes} węzłów (oczekiwane ≥ 28)${status ? ` — pasek stanu: ${status}` : ''}`);
@@ -300,6 +317,8 @@ check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitR
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexHits > 0 && ragRes.had && ragRes.localOnly,
   `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
+check(prRes && !prRes.error && prRes.changed === 2 && prRes.outside === 1 && prRes.impacted > 0 && prRes.cur === "pr" && prRes.card && prRes.md && prRes.link && prRes.chat && prRes.persisted && prRes.cleared,
+  `mapa wpływu PR: ryzyko, zależne, nakładka, panel, raport, link, ChatBot: ${JSON.stringify(prRes)}`);
 check(chatbotRes && !chatbotRes.error && chatbotRes.bad === 0 && chatbotRes.good === 2 && chatbotRes.help && chatbotRes.lines >= 40 && chatbotRes.err === 0 && chatbotRes.acts === 0,
   `ChatBot: pomoc bez modelu, walidacja akcji: ${JSON.stringify(chatbotRes)}`);
 {

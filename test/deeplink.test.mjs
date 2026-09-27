@@ -300,3 +300,12 @@ describe('loaders: podkatalog z deep-linku (opts.sub)', () => {
     assert.equal(files.find((x) => x.path === 'sub/b.js').content, 'export {};');
   });
 });
+
+describe('parseHash — &pr= (mapa wpływu PR)', () => {
+  test('numer PR przechodzi, zero / tekst / za długi — ignorowane (0)', () => {
+    assert.equal(DL.parseHash('#repo=o/r@main&pr=12').pr, 12);
+    assert.equal(DL.parseHash('#repo=gitlab.com/g/p&branch=dev&pr=7').pr, 7);
+    for (const bad of ['0', 'abc', '12a', '-3', '12345678']) assert.equal(DL.parseHash('#repo=o/r&pr=' + bad).pr, 0, bad);
+    assert.equal(DL.parseHash('#repo=o/r').pr, 0);
+  });
+});

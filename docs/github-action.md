@@ -30,6 +30,38 @@ jobs:
 Raport Markdown (wynik, języki, znaleziska wg reguł, hotspoty, git, testy i pokrycie, szczegóły reguł)
 trafia do **podsumowania kroku** (`$GITHUB_STEP_SUMMARY`), podsumowanie tekstowe — do logu.
 
+## Przegląd PR — komentarz z ryzykiem zmian
+
+W zdarzeniu `pull_request` akcja sama bierze bazę PR (`github.event.pull_request.base.sha`): liczy ryzyko
+każdego zmienionego pliku (częstość zmian z historii git, złożoność, pliki zależne, testy / pokrycie, rozmiar
+zmiany, znajomość pliku przez autora), health score przed i po zmianach, nowe znaleziska i sugerowanych
+recenzentów — i dodaje **jeden** komentarz w PR, aktualizowany przy kolejnych pushach.
+
+```yaml
+# .github/workflows/codemap-pr.yml
+name: CodeMap PR
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write          # komentarz w PR
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # historia git i baza PR
+      - uses: RaCzKoViC/CodeMap@main   # komentarz w PR: od wydania v1.2.0 (albo @main)
+        with:
+          pr-comment: true
+          max-score-drop: 0     # porażka, gdy PR obniża health score
+```
+
+Wejścia przeglądu: `base` (domyślnie baza PR), `baseline` (`true` — health score bazy z tymczasowego
+`git worktree`), `max-score-drop`, `pr-comment`, `map-link` (link do mapy wpływu w aplikacji — działa
+dla repozytoriów publicznych), `github-token`. Wyjścia: `risk`, `score-delta`. To samo w CLI:
+`codemap analyze --base origin/main --baseline --pr-md pr.md [--max-score-drop 0]`.
+
 ## Akcja z GitHub code scanning (SARIF)
 
 Znaleziska jako alerty w zakładce **Security → Code scanning** i adnotacje w pull requestach:

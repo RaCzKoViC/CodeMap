@@ -373,6 +373,13 @@ body.light .code-preview,body.light .fv-codewrap{background:#0d1320;color:#aebac
 .fv-codewrap{position:relative}
 .fv-band{position:absolute;left:0;right:0;background:rgba(250,204,21,.13);border-left:3px solid #facc15;pointer-events:none}
 .git-pill{display:flex;align-items:center;gap:10px}
+/* mapa wpływu PR (pr.js) */
+.pr-card .pr-title{font-weight:600;margin:0 0 6px;line-height:1.35}
+.pr-card .pr-risk{font-weight:700;border:1px solid}
+.pr-card .pr-sub{margin:8px 0 2px}
+.pr-card .pr-file{cursor:pointer}
+.pr-card .pr-file:hover .bl{color:var(--accent)}
+.pr-st{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font:800 9px system-ui,sans-serif;color:#05080e;flex-shrink:0}
 .git-pill .gp-x{background:none;border:0;color:inherit;font-size:16px;line-height:1;cursor:pointer;opacity:.7;padding:0 2px}
 .git-pill .gp-x:hover{opacity:1}
 .git-card .tag{margin:0 4px 4px 0}

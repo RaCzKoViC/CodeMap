@@ -87,15 +87,15 @@ Publikacja:
 - Rozszerzenie VS Code / integracja z LSP jako opcja.
 - Wydanie v1.1.0 (Release, notatki z CHANGELOG, nowe zrzuty).
 
-## Faza 5 — przegląd zmian (PR)
+## Faza 5 — przegląd zmian (PR) — W TOKU 2026-09-27
 
 Największa wartość przy małym koszcie: łączy graf zależności, historię git, testy i pokrycie.
-- Mapa wpływu PR: zmienione pliki z API GitHub/GitLab (`pulls/:n/files`, `merge_requests/:iid/changes`),
-  zasięg zależności (`impactSet`), ocena ryzyka (częstość zmian × złożoność × pokrycie × właściciel), link
-  `#repo=…&pr=N`.
-- Komentarz w PR z GitHub Action: ryzyko, nowe cykle i naruszenia reguł, pliki bez testów, link do mapy.
-- Sugerowani recenzenci z własności plików (git).
-- CLI `--baseline`: health score przed/po, próg „nie pogarszaj" w CI.
+- [x] Mapa wpływu PR (`js/pr-core.js`, `js/pr.js`): zmienione pliki z API GitHub / GitLab / Bitbucket, zależne
+  (odwrotny BFS), ryzyko 0–100 z sześciu składników, nakładka, panel, raport, link `#repo=…&pr=N`.
+- [x] Komentarz w PR z GitHub Action (`pr-comment`): ryzyko, pliki, zdrowie przed/po, nowe znaleziska, link do mapy.
+- [x] Sugerowani recenzenci z własności plików (git).
+- [x] CLI `--base` / `--baseline` / `--pr-md` / `--max-score-drop`: health score przed/po, próg „nie pogarszaj".
+- [ ] Zostało: wybór PR z listy otwartych PR w oknie, porównanie przed/po także w aplikacji (dziś tylko CLI).
 
 ## Faza 6 — tryb na żywo i skala
 

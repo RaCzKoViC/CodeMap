@@ -122,7 +122,7 @@
     return openMapFrom('share', id, opts);
   }
   // repozytorium z linku: publiczny dostęp (bez tokenu), z treścią plików, opcjonalnie podkatalog i układ
-  async function openRepoLink(spec, layout){
+  async function openRepoLink(spec, layout, pr){
     if(layout) A.setLayoutSelect(layout);
     A._restoring=true;
     let ok=false;
@@ -131,6 +131,7 @@
         T('ca.connectingToRepo','Łączenie z repozytorium…'));
     }finally{ A._restoring=false; }
     if(ok) U.toast(T('dl.repoOpened','Otwarto z linku: ')+'<b>'+DL.label(spec)+'</b>', 'success', 5000);
+    if(ok && pr && CM.PR) CM.PR.run(pr);   // #repo=…&pr=N → mapa wpływu PR
     return !!ok;
   }
   // #repo= / #gist= / #share= → wczytanie; false dla innych hashy i błędów (czytelny toast)
@@ -142,7 +143,7 @@
     if(opts.confirmReplace && state.counts.nodes>0 && !confirm(T('dl.confirmReplace','Otworzyć mapę z linku? Zastąpi bieżącą mapę (ostatnia sesja jest zapisana automatycznie).'))) return false;
     if(r.kind==='gist') return openGist(r.id, opts);
     if(r.kind==='share') return openShare(r.id, opts);
-    return openRepoLink(r.spec, r.layout);
+    return openRepoLink(r.spec, r.layout, r.pr);
   }
   // link wklejony w pasek adresu otwartej już aplikacji (zmienia się tylko hash — bez przeładowania strony)
   window.addEventListener('hashchange', ()=>{ if(DL.isDeepLink(location.hash)) openDeepLink(location.hash, {confirmReplace:true}).catch(()=>{}); });

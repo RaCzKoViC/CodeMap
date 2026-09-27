@@ -193,7 +193,12 @@ CM.Loaders = (function(){
     return {files:out, warnings};
   }
 
+  // pliki z sekretami: węzeł na mapie tak, ale treści NIE czytamy — trafiłaby do podglądu, zapisanej mapy,
+  // publicznego linku, RAG i raportów CLI (.env.example / .sample / .template zostają czytelne)
+  const RE_SECRET=/^(\.env(\.(?!example$|sample$|template$|dist$)[\w.-]+)?|\.npmrc|\.pypirc|\.netrc|id_(rsa|dsa|ecdsa|ed25519)|.+\.(pem|key|p12|pfx|jks|keystore))$/i;
+  function isSecretFile(name){ return RE_SECRET.test(String(name||'').split('/').pop()); }
   function isTextFile(name, size){
+    if(isSecretFile(name)) return false;
     const info = L.lookup(name);
     return info.text && size <= TEXT_SIZE_LIMIT;
   }
@@ -650,5 +655,5 @@ CM.Loaders = (function(){
     const j=await r.json(); return {url:j.html_url, id:j.id};
   }
 
-  return {TEXT_SIZE_LIMIT, MAX_CONTENT_FILES, resolveSide, RE_COVERAGE, fromFileList, fromDrop, fromDataTransfer, fromGitHub, fromGitLab, fromBitbucket, fromRepoURL, repoHost, parseSource, isTextFile, shouldSkip, fetchRefs, fetchTreeSig, ghRateLimit, createGist, mistralChat, mistralStream};
+  return {TEXT_SIZE_LIMIT, MAX_CONTENT_FILES, resolveSide, RE_COVERAGE, isSecretFile, fromFileList, fromDrop, fromDataTransfer, fromGitHub, fromGitLab, fromBitbucket, fromRepoURL, repoHost, parseSource, isTextFile, shouldSkip, fetchRefs, fetchTreeSig, ghRateLimit, createGist, mistralChat, mistralStream};
 })();

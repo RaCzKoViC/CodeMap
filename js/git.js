@@ -96,6 +96,7 @@
       job=null; hidePill();
       invalidate();
       A.refreshView();
+      try{ document.dispatchEvent(new CustomEvent('codemap:git')); }catch(e){}   // np. pr.js przelicza ryzyko PR
       const bf=g.gitInfo.busFactor, au=g.gitInfo.authors;
       let msg=T('git.doneA','Historia git: ')+U.fmtNum(res.commits)+T('git.doneCommits',' commitów · ')+U.fmtNum(au.filter(a=>!a.bot).length)
         +T('git.doneAuthors',' autorów · bus factor ')+bf.value+(bf.authors.length?' ('+bf.authors.slice(0,3).map(i=>au[i].name).join(', ')+')':'')

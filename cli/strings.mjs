@@ -30,6 +30,14 @@ Progi (kod wyjścia 1, gdy niespełnione):
   --fail-on <lista>      po przecinku: poziom ważności (high | med | low | info — ten lub wyższy)
                          albo identyfikatory reguł (np. cycles,archviolation)
   --max-findings <N>     więcej niż N znalezisk łącznie
+  --max-score-drop <N>   (z --baseline) health score spadł o więcej niż N względem --base
+
+Przegląd zmian (PR):
+  --base <ref>           zmienione pliki z „git diff <ref>...HEAD": ryzyko każdej zmiany, pliki zależne,
+                         sugerowani recenzenci (w raporcie JSON: „pr")
+  --baseline             policz też health score dla <ref> (tymczasowy git worktree) i nowe znaleziska
+  --pr-md <plik>         komentarz Markdown do PR (ryzyko, pliki, zdrowie przed/po, nowe znaleziska)
+  --pr-number <N>, --pr-title <tekst>, --pr-author <login>, --pr-link <url>   dane PR do komentarza
 
 Inne:
   --lang pl|en           język raportów i komunikatów (domyślnie pl)
@@ -54,6 +62,9 @@ Reguły: {rules}`,
     failSev: '{n} o ważności ≥ {sev} (--fail-on {sev})',
     failRule: 'reguła „{rule}" ({title}): {n} (--fail-on)',
     failMax: '{n} > --max-findings {max}',
+    failDrop: 'health score spadł o {d} (z {b} do {s}) > --max-score-drop {max}', eBaselineNoBase: '--baseline i --pr-md wymagają --base <ref>',
+    prLine: 'Zmiany vs {base}', prVal: 'ryzyko {risk}/100 ({lvl}) · plików {n} (+{a} / −{d}) · zależnych {dep}',
+    blLine: 'Zdrowie vs {base}', blVal: '{b} → {s} ({sign}{d}) · nowe znaleziska: {nf}, usunięte: {rf}',
     warn: 'uwaga', err: 'błąd',
     eNoCmd: 'brak polecenia — użyj „codemap analyze [ścieżka]" (codemap --help)',
     eCmd: 'nieznane polecenie „{c}" (codemap --help)',
@@ -103,6 +114,14 @@ Thresholds (exit code 1 when not met):
   --fail-on <list>       comma-separated: severity (high | med | low | info — that or higher)
                          or rule ids (e.g. cycles,archviolation)
   --max-findings <N>     more than N findings in total
+  --max-score-drop <N>   (with --baseline) health score dropped by more than N vs --base
+
+Change review (PR):
+  --base <ref>           changed files from "git diff <ref>...HEAD": risk of each change, dependent files,
+                         suggested reviewers (JSON report: "pr")
+  --baseline             also compute the health score of <ref> (temporary git worktree) and new findings
+  --pr-md <file>         Markdown PR comment (risk, files, health before/after, new findings)
+  --pr-number <N>, --pr-title <text>, --pr-author <login>, --pr-link <url>   PR data for the comment
 
 Other:
   --lang pl|en           language of reports and messages (default pl)
@@ -127,6 +146,9 @@ Rules: {rules}`,
     failSev: '{n} with severity ≥ {sev} (--fail-on {sev})',
     failRule: 'rule "{rule}" ({title}): {n} (--fail-on)',
     failMax: '{n} > --max-findings {max}',
+    failDrop: 'health score dropped by {d} (from {b} to {s}) > --max-score-drop {max}', eBaselineNoBase: '--baseline and --pr-md need --base <ref>',
+    prLine: 'Changes vs {base}', prVal: 'risk {risk}/100 ({lvl}) · {n} files (+{a} / −{d}) · {dep} dependents',
+    blLine: 'Health vs {base}', blVal: '{b} → {s} ({sign}{d}) · new findings: {nf}, resolved: {rf}',
     warn: 'warning', err: 'error',
     eNoCmd: 'no command — use "codemap analyze [path]" (codemap --help)',
     eCmd: 'unknown command "{c}" (codemap --help)',

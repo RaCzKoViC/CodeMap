@@ -5,6 +5,25 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 5 (przegląd zmian)
+- **Mapa wpływu PR** (`js/pr-core.js`, `js/pr.js`): Projekt → „Przegląd PR…" (numer albo adres PR / MR
+  z GitHub, GitLab, Bitbucket; PR z innego repozytorium wczytuje najpierw to repozytorium) i link
+  `#repo=…&pr=N`. Zmienione pliki z API hostingu, pliki zależne (odwrotny BFS po importach, do 3 poziomów),
+  ryzyko każdej zmiany 0–100 (częstość zmian, złożoność — tylko kod, zależni, testy / pokrycie — tylko kod,
+  rozmiar zmiany, znajomość pliku przez autora), sugerowani recenzenci z własności plików; nakładka „Wpływ PR"
+  z legendą, znaczniki A/M/D/R na węzłach, karta PR i sekcje plików w panelu, raport Markdown, link do mapy,
+  przeliczenie po dołączeniu historii git; dane PR zapisują się w mapie. ChatBot: `prReview {pr}`, `prRisk`.
+- **CLI — przegląd zmian**: `--base <ref>` (pliki z `git diff <ref>...HEAD`, ta sama ocena co w aplikacji),
+  `--baseline` (health score bazy z tymczasowego `git worktree` + nowe i usunięte znaleziska), `--pr-md`
+  (komentarz Markdown), `--max-score-drop N` (próg „nie pogarszaj"), `--pr-number/-title/-author/-link`.
+- **GitHub Action — komentarz w PR**: w `pull_request` baza PR automatycznie, jeden komentarz aktualizowany
+  przy kolejnych pushach (`pr-comment`), `max-score-drop`, link do mapy wpływu, wyjścia `risk` i `score-delta`.
+
+### Bezpieczeństwo
+- Treść plików z sekretami (`.env*` poza przykładami, `.npmrc`, `.netrc`, klucze prywatne, `*.pem/.key/.p12/.pfx/.jks`)
+  nie jest czytana — plik jest na mapie, ale jego treść nie trafia do podglądu, zapisanej mapy, publicznego
+  linku, RAG ani raportów CLI (wcześniej m.in. `server/.env` trafiał do analizy).
+
 ## [1.1.0] — 2026-09-27
 
 Fazy 2–4 planu rozwoju — głębsza analiza, inteligencja git, ekosystem ([docs/ROADMAP.md](docs/ROADMAP.md)).

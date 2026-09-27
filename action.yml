@@ -50,6 +50,30 @@ inputs:
     description: 'Wersja Node.js (≥ 20.6).'
     required: false
     default: '22'
+  base:
+    description: 'Ref bazowy przeglądu zmian (git diff <base>...HEAD): ryzyko zmian, pliki zależne, recenzenci. W zdarzeniu pull_request domyślnie baza PR. Wymaga actions/checkout z fetch-depth: 0.'
+    required: false
+    default: ''
+  baseline:
+    description: 'Policz health score dla bazy (tymczasowy git worktree) i nowe znaleziska względem niej.'
+    required: false
+    default: 'true'
+  max-score-drop:
+    description: 'Porażka, gdy health score spadnie względem bazy o więcej niż N (0 = „nie pogarszaj"). Puste = bez progu.'
+    required: false
+    default: ''
+  pr-comment:
+    description: 'W zdarzeniu pull_request: dodaj / zaktualizuj komentarz CodeMap w PR (wymaga permissions: pull-requests: write).'
+    required: false
+    default: 'false'
+  map-link:
+    description: 'Dodaj do komentarza link do mapy wpływu PR w aplikacji CodeMap (działa dla publicznych repozytoriów).'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'Token do komentarza w PR.'
+    required: false
+    default: ${{ github.token }}
 
 outputs:
   score:
@@ -61,6 +85,12 @@ outputs:
   sarif-file:
     description: 'Ścieżka zapisanego pliku SARIF (pusta, gdy wyłączony).'
     value: ${{ steps.analyze.outputs.sarif-file }}
+  risk:
+    description: 'Ryzyko zmian względem bazy (0–100; puste bez przeglądu zmian).'
+    value: ${{ steps.analyze.outputs.risk }}
+  score-delta:
+    description: 'Zmiana health score względem bazy (puste bez baseline).'
+    value: ${{ steps.analyze.outputs.score-delta }}
 
 runs:
   using: 'composite'
@@ -82,6 +112,17 @@ runs:
         CM_LANG: ${{ inputs.lang }}
         CM_GIT: ${{ inputs.git }}
         CM_ARGS: ${{ inputs.args }}
+        CM_BASE: ${{ inputs.base || github.event.pull_request.base.sha }}
+        CM_BASELINE: ${{ inputs.baseline }}
+        CM_MAX_DROP: ${{ inputs.max-score-drop }}
+        CM_PR_COMMENT: ${{ inputs.pr-comment }}
+        CM_MAP_LINK: ${{ inputs.map-link }}
+        CM_PR_NUMBER: ${{ github.event.pull_request.number }}
+        CM_PR_TITLE: ${{ github.event.pull_request.title }}
+        CM_PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        CM_HEAD_REF: ${{ github.head_ref }}
+        CM_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
         set -uo pipefail
         tmp="${RUNNER_TEMP:-/tmp}/codemap-$$"
@@ -94,14 +135,40 @@ runs:
         [ -n "$CM_FAIL_ON" ] && args+=(--fail-on "$CM_FAIL_ON")
         [ -n "$CM_MAX_FINDINGS" ] && args+=(--max-findings "$CM_MAX_FINDINGS")
         case "$CM_GIT" in false|False|FALSE|0|no|off) args+=(--no-git) ;; esac
+        prmd=""
+        if [ -n "$CM_BASE" ]; then
+          # płytki checkout nie ma bazy — dociągnij ją (bez błędu, gdy już jest)
+          git rev-parse --verify --quiet "$CM_BASE^{commit}" >/dev/null || git fetch --no-tags --quiet origin "$CM_BASE" || true
+          prmd="$tmp/codemap-pr.md"
+          args+=(--base "$CM_BASE" --pr-md "$prmd")
+          case "$CM_BASELINE" in true|True|TRUE|1|yes|on) args+=(--baseline) ;; esac
+          [ -n "$CM_MAX_DROP" ] && args+=(--max-score-drop "$CM_MAX_DROP")
+          [ -n "$CM_PR_NUMBER" ] && args+=(--pr-number "$CM_PR_NUMBER")
+          [ -n "$CM_PR_TITLE" ] && args+=(--pr-title "$CM_PR_TITLE")
+          [ -n "$CM_PR_AUTHOR" ] && args+=(--pr-author "$CM_PR_AUTHOR")
+          if [ -n "$CM_PR_NUMBER" ] && [ "$CM_MAP_LINK" = "true" ]; then
+            args+=(--pr-link "https://raczkovic.github.io/CodeMap/#repo=${CM_REPO}&pr=${CM_PR_NUMBER}")
+          fi
+        fi
         if [ -n "$CM_ARGS" ]; then read -r -a extra <<< "$CM_ARGS"; args+=("${extra[@]}"); fi
 
         node "$GITHUB_ACTION_PATH/cli/codemap.mjs" "${args[@]}"
         code=$?
 
+        if [ -n "$prmd" ] && [ -f "$prmd" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$prmd" >> "$GITHUB_STEP_SUMMARY"; echo >> "$GITHUB_STEP_SUMMARY"; fi
         if [ -f "$md" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$md" >> "$GITHUB_STEP_SUMMARY"; fi
+        # komentarz w PR: jeden, aktualizowany przy kolejnych pushach (znacznik w treści)
+        case "$CM_PR_COMMENT" in true|True|TRUE|1|yes|on)
+          if [ -n "$CM_PR_NUMBER" ] && [ -n "$prmd" ] && [ -f "$prmd" ]; then
+            marker='<!-- codemap-pr-comment -->'
+            body="$(printf '%s\n%s' "$marker" "$(cat "$prmd")")"
+            cid="$(gh api "repos/$CM_REPO/issues/$CM_PR_NUMBER/comments" --paginate --jq ".[] | select(.body | contains(\"$marker\")) | .id" 2>/dev/null | head -n1 || true)"
+            if [ -n "$cid" ]; then gh api -X PATCH "repos/$CM_REPO/issues/comments/$cid" -f body="$body" >/dev/null || echo "::warning::CodeMap: nie udało się zaktualizować komentarza w PR"
+            else gh api "repos/$CM_REPO/issues/$CM_PR_NUMBER/comments" -f body="$body" >/dev/null || echo "::warning::CodeMap: nie udało się dodać komentarza w PR (permissions: pull-requests: write?)"; fi
+          fi ;;
+        esac
         if [ -f "$json" ]; then
-          node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log("score="+r.score);console.log("findings="+r.totals.findings)' "$json" >> "$GITHUB_OUTPUT"
+          node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log("score="+r.score);console.log("findings="+r.totals.findings);console.log("risk="+(r.pr?r.pr.risk:""));console.log("score-delta="+(r.baseline?r.baseline.delta:""))' "$json" >> "$GITHUB_OUTPUT"
         fi
         if [ -n "$CM_SARIF" ] && [ -f "$CM_SARIF" ]; then echo "sarif-file=$CM_SARIF" >> "$GITHUB_OUTPUT"; else echo "sarif-file=" >> "$GITHUB_OUTPUT"; fi
         exit $code

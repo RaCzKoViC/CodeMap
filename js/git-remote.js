@@ -138,6 +138,50 @@ CM.GitRemote = (function(){
       stats:{listed:commits.length, detailed:d.detailed, truncated:commits.length>=o.max, rateLimited:rate.limited||(d.stopped&&d.stopped.code==='rate'), remaining:rate.remaining, stopped:d.stopped&&d.stopped.message}};
   }
 
+  // ---------------- pull / merge requesty (faza 5: mapa wpływu PR) ----------------
+  // → {pr:{number, title, state, draft, url, author:{login, name, avatar}, base, head}, files:[{path, status, add, del, from?}], truncated}
+  async function fetchPR(meta, number, opts){
+    opts=opts||{}; const n=Math.floor(+number); if(!supported(meta)||!(n>0)) throw new Error(T('git.prBad','Podaj numer PR w repozytorium z GitHub / GitLab / Bitbucket.'));
+    const rate={remaining:null, limited:false}, sig=opts.signal;
+    if(meta.host==='gitlab'){
+      const h={}; if(opts.token) h['PRIVATE-TOKEN']=opts.token;
+      const get=client(h, sig, rate), api='https://gitlab.com/api/v4/projects/'+encodeURIComponent(meta.repo)+'/merge_requests/'+n;
+      const m=await get(api); const files=[];
+      let list=null; try{ const ch=await get(api+'/changes'); list=ch&&ch.changes; }catch(e){ if(e.code==='cancelled') throw e; }
+      if(!list){ list=[]; for(let p=1;p<=30;p++){ const arr=await get(api+'/diffs?per_page=100&page='+p); if(!Array.isArray(arr)||!arr.length) break; list.push(...arr); if(arr.length<100) break; } }
+      for(const f of list){ const {add,del}=diffLines(f.diff); const s=f.new_file?'A':f.deleted_file?'D':f.renamed_file?'R':'M';
+        const r={path:s==='D'?f.old_path:f.new_path, status:s, add, del}; if(s==='R') r.from=f.old_path; files.push(r); }
+      return {pr:{number:m.iid||n, title:m.title||'', state:m.state||'', draft:!!(m.draft||m.work_in_progress), url:m.web_url||'',
+        author:{login:m.author&&m.author.username||null, name:m.author&&m.author.name||'', avatar:m.author&&m.author.avatar_url||null},
+        base:m.target_branch||'', head:m.source_branch||''}, files, truncated:false};
+    }
+    if(meta.host==='bitbucket'){
+      const h={}; if(opts.token) h['Authorization']='Bearer '+opts.token;
+      const get=client(h, sig, rate), api='https://api.bitbucket.org/2.0/repositories/'+meta.repo+'/pullrequests/'+n;
+      const m=await get(api); const files=[]; let u=api+'/diffstat?pagelen=100', g=0;
+      while(u && g++<30){ const j=await get(u);
+        for(const f of (j.values||[])){ const s={added:'A', removed:'D', modified:'M', renamed:'R'}[f.status]||'M';
+          const r={path:(s==='D'?(f.old&&f.old.path):(f.new&&f.new.path))||'', status:s, add:f.lines_added||0, del:f.lines_removed||0};
+          if(s==='R'&&f.old) r.from=f.old.path; if(r.path) files.push(r); }
+        u=j.next||null; }
+      const a=m.author||{};
+      return {pr:{number:m.id||n, title:m.title||'', state:m.state||'', draft:false, url:(m.links&&m.links.html&&m.links.html.href)||'',
+        author:{login:a.nickname||null, name:a.display_name||'', avatar:(a.links&&a.links.avatar&&a.links.avatar.href)||null},
+        base:(m.destination&&m.destination.branch&&m.destination.branch.name)||'', head:(m.source&&m.source.branch&&m.source.branch.name)||''}, files, truncated:!!u};
+    }
+    const h={'Accept':'application/vnd.github+json'}; if(opts.token) h['Authorization']='Bearer '+opts.token;
+    const get=client(h, sig, rate), api='https://api.github.com/repos/'+meta.repo+'/pulls/'+n;
+    const m=await get(api); const files=[]; let page=1, last=0;
+    for(; page<=30; page++){ const arr=await get(api+'/files?per_page=100&page='+page); last=Array.isArray(arr)?arr.length:0;
+      for(const f of (arr||[])){ const s=STATUS_GH[f.status]||'M'; const r={path:f.filename, status:s, add:f.additions||0, del:f.deletions||0};
+        if(s==='R'&&f.previous_filename) r.from=f.previous_filename; files.push(r); }
+      if(last<100) break; }
+    const u=m.user||{};
+    return {pr:{number:m.number||n, title:m.title||'', state:m.merged_at?'merged':(m.state||''), draft:!!m.draft, url:m.html_url||'',
+      author:{login:u.login||null, name:'', avatar:u.avatar_url||null}, base:(m.base&&m.base.ref)||'', head:(m.head&&m.head.ref)||''},
+      files, truncated:page>30&&last===100, remaining:rate.remaining};
+  }
+
   // meta = graph.meta z loadera (host, repo, branch, sub); opts = {token, max=1000, maxDetails, onProgress, signal}
   function supported(meta){ return !!(meta && meta.repo && /^(github|gitlab|bitbucket)$/.test(meta.host||'')); }
   async function fetchHistory(meta, opts){
@@ -147,5 +191,5 @@ CM.GitRemote = (function(){
     if(meta.host==='bitbucket') return bitbucket(meta, o);
     return github(meta, o);
   }
-  return {fetchHistory, supported, _diffLines:diffLines, _parseRaw:parseRaw};
+  return {fetchHistory, fetchPR, supported, _diffLines:diffLines, _parseRaw:parseRaw};
 })();

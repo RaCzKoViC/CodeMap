@@ -13,6 +13,7 @@ import { runAnalysis, mapJSON, DEFAULTS } from './analyze.mjs';
 import { toSummary, SEVS, SEV_RANK } from './report.mjs';
 import { strings, countOf, CliError } from './strings.mjs';
 import { loadCodeMap } from './runtime.mjs';
+import { changedFiles, prReport, baseline, diffFindings, prMarkdown } from './pr.mjs';
 
 const SEV_ALIAS = { high: 'high', error: 'high', critical: 'high', med: 'med', medium: 'med', warning: 'med',
   low: 'low', note: 'low', info: 'info' };
@@ -31,7 +32,8 @@ export function parseArgs(argv, RULES) {
   const tr = strings(lang);
   const o = { cmd: null, dir: null, lang, json: null, md: null, sarif: null, map: null, export: null, out: null,
     minScore: null, failOn: [], maxFindings: null, git: DEFAULTS.git, gitMax: DEFAULTS.gitMax, coverage: [], noCoverage: false,
-    exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false };
+    exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false,
+    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null };
   const num = (flag, v) => { const n = Number(v); if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw new CliError(tr('eNum', { o: flag, v })); return n; };
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i], val = null;
@@ -49,6 +51,14 @@ export function parseArgs(argv, RULES) {
       case '--out': case '-o': o.out = need(); break;
       case '--min-score': o.minScore = num(a, need()); break;
       case '--max-findings': o.maxFindings = num(a, need()); break;
+      case '--max-score-drop': o.maxScoreDrop = num(a, need()); break;
+      case '--base': o.base = need(); break;
+      case '--baseline': o.baseline = true; break;
+      case '--pr-md': o.prMd = need(); break;
+      case '--pr-number': o.prNumber = Math.floor(num(a, need())); break;
+      case '--pr-title': o.prTitle = need(); break;
+      case '--pr-author': o.prAuthor = need(); break;
+      case '--pr-link': o.prLink = need(); break;
       case '--fail-on':
         for (const raw of need().split(',').map((s) => s.trim()).filter(Boolean)) {
           const sev = SEV_ALIAS[raw.toLowerCase()];
@@ -76,7 +86,8 @@ export function parseArgs(argv, RULES) {
     }
   }
   if (o.out && !o.export) throw new CliError(tr('eOutNoExport'));
-  const toStdout = [o.json, o.md, o.sarif, o.map].filter((x) => x === '-').length + (o.export && (!o.out || o.out === '-') ? 1 : 0);
+  if ((o.baseline || o.prMd || o.maxScoreDrop != null) && !o.base) throw new CliError(tr('eBaselineNoBase'));
+  const toStdout = [o.json, o.md, o.sarif, o.map, o.prMd].filter((x) => x === '-').length + (o.export && (!o.out || o.out === '-') ? 1 : 0);
   if (toStdout > 1) throw new CliError(tr('eStdout'));
   o.stdoutUsed = toStdout > 0;
   return o;
@@ -97,6 +108,8 @@ export function checkThresholds(report, o, tr) {
     }
   }
   if (o.maxFindings != null && report.totals.findings > o.maxFindings) why.push(tr('failMax', { n: cnt(report.totals.findings), max: o.maxFindings }));
+  if (o.maxScoreDrop != null && report.baseline && report.baseline.score - report.score > o.maxScoreDrop)
+    why.push(tr('failDrop', { d: report.baseline.score - report.score, b: report.baseline.score, s: report.score, max: o.maxScoreDrop }));
   return why;
 }
 
@@ -121,11 +134,24 @@ export async function main(argv = process.argv.slice(2)) {
     if (!o.cmd) { process.stderr.write(tr('help', { v: CM0.VERSION, max: CM0.Loaders.MAX_CONTENT_FILES, rules: CM0.Inspect.RULES.join(', ') }) + '\n\n' + tr('err') + ': ' + tr('eNoCmd') + '\n'); return 2; }
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 
-    const res = await runAnalysis(o.dir || '.', {
-      lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
-      maxContent: o.maxContent, exclude: o.exclude,
-    });
+    const aOpts = { lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
+      maxContent: o.maxContent, exclude: o.exclude };
+    const res = await runAnalysis(o.dir || '.', aOpts);
     const { CM, graph, report } = res;
+    // przegląd zmian: pliki z git diff <base>...HEAD → ryzyko (CM.PRCore), opcjonalnie wynik bazowy
+    let prFiles = null, bl = null, fdiff = null;
+    const prMeta = { number: o.prNumber || null, title: o.prTitle || '', author: o.prAuthor ? { login: o.prAuthor } : undefined };
+    if (o.base) {
+      if (!res.repoRoot) throw new CliError(lang === 'en' ? '--base needs a git repository' : '--base wymaga repozytorium git');
+      prFiles = changedFiles(res.repoRoot, o.base, res.sub, lang);
+      report.pr = Object.assign({ base: o.base }, prReport(CM, graph, prFiles, prMeta));
+      if (o.baseline) {
+        bl = await baseline(res.repoRoot, o.base, res.sub, runAnalysis, aOpts, lang);
+        fdiff = diffFindings(bl.keys, report);
+        report.baseline = { ref: o.base, score: bl.score, totals: bl.totals, delta: report.score - bl.score,
+          newFindings: fdiff.added.length, resolvedFindings: fdiff.removed.length, added: fdiff.added.slice(0, 100) };
+      }
+    }
     const log = (s) => { if (!o.quiet) process.stderr.write(s + '\n'); };
     const written = [];
     if (o.json) { writeOut(o.json, JSON.stringify(report, null, 2) + '\n'); written.push(['JSON', o.json]); }
@@ -136,12 +162,17 @@ export async function main(argv = process.argv.slice(2)) {
       writeOut(o.out || '-', ex.text);
       written.push([o.export.toUpperCase(), o.out || '-']);
     }
+    if (o.prMd) { writeOut(o.prMd, prMarkdown(CM, graph, prFiles, prMeta, { lang, link: o.prLink, baseline: bl, score: report.score, diff: fdiff })); written.push(['PR Markdown', o.prMd]); }
     if (o.map) { writeOut(o.map, JSON.stringify(mapJSON(CM, graph)) + '\n'); written.push(['.codemap.json', o.map]); }
     // podsumowanie: na stdout, chyba że stdout zajmuje któreś wyjście (wtedy na stderr)
     if (!o.quiet) {
       const stream = o.stdoutUsed ? process.stderr : process.stdout;
       const color = o.color != null ? o.color : (!!stream.isTTY && !process.env.NO_COLOR) || !!process.env.FORCE_COLOR;
       stream.write(toSummary(CM, report, { color }) + '\n');
+      if (report.pr) { const p = report.pr, lvl = { high: lang === 'en' ? 'high' : 'wysokie', med: lang === 'en' ? 'medium' : 'średnie', low: lang === 'en' ? 'low' : 'niskie' }[p.level];
+        stream.write('  ' + tr('prLine', { base: p.base }).padEnd(18) + tr('prVal', { risk: p.risk, lvl, n: p.changed.length + p.outside.length, a: p.add, d: p.del, dep: p.impacted }) + '\n'); }
+      if (report.baseline) { const b = report.baseline, d = b.delta;
+        stream.write('  ' + tr('blLine', { base: b.ref }).padEnd(18) + tr('blVal', { b: b.score, s: report.score, sign: d > 0 ? '+' : d < 0 ? '−' : '±', d: Math.abs(d), nf: b.newFindings, rf: b.resolvedFindings }) + '\n'); }
       for (const [what, file] of written) if (file !== '-') stream.write('  ' + tr('written', { what, file }) + '\n');
     }
     for (const w of report.warnings) log(`codemap: ${tr('warn')}: ${w}`);

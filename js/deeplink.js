@@ -124,7 +124,8 @@ CM.DeepLink = (function(){
     if(p.has('branch')){ const b=p.get('branch').trim(); if(b){ if(!validRef(b)) return bad('branch'); spec=Object.assign({}, spec, {branch:b}); } }
     if(p.has('path')){ const s=normSub(p.get('path').trim()); if(!validSub(s)) return bad('path'); spec=Object.assign({}, spec, {sub:s}); }
     const ly=(p.get('layout')||'').trim();
-    return {kind:'repo', spec, layout:RE_LAYOUT.test(ly)?ly:''};   // nieznany układ = zignorowany (sprawdzany też z listą układów)
+    const prs=(p.get('pr')||'').trim(), pr=/^[1-9]\d{0,6}$/.test(prs)?+prs:0;   // &pr=N → mapa wpływu PR (pr.js)
+    return {kind:'repo', spec, layout:RE_LAYOUT.test(ly)?ly:'', pr};   // nieznany układ = zignorowany (sprawdzany też z listą układów)
   }
 
   // ---------------- mapa z niezaufanego źródła ----------------

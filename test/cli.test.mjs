@@ -272,3 +272,50 @@ describe('CLI: podkatalog repozytorium i API analyzeProject', () => {
     assert.match(r.markdown, /^# CodeMap — Static analysis: fixture/);
   });
 });
+
+describe('CLI: przegląd zmian (--base, --baseline, --pr-md)', { skip: !HAS_GIT && 'brak polecenia git' }, () => {
+  let r = null, rep = null;
+  before(() => {
+    // gałąź feature: nowy plik importujący c.js + zmiana c.js (autor Anna) — wynik względem main
+    git(DIR, ['checkout', '-q', '-b', 'feature']);
+    put('src/d.js', "import { c } from './c.js';\nexport function d(x){ if (x) { return c(); } return null; }\n");
+    put('src/c.js', FILES['src/c.js'] + 'export const extra = 1;\n');
+    git(DIR, ['add', '-A']);
+    git(DIR, ['-c', 'user.name=Anna Nowak', '-c', 'user.email=anna@example.com', 'commit', '-q', '-m', 'feature: d'],
+      { env: { GIT_AUTHOR_DATE: '1700100000 +0200', GIT_COMMITTER_DATE: '1700100000 +0200' } });
+    r = cli(['analyze', '.', '--base', 'main', '--baseline', '--json', out('pr.json'), '--pr-md', out('pr.md'),
+      '--pr-number', '3', '--pr-title', 'Dodaj d', '--pr-author', 'anna', '--pr-link', 'https://example.com/#repo=o/r&pr=3']);
+    rep = r.code === 0 || r.code === 1 ? readJSON(out('pr.json')) : null;
+  });
+  test('raport „pr": zmienione pliki ze statusem, ryzyko, zależne; podsumowanie w terminalu', () => {
+    assert.ok(rep, r.err);
+    const ch = rep.pr.changed.map((c) => c.status + ' ' + c.path).sort();
+    assert.deepEqual(ch, ['A src/d.js', 'M src/c.js']);
+    assert.ok(rep.pr.risk >= 0 && rep.pr.risk <= 100);
+    assert.ok(rep.pr.impacted >= 1, 'c.js ma importujących (b.js)');
+    assert.equal(rep.pr.base, 'main');
+    assert.match(r.out, /Zmiany vs main\s+ryzyko \d+\/100/);
+  });
+  test('baseline: wynik main, różnica i nowe znaleziska; tymczasowy worktree usunięty', () => {
+    assert.equal(typeof rep.baseline.score, 'number');
+    assert.equal(rep.baseline.delta, rep.score - rep.baseline.score);
+    assert.match(r.out, /Zdrowie vs main\s+\d+ → \d+/);
+    const wts = spawnSync('git', ['-C', DIR, 'worktree', 'list'], { encoding: 'utf8' }).stdout.trim().split('\n');
+    assert.equal(wts.length, 1, wts.join('\n'));
+  });
+  test('komentarz Markdown do PR: nagłówek z numerem, tabela, stan zdrowia, link', () => {
+    const md = fs.readFileSync(out('pr.md'), 'utf8');
+    assert.match(md, /### CodeMap — wpływ PR #3: Dodaj d/);
+    assert.match(md, /\| `src\/c\.js` \| M \+\d+\/−\d+ \|/);
+    assert.match(md, /\*\*Stan zdrowia:\*\* \d+\/100/);
+    assert.match(md, /\(https:\/\/example\.com\/#repo=o\/r&pr=3\)/);
+  });
+  test('--max-score-drop: kod 1 tylko przy spadku ponad próg; --baseline bez --base i zły ref → kod 2', () => {
+    const drop = rep.baseline.score - rep.score;
+    const t = cli(['analyze', '.', '--base', 'main', '--baseline', '--max-score-drop', String(Math.max(0, drop - 1)), '-q']);
+    assert.equal(t.code, drop > 0 ? 1 : 0, t.err);
+    assert.equal(cli(['analyze', '.', '--baseline', '-q']).code, 2);
+    const bad = cli(['analyze', '.', '--base', 'nie-ma-takiej-galezi', '-q']);
+    assert.equal(bad.code, 2); assert.match(bad.err, /nie znaleziono refa bazowego/);
+  });
+});
