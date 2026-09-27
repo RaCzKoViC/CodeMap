@@ -75,7 +75,7 @@ jobs:
           sarif: codemap.sarif
           markdown: codemap.md
           args: --exclude .claude
-          min-score: 40
+          min-score: 35          # zapas: reguły git (hotspoty) zmieniają się z każdym commitem; w PR pilnuje max-score-drop
           max-score-drop: 0       # działa tylko z bazą, czyli w PR (na push baza jest pusta)
           pr-comment: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
       - name: Wynik
