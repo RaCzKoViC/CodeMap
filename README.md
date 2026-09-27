@@ -167,7 +167,7 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   `--export dot|mermaid|graphml`. CI thresholds: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
-- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — a report in the step summary, SARIF, thresholds; an example
+- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.2.0` — a report in the step summary, SARIF, thresholds; an example
   with code scanning is in [docs/github-action.md](docs/github-action.md) (in Polish). The same step runs in this repository's CI.
 
 ### VS Code extension

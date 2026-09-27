@@ -166,7 +166,7 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
   `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (kody wyjścia 0 / 1 / 2); przegląd zmian: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
-- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.1.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
+- **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.2.0` — raport w podsumowaniu kroku, SARIF, progi; przykład
   z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
 
 ### Rozszerzenie VS Code

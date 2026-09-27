@@ -5,6 +5,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-09-27
+
+Rozszerzenie VS Code (domknięcie fazy 4), przegląd zmian w PR (faza 5), folder na żywo (faza 6), README po angielsku
+i jakość własnego kodu (faza 8) — [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ### Dodane — Faza 4 (rozszerzenie VS Code)
 - **Rozszerzenie VS Code** (`integrations/vscode/`, v0.1.0, VS Code ≥ 1.90): analiza workspace (kopia CLI w wątku
   roboczym, anulowanie) → diagnostyki w Problems z progiem ważności, kodem reguły i powiązanymi plikami; health
