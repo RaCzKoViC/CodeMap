@@ -237,6 +237,8 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
 - **Trend zdrowia**: `--history N` — N commitów rozłożonych równo na historii (pierwszy rodzic HEAD), każde drzewo
   czytane wprost z `.git` (bez checkoutu i binarki git) i analizowane jak folder, bez reguł historii git i pokrycia,
   żeby punkty były porównywalne; tabela w podsumowaniu, `history` w `--json`, sekcja ze zmianami reguł w `--md`.
+  W aplikacji: Projekt → **Trend zdrowia** dla folderu wczytanego razem z `.git` — to samo liczenie w przeglądarce
+  z paskiem postępu i anulowaniem, wykres wyniku w czasie, tabela punktów i największe zmiany reguł.
 - Paczka npm (jeszcze nieopublikowana — nazwa `codemap` jest zajęta, więc idzie pod zakresem): `npm run npm-pack -- --name @zakres/codemap`
   buduje paczkę 170 KB (CLI + 17 modułów analizy), instaluje ją w katalogu tymczasowym i uruchamia zainstalowane
   `codemap analyze`; potem `npm publish dist/npm/<plik>.tgz --access public` i `npx @zakres/codemap analyze .`.
@@ -322,6 +324,7 @@ js/vulns.js  js/vulns-ui.js     # podatne zależności: wersje z blokad/manifest
 js/mapquery.js                  # pytania o mapę językiem naturalnym (PL/EN) → spec → pliki, bez modelu; akcja mapQuery
 js/testgen.js                   # szkielety testów: framework i położenie wg konwencji projektu, przypadki wg złożoności (czyste)
 js/pr-review.js                 # asystent przeglądu PR: łatka → hunki → wiersze przed/po, prompt z fragmentami [n] (czyste)
+js/health-trend.js  js/health-trend-ui.js  # trend zdrowia w historii git (wspólny dla CLI i aplikacji) + okno z wykresem
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

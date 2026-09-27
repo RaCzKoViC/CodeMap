@@ -157,7 +157,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   ciągłe bloki ≥ 50 tokenów (78 → 24 par); ✅ testy 35 nieprzetestowanych modułów (755 testów, serwer 43; pliki kodu z
   testami 38 % → 63 %, dwa błędy znalezione i naprawione).
 
-## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27 (poza wykresem trendu w aplikacji)
+## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27
 
 - ✅ Sprzężenie zmian (change coupling): `GitCore.coupling` z osi czasu historii (stopień jak w code-maat, bez masowych
   commitów), sekcja „Zmieniany razem z" w panelu z oznaczeniem „bez importu", reguła Inspect „ukryte sprzężenie zmian",
@@ -165,7 +165,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   zależne przez globalne `CM.*` i klucze tekstów, których import nie pokazuje.
 - ✅ Trend zdrowia w czasie: `codemap analyze --history N` (`cli/history.mjs`: N commitów równo na historii pierwszego
   rodzica, drzewa z `.git` przez `GitLocal.snapshot` bez checkoutu, analiza bez reguł historii git i pokrycia; tabela,
-  `history` w JSON, sekcja w Markdown). Na CodeMap: 44 → 55 w 93 commitach. Zostaje wykres w aplikacji.
+  `history` w JSON, sekcja w Markdown). Na CodeMap: 44 → 55 w 93 commitach. ✅ Wykres w aplikacji: pętla wydzielona do
+  `js/health-trend.js` (wspólna z CLI), okno Projekt → Trend zdrowia (`js/health-trend-ui.js`, lokalny `.git`).
 - ✅ Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami: `js/dsm.js` (jednostki = pakiety z
   manifestów, `graph.packages` w zapisie mapy, albo foldery; SCC + kolejność dostawcy → konsumenci), okno `js/dsm-ui.js`
   (Projekt → Macierz zależności, klik w komórkę = pary importów), reguła `pkgcycle` (wysoka), akcja `dependencyMatrix`.

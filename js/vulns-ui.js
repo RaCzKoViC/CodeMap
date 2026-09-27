@@ -82,7 +82,7 @@
     const after=document.getElementById('btn-inspect');
     if(after && !document.getElementById('btn-vulns')){
       const b=el('button',{class:'menu-item', id:'btn-vulns', type:'button', 'data-ic':'target', text:t('vu.menu'),
-        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ open(); }catch(e){ if(A.toast) A.toast(e.message); } }});
+        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ open(); }catch(e){ U.toast(e.message,'error'); } }});
       after.parentNode.insertBefore(b, after.nextSibling); if(CM.icons&&CM.icons.hydrate) CM.icons.hydrate(b.parentNode);
     }
   }

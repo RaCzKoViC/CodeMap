@@ -93,7 +93,7 @@
     const after=document.getElementById('btn-cycles');
     if(after && !document.getElementById('btn-dsm')){
       const b=el('button',{class:'menu-item', id:'btn-dsm', type:'button', 'data-ic':'layers', text:t('dsm.menu'),
-        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ open(); }catch(e){ if(A.toast) A.toast(e.message); } }});
+        onclick:()=>{ document.querySelectorAll('.menu-panel').forEach(p=>p.classList.remove('open')); try{ open(); }catch(e){ U.toast(e.message,'error'); } }});
       after.parentNode.insertBefore(b, after.nextSibling); if(CM.icons&&CM.icons.hydrate) CM.icons.hydrate(b.parentNode);
     }
   }

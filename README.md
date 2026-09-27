@@ -237,6 +237,8 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
 - **Health trend**: `--history N` — N commits spread evenly over the history (HEAD first parent), each tree read
   straight from `.git` (no checkout, no git binary) and analyzed like the folder, without git-history rules and coverage
   so the points are comparable; a table in the summary, `history` in `--json`, a section with per-rule changes in `--md`.
+  In the app: Project → **Health trend** for a folder loaded with its `.git` — the same computation in the browser with
+  a progress bar and cancel, a chart of the score over time, a table of points and the largest rule changes.
 - npm package (not published yet — the name `codemap` is taken, so it goes under a scope): `npm run npm-pack -- --name @scope/codemap`
   builds a 170 KB package (CLI + 17 analysis modules), installs it in a temp dir and runs the installed `codemap analyze`;
   then `npm publish dist/npm/<file>.tgz --access public` and `npx @scope/codemap analyze .`.
@@ -323,6 +325,7 @@ js/vulns.js  js/vulns-ui.js     # vulnerable dependencies: lockfile/manifest ver
 js/mapquery.js                  # map questions in natural language (PL/EN) → spec → files, no model; mapQuery action
 js/testgen.js                   # test skeletons: framework + location from the project's conventions, cases by complexity (pure)
 js/pr-review.js                 # PR review assistant: patch → hunks → before/after rows, review prompt with [n] fragments (pure)
+js/health-trend.js  js/health-trend-ui.js  # health trend over git history (shared by the CLI and the app) + chart window
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

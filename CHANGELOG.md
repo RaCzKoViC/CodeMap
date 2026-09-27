@@ -64,6 +64,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   bez checkoutu i bez binarki git), analiza jak dla folderu (te same reguły wczytywania — `acceptPath` w fsload.mjs,
   graf, testy ↔ kod, Inspect) bez reguł historii git i pokrycia, żeby punkty były porównywalne. Tabela z paskami w
   podsumowaniu, `history` w `--json`, sekcja w `--md` z największymi zmianami reguł. Na CodeMap: 44 → 55 (93 commity).
+- **Trend zdrowia w aplikacji** (Projekt → Trend zdrowia, `js/health-trend-ui.js`): dla folderu wczytanego z `.git`
+  ta sama pętla co CLI `--history` (wydzielona do `js/health-trend.js` — `CM.HealthTrend.compute`, wspólna dla obu),
+  liczona w przeglądarce z paskiem postępu i anulowaniem (6 / 10 / 16 / 24 punkty); wykres wyniku w czasie (SVG, oś
+  dopasowana do danych, opis punktu w podpowiedzi), tabela punktów i największe zmiany reguł; repozytorium z hostingu
+  → podpowiedź CLI. Akcja ChatBota `healthTrend {n?}`; `CM.HealthTrendUI.show(h)` pokazuje gotowy wynik (np. z `--json`).
 - **Macierz zależności (DSM) i pakiety monorepo** (`js/dsm.js` + `js/dsm-ui.js`): jednostki = pakiety z manifestów
   (package.json, Cargo.toml, go.mod, pubspec.yaml i nowo pyproject.toml; plik należy do najgłębszego pakietu; lista w
   `graph.packages`, zachowywana w zapisie mapy) albo foldery poziomu 1/2; kolejność po silnie spójnych składowych —

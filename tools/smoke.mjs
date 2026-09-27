@@ -621,6 +621,23 @@ const prrRes = await evalJs(`(async()=>{ try{
 check(prrRes && !prrRes.error && prrRes.btn && prrRes.del === 1 && prrRes.add === 2 && prrRes.sources === 1 && prrRes.diff && !prrRes.saved
   && /^🔍 Przegląd PR #12/.test(prrRes.ask) && prrRes.note,
   `asystent przeglądu PR: przed/po z łatki, prompt z diffem, łatka poza zapisem mapy, ChatBot tylko lokalnie: ${JSON.stringify(prrRes)}`);
+// trend zdrowia w aplikacji (faza 10): CM.HealthTrend na atrapie repozytorium w przeglądarce (graf + Inspect per
+// punkt), okno z menu na demo bez .git → podpowiedź CLI zamiast przycisku
+const htRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const enc=new TextEncoder();
+  const blobs={a:enc.encode('export const a = 1;\\n'), b:enc.encode("import { a } from './a.js';\\ntry { a(); } catch (e) {}\\n")};
+  const trees={c0:[{path:'src/a.js',sha:'a'}], c1:[{path:'src/a.js',sha:'a'},{path:'src/b.js',sha:'b'}]};
+  const cm={c0:{sha:'c0',parents:[],author:{time:Date.UTC(2026,0,1)},message:'start'}, c1:{sha:'c1',parents:['c0'],author:{time:Date.UTC(2026,0,2)},message:'b'}};
+  const repo={commit:async(r)=>cm[r==='HEAD'?'c1':r]||null, snapshot:async(s)=>({commit:cm[s], files:trees[s].map(f=>({...f}))}), blob:async(s)=>blobs[s]};
+  const h=await CM.HealthTrend.compute(repo,{n:5, tick:()=>new Promise(r=>setTimeout(r,0))});
+  CMApp.loadDemo(); await sleep(900);
+  const menu=!!document.getElementById('btn-trend'); document.getElementById('btn-trend').click(); await sleep(200);
+  const local=!!document.querySelector('#ht-body .ht-local'), btn=!!document.querySelector('#ht-foot .tb-btn.primary');
+  document.querySelector('#modal-trend .modal-x').click();
+  return {pts:h.points.map(p=>p.sha+':'+(p.rules.emptycatch||0)).join(','), chain:h.chain, menu, local, btn};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(htRes && !htRes.error && htRes.pts === 'c0:0,c1:1' && htRes.chain === 2 && htRes.menu && htRes.local && !htRes.btn,
+  `trend zdrowia: liczenie w przeglądarce (atrapa repo), okno z menu, bez .git — podpowiedź CLI: ${JSON.stringify(htRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
