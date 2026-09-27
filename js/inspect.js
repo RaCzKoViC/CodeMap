@@ -45,6 +45,10 @@ CM.Inspect = (function(){
     'gitHot':'{c} zmian × złożoność {cx}','silo':'{who}: {s} % z {c} zmian',
     'r.hiddencoupling':'Ukryte sprzężenie zmian (historia git)','r.hiddencoupling.d':'Pliki kodu zmieniane razem w co najmniej połowie swoich commitów (min. 5 wspólnych), choć żaden nie importuje drugiego — zależność przez globalne nazwy, konfigurację, klucze tekstów albo protokół. Rozważ jawny import lub wspólny moduł. (Bez testów, masowych commitów > 30 plików i plików z < 5 zmianami.)',
     'coupled':'razem z {b} — wspólne commity: {n}, stopień: {d} %',
+    'r.unowned':'Kod bez właściciela (CODEOWNERS)','r.unowned.d':'Pliki kodu, których nie obejmuje żadna reguła CODEOWNERS (albo reguła bez właścicieli) — przegląd ich zmian nie trafi do nikogo. Jedna pozycja na folder.',
+    'unowned':'plików bez właściciela: {n}',
+    'r.ownerdrift':'Rozjazd CODEOWNERS z historią git','r.ownerdrift.d':'Deklarowany właściciel (osoba rozpoznana w historii) ma < 10 % zmian pliku, a ktoś inny ≥ 50 % z co najmniej 5 — CODEOWNERS nie wskazuje osoby, która naprawdę zna ten kod.',
+    'drift':'CODEOWNERS: {o} · git: {who} {s} % z {c} zmian',
   },
   en:{
     'title':'Static analysis',
@@ -82,6 +86,10 @@ CM.Inspect = (function(){
     'gitHot':'{c} changes × complexity {cx}','silo':'{who}: {s} % of {c} changes',
     'r.hiddencoupling':'Hidden change coupling (git history)','r.hiddencoupling.d':'Code files changed together in at least half of their commits (min. 5 shared) although neither imports the other — a dependency through globals, configuration, string keys or a protocol. Consider an explicit import or a shared module. (Tests, bulk commits > 30 files and files with < 5 changes excluded.)',
     'coupled':'with {b} — shared commits: {n}, degree: {d} %',
+    'r.unowned':'Code without an owner (CODEOWNERS)','r.unowned.d':'Code files not covered by any CODEOWNERS rule (or by a rule without owners) — reviews of their changes reach nobody. One entry per folder.',
+    'unowned':'files without an owner: {n}',
+    'r.ownerdrift':'CODEOWNERS drift from git history','r.ownerdrift.d':'The declared owner (a person found in the history) has < 10 % of the file\'s changes while someone else has ≥ 50 % of at least 5 — CODEOWNERS does not point to the person who actually knows this code.',
+    'drift':'CODEOWNERS: {o} · git: {who} {s} % of {c} changes',
   }};
   function t(k,sub){ const l=I.getLang(); const d=STR[l]||STR.pl; let s=(d&&k in d)?d[k]:(STR.pl[k]||k); if(sub) for(const p in sub) s=s.replace('{'+p+'}',sub[p]); return s; }
 
@@ -98,7 +106,7 @@ CM.Inspect = (function(){
   // real programming languages only — manifests/docs/styles being "orphans" is normal, not a smell
   const CODE_RE=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte|py|java|go|rb|php|cs|cpp|cxx|cc|c|h|hpp|rs|kt|kts|swift|scala|dart|lua|pl|r|jl|ex|exs|erl|hs|ml|fs|clj|groovy|zig|nim|v|sol)$/i;
   // kolejność reguł w raporcie (= wszystkie identyfikatory reguł; CLI waliduje nimi --fail-on)
-  const ORDER=['archviolation','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+  const ORDER=['archviolation','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','ownerdrift','unowned','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
 
   // returns {findings:[{rule,sev,items:[{id,name,path,detail,sev,related?}],count}], score, files, ms}
   // item.sev = ważność tej pozycji (f.sev = pierwszej; liczy się do wyniku), related = id powiązanych węzłów (SARIF)
@@ -207,6 +215,19 @@ CM.Inspect = (function(){
       for(const [a,b,p] of hidden.slice(0,LIMIT)) add(F,'hiddencoupling','low',a, t('coupled',{b:b.name, n:p.shared, d:Math.round(p.degree*100)}), [b.id]);
       if(hidden.length>LIMIT){ const f=F.get('hiddencoupling'); if(f) f.count=hidden.length; }
     }catch(e){ /* brak osi czasu w starszej mapie — reguła pominięta */ } }
+
+    // ---- CODEOWNERS a własność z historii git (CM.CodeOwners) ----
+    if(CM.CodeOwners){ try{
+      const co=CM.CodeOwners.analyze(graph);
+      if(co){
+        const byDir=new Map();                                     // bez właściciela: jedna pozycja na folder
+        for(const id of co.unowned){ const n=graph.nodes.get(id); const d=n.parent!=null?n.parent:'__root__'; if(!byDir.has(d)) byDir.set(d,[]); byDir.get(d).push(n); }
+        for(const [d,list] of byDir) add(F,'unowned','low',graph.nodes.get(d)||graph.root, t('unowned',{n:list.length}), list.slice(0,100).map(n=>n.id));
+        const au=(graph.gitInfo&&graph.gitInfo.authors)||[];
+        for(const x of co.drift.slice(0,LIMIT)) add(F,'ownerdrift','low',graph.nodes.get(x.id), t('drift',{o:x.owners.join(' '), who:(au[x.own]||{}).name||'?', s:Math.round(x.share*100), c:x.c}));
+        if(co.drift.length>LIMIT){ const f=F.get('ownerdrift'); if(f) f.count=co.drift.length; }
+      }
+    }catch(e){ /* niepoprawny CODEOWNERS nie psuje analizy */ } }
 
     // ---- folder rules ----
     for(const fd of folders){

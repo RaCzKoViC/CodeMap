@@ -164,7 +164,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - ✅ Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami: `js/dsm.js` (jednostki = pakiety z
   manifestów, `graph.packages` w zapisie mapy, albo foldery; SCC + kolejność dostawcy → konsumenci), okno `js/dsm-ui.js`
   (Projekt → Macierz zależności, klik w komórkę = pary importów), reguła `pkgcycle` (wysoka), akcja `dependencyMatrix`.
-- CODEOWNERS a rzeczywista własność z git (rozjazdy, pliki bez właściciela).
+- ✅ CODEOWNERS a rzeczywista własność z git: `js/codeowners.js` (wzorce GitHuba, ostatnie dopasowanie, `@login`/e-mail →
+  autorzy historii), reguły `unowned` (po folderach) i `ownerdrift`, sekcja w panelu, nakładka, akcja `codeOwners`.
 - Podatne zależności (OSV.dev, tylko nazwy i wersje pakietów, opcjonalnie).
 
 ## Faza 11 — AI dalej lokalnie

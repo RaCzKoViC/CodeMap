@@ -121,6 +121,10 @@ Click **“✨ See demo”** or open `index.html#demo`.
   pairs **without an import** between them (a hidden dependency: globals, config, string keys); the `changeCoupling` ChatBot action.
 - Inspect: the **Change hotspots**, **Knowledge in one head** (≥ 90 % of a complex file's changes come from one person) and
   **Hidden change coupling** rules (code files changed together in ≥ 50 % of their commits with no import either way).
+- **CODEOWNERS vs git**: GitHub pattern semantics (last match wins, `docs/*` direct children only, `apps/` at any depth),
+  `@login` / e-mail owners resolved to history authors; Inspect rules **code without an owner** (one entry per folder)
+  and **CODEOWNERS drift** (the declared owner has < 10 % of a file's changes, someone else ≥ 50 %); a details-panel
+  section, the **Owner (CODEOWNERS)** coloring and the `codeOwners` ChatBot action.
 
 ### Tests and coverage
 - CodeMap links **tests to the code they test** on its own — by name (including mirrored paths `test/` ↔ `src/`,
@@ -295,6 +299,7 @@ js/agent.js                # agent loop: read-only tools (codeSearch, readFile, 
 js/doctor.js  js/doctor-ui.js   # hotspot doctor: file record + prompt (pure), file-panel section and hotspotDoctor action
 js/cochange.js                  # change coupling (GitCore.coupling): "changes together with" panel section, changeCoupling action
 js/dsm.js  js/dsm-ui.js         # packages and dependency matrix: units, providers → consumers order, cycles (pure) + the DSM window
+js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: patterns, owners → git authors, unowned / drift (pure) + panel, coloring, action
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

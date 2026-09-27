@@ -121,6 +121,10 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   pary **bez importu** między nimi (ukryta zależność: globalne nazwy, konfiguracja, klucze tekstów); akcja ChatBota `changeCoupling`.
 - Inspect: reguły **hotspoty zmian**, **wiedza w jednej głowie** (≥ 90 % zmian złożonego pliku od jednej osoby) i **ukryte
   sprzężenie zmian** (pliki kodu zmieniane razem w ≥ 50 % swoich commitów bez importu w żadną stronę).
+- **CODEOWNERS a git**: wzorce jak na GitHubie (ostatnie dopasowanie wygrywa, `docs/*` tylko bezpośrednie pliki, `apps/`
+  na dowolnej głębokości), właściciele `@login` / e-mail rozwiązywani na autorów historii; reguły Inspect **kod bez
+  właściciela** (jedna pozycja na folder) i **rozjazd CODEOWNERS** (deklarowany właściciel ma < 10 % zmian pliku, ktoś
+  inny ≥ 50 %); sekcja w panelu, kolorowanie **Właściciel (CODEOWNERS)** i akcja ChatBota `codeOwners`.
 
 ### Testy i pokrycie
 - CodeMap sam wiąże **testy z testowanym kodem** — po nazwie (także ścieżki lustrzane `test/` ↔ `src/`,
@@ -294,6 +298,7 @@ js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSea
 js/doctor.js  js/doctor-ui.js   # Doktor hotspotów: kartoteka pliku + prompt (czyste), sekcja w panelu pliku i akcja hotspotDoctor
 js/cochange.js                  # sprzężenie zmian (GitCore.coupling): sekcja „Zmieniany razem z" w panelu, akcja changeCoupling
 js/dsm.js  js/dsm-ui.js         # pakiety i macierz zależności: jednostki, kolejność dostawcy → konsumenci, cykle (czyste) + okno DSM
+js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: wzorce, właściciele → autorzy git, bez właściciela / rozjazd (czyste) + panel, kolorowanie, akcja
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

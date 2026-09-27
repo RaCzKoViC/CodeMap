@@ -516,6 +516,28 @@ const dsmRes = await evalJs(`(async()=>{ try{
 check(dsmRes && !dsmRes.error && dsmRes.menu && dsmRes.rows === 4 && dsmRes.up === 1 && dsmRes.pairs === 1 && dsmRes.hi === 2 && dsmRes.cyc === 2
   && /@m\/core ↔ @m\/ui/.test(dsmRes.chat) && dsmRes.rule === 1,
   `macierz zależności: menu, okno, cykl nad przekątną, pary importów, reguła pkgcycle, akcja ChatBota: ${JSON.stringify(dsmRes)}`);
+// CODEOWNERS (faza 10): deklarowany @ala, a plik zmieniał tylko Bob → sekcja panelu z „rozjazd", nakładka
+// „Właściciel (CODEOWNERS)" z legendą (bez właściciela), akcja ChatBota codeOwners
+const coRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const F=(p,c)=>({path:p,size:c.length,content:c,mtime:Date.now()});
+  await CMApp.loadFiles([F('.github/CODEOWNERS','/src/ @ala\\n'), F('src/core.js','export const c = 1;\\n'), F('lib/free.js','export const f = 1;\\n')], {name:'co-demo', source:'smoke'});
+  for(let i=0;i<50;i++){ if(CMApp.graph&&CMApp.graph.meta&&CMApp.graph.meta.name==='co-demo'&&CMApp.graph.nodes.size>3) break; await sleep(100); }
+  const g=CMApp.graph, T0=Date.UTC(2026,0,1), cs=[];
+  for(let i=0;i<6;i++) cs.push({sha:'c'+i, parents:[], merge:false, author:{name:'Bob Nowak',email:'bob@x.pl'}, authorTime:T0+i*864e5, time:T0+i*864e5, message:'m', files:[{path:'src/core.js',status:'M'}]});
+  cs.push({sha:'c9', parents:[], merge:false, author:{name:'Ala Kowalska',email:'ala@x.pl'}, authorTime:T0+20*864e5, time:T0+20*864e5, message:'m', files:[{path:'lib/free.js',status:'M'}]});
+  CM.GitCore.applyToGraph(g, CM.GitCore.analyze(cs.reverse(), ['.github/CODEOWNERS','src/core.js','lib/free.js']), {source:'smoke'});
+  CMApp.focusNode('src/core.js'); await sleep(250);
+  const sec=document.querySelector('#details-body .det-codeowners'), txt=sec?sec.textContent:'';
+  CMApp.exec('colorBy',{mode:'codeowners'}); await sleep(150);
+  const cur=CM.Overlays.current(), leg=(document.getElementById('overlay-legend')||document.body).textContent||'';
+  const chat=CMApp.exec('codeOwners',{});
+  CMApp.exec('colorBy',{mode:'lang'});
+  return {sec:!!sec, ala:/@ala/.test(txt), drift:/rozjazd/.test(txt), cur, legend:/bez właściciela/.test(leg), chat:String(chat)};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(coRes && !coRes.error && coRes.sec && coRes.ala && coRes.drift && coRes.cur === 'codeowners' && coRes.legend
+  && /reguły 1, pliki kodu bez właściciela 1, rozjazdy z git 1/.test(coRes.chat),
+  `CODEOWNERS: panel z rozjazdem, nakładka, akcja ChatBota: ${JSON.stringify(coRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);

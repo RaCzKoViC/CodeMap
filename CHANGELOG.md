@@ -38,6 +38,12 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   dostawcy u góry, konsumenci niżej — więc zależności leżą pod przekątną, a komórki nad nią (czerwone) to cykle. Okno
   Projekt → Macierz zależności: wybór jednostek, klik w komórkę = pary importów + podświetlenie plików, klik w wiersz =
   pliki jednostki. Reguła Inspect **„cykle między pakietami"** (wysoka, także w CLI/SARIF) i akcja ChatBota `dependencyMatrix`.
+- **CODEOWNERS a własność z historii git** (`js/codeowners.js` + `js/codeowners-ui.js`): plik z `.github/`, korzenia,
+  `docs/` albo `.gitlab/`; wzorce zgodne z dokumentacją GitHuba (zakotwiczenie, `docs/*` tylko pliki bezpośrednio w
+  katalogu, `apps/` na dowolnej głębokości, `**`, ostatnie dopasowanie wygrywa, reguła bez właścicieli), sekcje GitLaba
+  pomijane; właściciele `@login` i e-mail rozwiązywani na autorów (login, część lokalna e-maila / noreply, nazwisko),
+  zespoły `@org/x` nieoceniane. Reguły Inspect **„kod bez właściciela"** (jedna pozycja na folder) i **„rozjazd
+  CODEOWNERS z historią git"**; sekcja w panelu pliku, kolorowanie „Właściciel (CODEOWNERS)", akcja ChatBota `codeOwners`.
 - **Reguła Inspect „ukryte sprzężenie zmian"**: pliki kodu zmieniane razem w ≥ 50 % commitów (min. 5 wspólnych) bez
   importu w żadną stronę; bez testów (test ↔ kod zmieniają się razem z natury). Trafia też do CLI, SARIF i komentarza PR.
 
