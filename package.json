@@ -22,6 +22,7 @@
     "test": "node --test \"test/**/*.test.mjs\"",
     "lint": "eslint .",
     "smoke": "node tools/smoke.mjs",
+    "bench": "node tools/bench.mjs",
     "bump": "node tools/bump.mjs",
     "serve": "python serve.py",
     "verify": "npm run check && npm test && npm run lint && npm run symbols-probe && npm run git-probe && npm run cli-smoke && npm run vscode-test",

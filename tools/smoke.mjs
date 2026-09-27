@@ -211,6 +211,25 @@ const agentRes = await evalJs(`(async()=>{ try{
     roles:seen.join(','), tools:CM.Agent.ollamaTools().length, same:CMApp.graph===g && g.nodes.size===n0};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// renderer WebGL (faza 6): demo wymuszone na GPU akcją renderOption — brak błędów GL, piksel w środku węzła ma
+// kolor węzła (odczyt z bufora GPU), hit-test i eksport PNG działają, powrót do trybu automatycznego (canvas dla demo)
+const glRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const R=CM.App.renderer;
+  if(!R.backends().includes('webgl')) return {skip:true};
+  R.setSelected(null); R.setHighlight(null); R.setImpact(null);   // poprzednie kroki mogły zostawić podświetlenie (przygaszone figury)
+  const act=CMApp.exec('renderOption',{backend:'webgl'}); R.fit(70,false); await sleep(100); R._draw();
+  const L=R._glLayer, gl=L.gl, err=gl.getError();
+  const n=[...R.nodes].filter(x=>x.type==='file').sort((a,b)=>b.r-a.r)[0], sp=R.cam.toScreen(n.x,n.y,R.w,R.h);
+  const px=new Uint8Array(4); gl.readPixels(Math.round(sp.x*R.dpr), Math.round(L.canvas.height-sp.y*R.dpr), 1,1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  const want=CM.GLLayer.rgba(R.colorFn&&R.colorFn(n)||CM.Renderer.badgeColor(n)).slice(0,3).map(v=>Math.round(v*255));
+  const close=want.every((v,i)=>Math.abs(v-px[i])<=40);
+  const hit=R.hitTest(sp.x, sp.y), png=await R.exportPNG({scale:1});
+  const stats=L.stats, disp=L.canvas.style.display;
+  CMApp.exec('renderOption',{backend:'auto'}); R._draw();
+  return {act:String(act), active:'webgl', err, stats, px:[...px].slice(0,3), want, close, hit:!!hit&&hit.id===n.id, png:!!png&&png.size>1000,
+    disp, back:R.activeBackend, hidden:L.canvas.style.display==='none'};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 // deep-linki i publiczne linki (faza 4) BEZ sieci: fetch podstawiony w stronie. #gist= → mapa (adresy z mapy
 // oczyszczone), #v= niesie gist; #share= bez backendu → czytelny błąd, mapa bez zmian; #repo= z podkatalogiem
 // i układem przez podstawione API GitHub; obcy host odrzucony bez żadnego zapytania; „Udostępnij publiczny
@@ -311,6 +330,10 @@ check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitR
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexHits > 0 && ragRes.had && ragRes.localOnly,
   `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
+if (glRes && glRes.skip) console.log('– renderer WebGL: pominięto — przeglądarka bez WebGL2');
+else check(glRes && !glRes.error && glRes.err === 0 && glRes.stats && glRes.stats.nodes > 20 && glRes.close && glRes.hit && glRes.png
+  && glRes.disp === 'block' && glRes.back === 'canvas' && glRes.hidden && /backend=webgl/.test(glRes.act),
+  `renderer WebGL: GPU rysuje demo, kolor piksela, hit-test, eksport PNG, powrót do auto: ${JSON.stringify(glRes)}`);
 check(agentRes && !agentRes.error && agentRes.steps === 'dependents:true,codeSearch:true,readFile:true' && agentRes.sources >= 2 && agentRes.nums
   && agentRes.roles === 'user,tool,user' && agentRes.tools === 9 && agentRes.same && /reducer/.test(agentRes.answer),
   `agent z narzędziami: tool_calls + JSON w treści, źródła [n], graf nietknięty: ${JSON.stringify(agentRes)}`);

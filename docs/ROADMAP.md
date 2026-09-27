@@ -103,9 +103,13 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - [x] Obserwacja folderu (`js/live.js`): FileSystemObserver + skan dat modyfikacji, analiza tylko zmienionych plików,
   przebudowa z zachowaniem stanu, RAG (wektory po hashu) i historia git (nowy commit) na bieżąco.
   Zostało: wznowienie obserwacji po przeładowaniu (uchwyt w IndexedDB + zgoda użytkownika).
-- Renderer WebGL dla 20 tys.+ węzłów (canvas 2D jest wąskim gardłem przy dużych monorepo).
+- [x] Renderer WebGL2 (`js/gl-layer.js`) dla dużych map: krawędzie i figury na GPU, etykiety na canvas 2D,
+  wygaszanie gęstych krawędzi zamiast LOD; 20 tys. plików / 60 tys. krawędzi ~1–2 ms na klatkę. Szybsza kamera
+  (`cam.xf`) przyspieszyła też canvas 2D ~2×. POZOSTAŁO: etykiety na GPU (atlas glifów) i hit-test z siatką
+  przestrzenną dla 100 tys.+ węzłów; łagodniejsze auto-odchudzanie widoku (>1200 węzłów) przy aktywnym GPU.
 - Cache analizy w OPFS (szybkie ponowne wczytanie tego samego projektu).
-- Benchmarki w CI (czasy wczytania / analizy / układu na stałych repozytoriach).
+- [x] Benchmarki w CI (`tools/bench.mjs`: wczytanie + klatka canvas/WebGL na syntetycznych 5k/20k plików, tabela
+  w podsumowaniu, JSON jako artefakt). POZOSTAŁO: prawdziwe repozytoria i próg regresji porównywany z bazą.
 
 ## Faza 7 — agent kodu (lokalne AI) — W TOKU 2026-09-27
 

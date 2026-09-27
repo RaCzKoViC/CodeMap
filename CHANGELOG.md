@@ -19,7 +19,24 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - `CM.Ollama.chatTools()` (wywołanie `/api/chat` z `tools`, bez strumienia, `think:false`), 12 testów pętli i narzędzi
   ze skryptowanym modelem, krok smoke w przeglądarce.
 
+### Dodane — Faza 6 (skala: rysowanie na GPU)
+- **Renderer WebGL2** (`js/gl-layer.js`): osobny `<canvas>` pod mapą 2D; tło, siatka, wszystkie krawędzie (łuki
+  liczone w shaderze z tym samym punktem kontrolnym co w canvas, grubość w px z wygładzaniem, linie przerywane
+  i kropkowane, nakładki wpływu, cykli i wybranej krawędzi) oraz figury (koła z obwódką, romby symboli, poświata
+  „cosmic") jako instancje; kamera to uniform, więc przesuwanie i przybliżanie nie przebudowuje buforów
+  (przebudowa po zmianie danych, kolorów, podświetlenia albo pozycji — podpis liczony co klatkę). Etykiety,
+  pierścienie zaznaczenia, strzałka krawędzi i dekoratory modułów zostają na przezroczystym canvas 2D, eksport PNG
+  też. Tryb automatyczny od 3000 widocznych węzłów + krawędzi, wybór w lewym panelu → Mapa („Rysowanie mapy")
+  i przez `renderOption {backend}`; utrata kontekstu albo błąd GL → canvas 2D. Gęste zależności są wygaszane według
+  pokrycia pikseli w oknie (długość krawędzi przyciętych do okna / pole mapy) zamiast pomijane jak w LOD canvas.
+  20 tys. plików / 60 tys. krawędzi: ~1–2 ms na klatkę (canvas 2D 30–150 ms).
+- `tools/bench.mjs` (`npm run bench`): syntetyczne projekty 5k / 20k plików, wczytanie + klatka z wymuszoną
+  rasteryzacją dla obu backendów, `--json`, `--summary`, `--max-frame`; krok informacyjny w CI z artefaktem.
+- Krok smoke: demo wymuszone na GPU — piksel w środku węzła ma kolor węzła, hit-test i eksport PNG działają.
+
 ### Zmienione
+- Kamera: `toScreen` bez sklejania klucza z liczb i bez `DOMPoint` (`cam.xf()` = współczynniki jako liczby),
+  etykiety odrzucają za małe węzły przed liczeniem pozycji — klatka canvas 2D przy 20 tys. węzłów 74 → 32 ms.
 - RAG: plik wymieniony w pytaniu z nazwy (`co robi agent.js…`), którego wyszukiwanie nie zwróciło, dostaje dwa
   najlepsze fragmenty na początku kontekstu (`CM.RAG.mentionedFiles`).
 

@@ -33,6 +33,17 @@ jobs:
         run: npm run smoke
         env:
           CHROME: /usr/bin/google-chrome
+      # czasy wczytania i klatki (canvas 2D vs WebGL) na syntetycznych projektach 5k / 20k plików — informacyjnie,
+      # bez progu (runner bez GPU); tabela w podsumowaniu, JSON jako artefakt do porównań między commitami
+      - name: Benchmark renderera (informacyjnie)
+        run: node tools/bench.mjs --n 5000,20000 --json bench.json --summary
+        env:
+          CHROME: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bench
+          path: bench.json
+          if-no-files-found: ignore
 
   backend:
     runs-on: ubuntu-latest

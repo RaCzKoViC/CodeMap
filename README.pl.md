@@ -74,6 +74,11 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
 - **13 układów**: upakowane koła, drzewo strukturalne, radialny, treemap, icicle, sunburst, siła (force),
   warstwowy, moduły, diagram łukowy, galaktyka, mgławica, pierścienie.
 - Fizyka układów siłowych w **Web Workerze** — UI nie zamiera na dużych repozytoriach (auto-LOD, budżet węzłów).
+- **Rysowanie na GPU (WebGL2)** dla dużych map: od 3000 widocznych węzłów + krawędzi tło, siatkę, wszystkie krawędzie
+  (łuki, linie przerywane, nakładki wpływu i cykli) i figury rysuje karta graficzna, a etykiety i zaznaczenia warstwa 2D
+  nad nią. 20 000 plików i 60 000 krawędzi: ~1–2 ms na klatkę zamiast 30–150 ms w canvas 2D; gęste krawędzie są
+  wygaszane według gęstości na ekranie zamiast pomijane. Lewy panel → Mapa → *Rysowanie mapy* (automatycznie / Canvas 2D /
+  WebGL); bez WebGL2 zostaje canvas. `npm run bench` mierzy oba na syntetycznych projektach (także w CI).
 - Pan, zoom do kursora, **obrót**, pseudo-3D, minimapa, radar okolicy, tryb lotu `WASD`, widok wpływu,
   podgląd kodu po najechaniu, menu kontekstowe, paleta poleceń `Ctrl+K`, wyszukiwarka `/`.
 - Eksport **PNG** (2×/4×) i **SVG**, link do bieżącego widoku (`#v=`).
@@ -247,6 +252,7 @@ js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi O
 js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSearch, readFile, dependents…), tool_calls albo JSON w treści
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
+js/gl-layer.js             # warstwa WebGL2 pod mapą: krawędzie i figury na GPU (instancje, kamera jako uniform)
 js/overlays.js             # kolorowanie węzłów wg danych (język, złożoność, git, pokrycie) + legenda
 js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / Bitbucket / Mistral; pliki boczne (.git, lcov)
 js/git-remote.js           # historia commitów z API GitHub / GitLab / Bitbucket

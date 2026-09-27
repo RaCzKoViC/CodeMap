@@ -389,6 +389,11 @@
     const optBind=(id,key)=>{ const el=$('#'+id); el.onchange=()=>{ A.renderer.opts[key]=el.checked; A.renderer.kick(); }; A.renderer.opts[key]=el.checked; };
     optBind('opt-grid','showGrid'); optBind('opt-curved','curvedImports');
     optBind('opt-lockall','lockAll');
+    // backend rysowania (canvas 2D / WebGL); bez WebGL2 opcja GPU jest wyłączona
+    const sb=$('#sel-backend');
+    if(sb){ sb.value=A.renderer.backend;
+      const gl=A.renderer.backends().includes('webgl'); const o=sb.querySelector('option[value="webgl"]'); if(o) o.disabled=!gl;
+      sb.onchange=()=>{ A.renderer.setBackend(sb.value); }; }
   }
 
   // ---------------- node appearance (size + spacing + label font) ----------------

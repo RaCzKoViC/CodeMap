@@ -74,6 +74,11 @@ Click **“✨ See demo”** or open `index.html#demo`.
 - **13 layouts**: packed circles, structure tree, radial tree, treemap, icicle, sunburst, force,
   dependency layers, modules, arc diagram, galaxy, nebula, rings.
 - Force-directed physics runs in a **Web Worker**, so the UI doesn't freeze on large repositories (auto-LOD, node budget).
+- **GPU rendering (WebGL2)** for large maps: from 3,000 visible nodes + edges the background, grid, all edges (arcs, dashes,
+  impact and cycle overlays) and all shapes are drawn by the GPU, with labels and selection on a 2D layer on top.
+  20,000 files with 60,000 edges: ~1–2 ms per frame instead of 30–150 ms on canvas 2D; dense edges fade by their
+  on-screen density instead of being dropped. Left panel → Map → *Map rendering* (automatic / Canvas 2D / WebGL);
+  without WebGL2 the canvas stays. `npm run bench` measures both on synthetic projects (also in CI).
 - Pan, zoom to cursor, **rotation**, pseudo-3D, minimap, neighborhood radar, `WASD` fly mode, impact view,
   code preview on hover, context menu, command palette (`Ctrl+K`), search (`/`).
 - **PNG** (2×/4×) and **SVG** export, link to the current view (`#v=`).
@@ -249,6 +254,7 @@ js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddi
 js/agent.js                # agent loop: read-only tools (codeSearch, readFile, dependents…), native tool_calls or JSON in text
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators
+js/gl-layer.js             # WebGL2 layer under the map: edges and shapes on the GPU (instanced, camera as a uniform)
 js/overlays.js             # node coloring by data (language, complexity, git, coverage) + legend
 js/loaders.js              # folder / files / archives / PDF / GitHub / GitLab / Bitbucket / Mistral; side files (.git, lcov)
 js/git-remote.js           # commit history from the GitHub / GitLab / Bitbucket APIs

@@ -297,7 +297,11 @@
       case 'resetAppearance': A.resetAppearance(); return I.t('cb.execResetApp','Przywrócono domyślny wygląd.');
       case 'renderOption': { const map={grid:'opt-grid',curved:'opt-curved',lockall:'opt-lockall',hoverPreview:'opt-hover-preview'}; const ch=[];   // glow/particles/animate removed — edge animation was dropped, those opts no longer affect rendering
         for(const k in args){ const id=map[k]; if(id&&typeof args[k]==='boolean'){ if(_cb(id,args[k])) ch.push(k+'='+args[k]); } }
-        if(!ch.length) throw new Error(I.t('cb.noOpt','Brak rozpoznanych opcji (grid/curved/lockall/hoverPreview).')); return I.t('cb.execOpt','Opcje: ')+ch.join(', '); }
+        if(args.backend!=null){ const b=String(args.backend).toLowerCase(), v=b==='gpu'||b==='gl'?'webgl':b==='2d'?'canvas':b;
+          if(!['auto','canvas','webgl'].includes(v)) throw new Error(I.t('cb.badBackend','Rysowanie: auto, canvas albo webgl.'));
+          if(v==='webgl' && !A.renderer.backends().includes('webgl')) throw new Error(I.t('cb.noWebGL','Ta przeglądarka nie udostępnia WebGL2 — zostaje canvas 2D.'));
+          A.renderer.setBackend(v); const s=$('#sel-backend'); if(s) s.value=v; ch.push('backend='+v); }
+        if(!ch.length) throw new Error(I.t('cb.noOpt','Brak rozpoznanych opcji (grid/curved/lockall/hoverPreview/backend).')); return I.t('cb.execOpt','Opcje: ')+ch.join(', '); }
       case 'setMetric': { _needProject(); if(args.metric){ const s=$('#sel-metric'); s.value=args.metric; s.dispatchEvent(new Event('change',{bubbles:true})); }
         if(typeof args.min==='number'){ const r=$('#rng-minmetric'); r.value=args.min; r.dispatchEvent(new Event('input',{bubbles:true})); }
         return I.t('cb.execMetric','Metryka: ')+(args.metric||filters.metric)+(typeof args.min==='number'?(' ≥ '+args.min):''); }

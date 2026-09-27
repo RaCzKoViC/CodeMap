@@ -183,6 +183,7 @@ body.mode-mindmap #tb-project-name{display:none}
 #main{flex:1;position:relative;min-height:0;overflow:hidden}
 #stage{position:absolute;inset:0;overflow:hidden;background:var(--bg)}
 #map-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#map-gl{position:absolute;inset:0;width:100%;height:100%;display:none;pointer-events:none}
 #map-canvas.grabbing{cursor:grabbing}
 #map-canvas.rotating{cursor:alias}
 

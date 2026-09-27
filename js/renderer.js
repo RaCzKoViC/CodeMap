@@ -28,6 +28,9 @@ CM.Renderer = (function(){
       this.diffMode = false;
       this.colorFn = null;            // nakładka (CM.Overlays): n -> #hex albo null = kolor języka
       this.decorators = [];           // rysowanie modułów po węzłach i etykietach (awatary właścicieli, oś czasu git): fn(ctx, renderer)
+      // backend rysowania: 'auto' (WebGL od glThreshold węzłów+krawędzi), 'canvas', 'webgl' — CM.GLLayer
+      this._mainCtx = this.ctx; this._glLayer = null; this._glFailed = false; this._cssVer = 0;
+      this.backend = (()=>{ try{ const b=localStorage.getItem('codemap_renderer'); return b==='canvas'||b==='webgl'?b:'auto'; }catch(e){ return 'auto'; } })();
       this.opts = {
         showGrid:true, showLabels:true, labelZoom:0.5, dim:0.10,
         edgeOpacity:0.45, curvedImports:true, nodeScale:1, showArrows:true,
@@ -41,6 +44,7 @@ CM.Renderer = (function(){
         lodEdgeBudget:6000,          // above this many visible edges, edges get thinned/skipped
         lodHugeNodes:9000,           // node count past which "huge graph" rules kick in
         lodSpecialCap:600,           // ceiling on per-node decorated (special) figures per frame
+        glThreshold:3000,            // tryb auto: od tylu widocznych węzłów + krawędzi rysuje GPU (CM.GLLayer)
       };
       // callbacks
       this.onSelect=()=>{}; this.onHover=()=>{}; this.onToggleCollapse=()=>{};
@@ -81,7 +85,28 @@ CM.Renderer = (function(){
       } else this.impact = null;
       this.kick();
     }
-    clearCssCache(){ _cssCache = {}; this.kick(); }
+    clearCssCache(){ _cssCache = {}; this._cssVer++; this.kick(); }
+
+    // ---------- backend rysowania (canvas 2D / WebGL2) ----------
+    backends(){ return ['canvas'].concat(CM.GLLayer && CM.GLLayer.supported() && !this._glFailed ? ['webgl'] : []); }
+    setBackend(b){
+      this.backend = (b==='canvas'||b==='webgl') ? b : 'auto';
+      try{ if(this.backend==='auto') localStorage.removeItem('codemap_renderer'); else localStorage.setItem('codemap_renderer', this.backend); }catch(e){}
+      this.kick(); return this.backend;
+    }
+    // czy ta klatka idzie przez GPU; eksport PNG (inny canvas) i brak / utrata WebGL → canvas 2D
+    _useGL(){
+      let want = this.ctx===this._mainCtx && !this._glFailed && this.backend!=='canvas'
+        && (this.backend==='webgl' || this.nodes.length+this.edges.length>=(this.opts.glThreshold||3000));
+      if(want && !this._glLayer){
+        if(!(CM.GLLayer && CM.GLLayer.supported())) want=false;
+        else try{ this._glLayer=new CM.GLLayer.Layer(this.canvas); this._glLayer.onLost=()=>this.kick(); }
+        catch(e){ this._glFailed=true; want=false; console.warn('CodeMap: WebGL niedostępny, zostaje canvas 2D —', e && e.message); }
+      }
+      if(this._glLayer){ if(this._glLayer.lost) want=false; if(this.ctx===this._mainCtx) this._glLayer.show(want); }
+      return want;
+    }
+    get activeBackend(){ return this._glLayer && this._glLayer.active ? 'webgl' : 'canvas'; }
 
     resize(){
       const r = this.canvas.getBoundingClientRect();
@@ -225,22 +250,25 @@ CM.Renderer = (function(){
     _draw(){
       if(this.w===0||this.h===0){ this.resize(); if(this.w===0||this.h===0) return; }
       const ctx=this.ctx, w=this.w, h=this.h;
+      let gl=this._useGL();
+      if(gl){ try{ gl=this._glLayer.render(this); }
+        catch(e){ console.warn('CodeMap: błąd WebGL, przełączam na canvas 2D —', e && e.message); this._glFailed=true; this._glLayer.show(false); gl=false; } }
       ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
       ctx.clearRect(0,0,w,h);
-      // background
-      ctx.fillStyle = getCss('--bg') || '#0a0e14';
-      ctx.fillRect(0,0,w,h);
+      // background (w trybie WebGL tło, siatkę, krawędzie i figury rysuje warstwa GPU pod tym canvasem)
+      if(!gl){ ctx.fillStyle = getCss('--bg') || '#0a0e14'; ctx.fillRect(0,0,w,h); }
 
       const m = new DOMMatrix().scale(this.dpr).multiply(this.cam.matrix(w,h));
       ctx.setTransform(m.a,m.b,m.c,m.d,m.e,m.f);
 
       const vb = this.worldBounds();
-      if(this.opts.showGrid) this._drawGrid(ctx, vb);
-      this._drawEdges(ctx, vb);
+      if(!gl){ if(this.opts.showGrid) this._drawGrid(ctx, vb); this._drawEdges(ctx, vb); }
+      else if(this.selectedEdge && this.opts.showArrows && this.cam.zoom>0.4){ const e=this.selectedEdge, s=this.nodeById.get(e.source), t=this.nodeById.get(e.target);
+        if(s&&t) this._arrow(ctx,s,t,'#ffffff',0.95); }
 
       // nodes + labels in SCREEN space (upright billboarded 3D solids, never squashed by the camera)
       ctx.setTransform(this.dpr,0,0,this.dpr,0,0);
-      this._drawNodes(ctx, vb);
+      this._drawNodes(ctx, vb, gl);
       if(this.opts.showLabels) this._drawLabels(ctx);
       for(const d of this.decorators){ try{ d(ctx, this); }catch(e){} ctx.globalAlpha=1; ctx.setLineDash([]); }
 
@@ -375,7 +403,7 @@ CM.Renderer = (function(){
 
     // NODES: flat colour discs, BATCHED by colour (one fill per colour). No gradients/shaders/shadows
     // -> the cheapest path, keeps FPS high even with thousands of figures.
-    _drawNodes(ctx, vb){
+    _drawNodes(ctx, vb, gl){
       const imp=this.impact, dimMode=!!this.highlight||!!imp, scale=this.opts.nodeScale, z=this.cam.zoom, W=this.w, H=this.h;
       const cosmic=!!this.opts.cosmic; if(cosmic) this._buildCosmicLUT();
       const upCol=imp?(getCss('--cm-impact-up')||'#ff9d4d'):null, downCol=imp?(getCss('--cm-impact-down')||'#36d0e0'):null,
@@ -387,21 +415,24 @@ CM.Renderer = (function(){
       const specialCap=this.opts.lodSpecialCap||600;
       // bucket visible nodes by colour; collect the few that need per-node decoration
       const full=new Map(), dim=new Map(), fullD=new Map(), dimD=new Map(), special=[];   // *D = romby (symbole)
+      const M=this.cam.xf(W,H), ma=M.a, mb=M.b, mc=M.c, md=M.d, me=M.e, mf=M.f;
       for(const n of this.nodes){
-        const sp=this.cam.toScreen(n.x,n.y,W,H);
         const rPx=n.r*scale*z;
-        if(sp.x<-rPx-20||sp.x>W+rPx+20||sp.y<-rPx-20||sp.y>H+rPx+20) continue;
         if(rPx<minRPx) continue;
-        let col=(this.colorFn&&this.colorFn(n))||(cosmic?this.cosmicColor(n._cosmic):badgeColor(n));
-        let bright;
-        if(imp){
-          bright=imp.all.has(n.id);
-          if(n.id===imp.focus) col=focusCol;
-          else if(imp.down.has(n.id)) col=downCol;
-          else if(imp.up.has(n.id)) col=upCol;
-        } else bright=!this.highlight||this.highlight.has(n.id);
-        const isSym=n.type==='symbol';
-        const m=bright?(isSym?fullD:full):(isSym?dimD:dim); let arr=m.get(col); if(!arr){ arr=[]; m.set(col,arr); } arr.push(sp.x,sp.y,rPx);
+        const sp={x:ma*n.x+mc*n.y+me, y:mb*n.x+md*n.y+mf};
+        if(sp.x<-rPx-20||sp.x>W+rPx+20||sp.y<-rPx-20||sp.y>H+rPx+20) continue;
+        if(!gl){   // w trybie WebGL wypełnienia rysuje GPU — tu zostają tylko obwódki zaznaczenia itp.
+          let col=(this.colorFn&&this.colorFn(n))||(cosmic?this.cosmicColor(n._cosmic):badgeColor(n));
+          let bright;
+          if(imp){
+            bright=imp.all.has(n.id);
+            if(n.id===imp.focus) col=focusCol;
+            else if(imp.down.has(n.id)) col=downCol;
+            else if(imp.up.has(n.id)) col=upCol;
+          } else bright=!this.highlight||this.highlight.has(n.id);
+          const isSym=n.type==='symbol';
+          const m=bright?(isSym?fullD:full):(isSym?dimD:dim); let arr=m.get(col); if(!arr){ arr=[]; m.set(col,arr); } arr.push(sp.x,sp.y,rPx);
+        }
         const isSel=this.selected&&this.selected.id===n.id, isHov=this.hovered&&this.hovered.id===n.id;
         const isFocus=imp&&n.id===imp.focus;
         if((isSel||isHov||isFocus||n.locked||((n.type==='folder'||n.symbolCount)&&n.collapsed)||(this.diffMode&&n.diff))
@@ -471,14 +502,17 @@ CM.Renderer = (function(){
       // selected & hovered always; others by threshold
       const minR = Math.max(z<0.4? 16 : z<0.8? 8 : 0, floorPx);
       const badgeMinPx = 15;   // node screen-diameter needed before its format badge shows
+      const M=this.cam.xf(this.w,this.h), selId=this.selected&&this.selected.id, hovId=this.hovered&&this.hovered.id;
       for(const n of this.nodes){
-        const isSel=this.selected&&this.selected.id===n.id, isHov=this.hovered&&this.hovered.id===n.id;
+        const isSel=selId===n.id, isHov=hovId===n.id;
         const force0 = isSel||isHov;
         // once the per-frame label budget is spent, only keep scanning for the (rare) sel/hover
         if(drawn>=labelCap && !force0) continue;
-        const sp=this.cam.toScreen(n.x,n.y,this.w,this.h);
-        if(sp.x< -40||sp.x>this.w+40||sp.y<-30||sp.y>this.h+30) continue;
         const rPx=n.r*scale*z;
+        // za mały na plakietkę i na nazwę → bez liczenia pozycji (większość węzłów przy dużych mapach)
+        if(!force0 && rPx*2<badgeMinPx && rPx<minR && !(n.type==='folder'&&n.r*z>14)) continue;
+        const sp={x:M.a*n.x+M.c*n.y+M.e, y:M.b*n.x+M.d*n.y+M.f};
+        if(sp.x< -40||sp.x>this.w+40||sp.y<-30||sp.y>this.h+30) continue;
 
         // ---- format badge ON TOP of the figure ----
         if(isSel||isHov||rPx*2>=badgeMinPx){
@@ -848,5 +882,5 @@ CM.Renderer = (function(){
   let _cssCache={};
   function getCss(v){ if(v in _cssCache) return _cssCache[v]; const c=getComputedStyle(document.documentElement).getPropertyValue(v).trim(); _cssCache[v]=c; return c; }
 
-  return {Renderer};
+  return {Renderer, badgeColor, getCss};
 })();

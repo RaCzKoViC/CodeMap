@@ -152,17 +152,22 @@ CM.util = (function(){
       tilt:0,            // pseudo-3D vertical squash (0..~0.6)
       _c:null, _ci:null, _k:'',   // cached matrix / inverse / cache key
       // build (and cache) the world->screen matrix for a viewport of size (w,h)
+      // (klucz porównywany liczbowo — sklejanie napisu przy każdym toScreen kosztowało ~13 ms/klatkę przy 20 tys. węzłów;
+      // `_k=''` z zewnątrz nadal unieważnia pamięć podręczną)
       matrix(w,h){
-        const k = this.x+'|'+this.y+'|'+this.zoom+'|'+this.rot+'|'+this.tilt+'|'+w+'|'+h;
-        if(this._k === k && this._c) return this._c;
+        const K=this._kv;
+        if(this._c && this._k!=='' && K && K[0]===this.x && K[1]===this.y && K[2]===this.zoom && K[3]===this.rot && K[4]===this.tilt && K[5]===w && K[6]===h) return this._c;
         const m = new DOMMatrix();
         m.translateSelf(w/2, h/2);
         m.scaleSelf(this.zoom, this.zoom * (1 - this.tilt));
         m.rotateSelf(this.rot * 180/Math.PI);
         m.translateSelf(-this.x, -this.y);
-        this._c = m; this._ci = null; this._k = k;
+        this._c = m; this._ci = null; this._k = '1'; this._kv = [this.x, this.y, this.zoom, this.rot, this.tilt, w, h];
+        this._xf = {a:m.a, b:m.b, c:m.c, d:m.d, e:m.e, f:m.f};
         return m;
       },
+      // współczynniki świat → ekran jako zwykłe liczby (pętle po tysiącach węzłów: x*a+y*c+e, x*b+y*d+f)
+      xf(w,h){ this.matrix(w,h); return this._xf; },
       matrixInverse(w,h){
         const m = this.matrix(w,h);
         if(!this._ci) this._ci = m.inverse();
@@ -174,8 +179,8 @@ CM.util = (function(){
         return {x:p.x, y:p.y};
       },
       toScreen(wx, wy, w, h){
-        const p = this.matrix(w,h).transformPoint(new DOMPoint(wx, wy));
-        return {x:p.x, y:p.y};
+        const m = this.xf(w,h);
+        return {x:m.a*wx+m.c*wy+m.e, y:m.b*wx+m.d*wy+m.f};
       }
     };
   }
