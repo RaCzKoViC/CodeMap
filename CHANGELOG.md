@@ -34,6 +34,10 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Podział `chatbot.js`** (1373 → 694 linie): `chatbot-strings.js` (teksty PL/EN), `chatbot-core.js` (`CM.ChatBotCore` — logika
   bez DOM: katalog narzędzi, prompty, parsowanie i walidacja akcji, `/` komendy, `intentFallback`), `chatbot-render.js`
   (markdown, wiadomości, źródła, kroki agenta, menu `/`, uchwyty okna); API `CM.ChatBot` bez zmian; 28 testów logiki.
+- **Podział `mindmap.js`** (1707 → 719 linii): `mindmap-strings.js`, `mindmap-templates.js` (16 ramek, 34 diagramy, miniatury),
+  `mindmap-layout.js` (algorytmy układu, okno „Schemat układu"), `mindmap-io.js` (Markdown w obie strony, .mindmap.json,
+  SVG/PNG, migawki), `mindmap-ui.js` (widżety); stan przekazywany jawnie przez `ctx`; API `CM.MindMap` bez zmian;
+  Markdown, SVG i pozycje węzłów identyczne jak przed podziałem; 16 testów (każdy diagram i ramka, round-trip Markdown).
 - **Podział `settings.js`** (946 → 392 linie): `settings-strings.js`, `settings-ai.js` (zakładka AI z RAG), `settings-docs.js`
   (Specyfikacja, Instrukcja); rejestr zakładek `CM.Settings.addTab(key, icon, render)` ze stałą kolejnością, wspólne
   helpery w `CM.Settings.kit`; HTML wszystkich 23 widoków zakładek identyczny jak przed podziałem; 10 testów.
