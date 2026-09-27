@@ -26,3 +26,5 @@ integrations/vscode/*.vsix
 
 # worktree agentow (subagent isolation)
 .claude/worktrees/
+# paczka npm budowana przez tools/npm-pack.mjs
+dist/

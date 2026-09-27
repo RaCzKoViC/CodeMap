@@ -13,6 +13,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   repozytoria…", akcja ChatBota `gallery {repo?, tour?}`. Sprawdzone na petite-vue z GitHuba: 53 pliki, trasa 7 kroków.
   Tarcza obrotu chowa się, gdy trasa jest aktywna (nachodziła na kartę kroku).
 
+- **Paczka npm CLI gotowa do publikacji** (`tools/npm-pack.mjs`, `npm run npm-pack -- --name @zakres/codemap`): CLI + tylko
+  17 modułów analizy (29 plików, 167 KB), `npm pack`, instalacja tarballa w pustym projekcie i uruchomienie
+  zainstalowanego `codemap analyze` (wykrywa cykl na próbce). Nazwa `codemap` w npm jest zajęta — publikacja pod
+  zakresem właściciela (`npm publish dist/npm/<plik>.tgz --access public`).
+
 ### Zmienione — Faza 8 (jakość własna)
 - Testy renderera (`test/renderer.test.mjs`, 9): kamera świat ↔ ekran przy obrocie i pochyleniu, pamięć macierzy,
   przybliżanie z punktem pod kursorem, trafianie węzłów (billboard przy pochyleniu) i krawędzi (prosta / łuk), `fit`

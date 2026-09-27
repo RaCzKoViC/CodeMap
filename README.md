@@ -202,6 +202,9 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   `--export dot|mermaid|graphml`. CI thresholds: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
+- npm package (not published yet — the name `codemap` is taken, so it goes under a scope): `npm run npm-pack -- --name @scope/codemap`
+  builds a 170 KB package (CLI + 17 analysis modules), installs it in a temp dir and runs the installed `codemap analyze`;
+  then `npm publish dist/npm/<file>.tgz --access public` and `npx @scope/codemap analyze .`.
 - **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.2.0` — a report in the step summary, SARIF, thresholds; an example
   with code scanning is in [docs/github-action.md](docs/github-action.md) (in Polish). The same step runs in this repository's CI.
 
