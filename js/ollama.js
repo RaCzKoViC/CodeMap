@@ -30,12 +30,31 @@ CM.Ollama = (function(){
   // z domyślnym OLLAMA_ORIGINS odrzuca obce originy (403 bez Access-Control-Allow-Origin), co przeglądarka zgłasza
   // identycznie. Rozróżnienie: zapytanie `no-cors` przechodzi (odpowiedź nieprzezroczysta), gdy serwer żyje, a pada,
   // gdy nikt nie słucha. Przekroczony czas to nie CORS — serwer żyje, ale nie odpowiada.
+  // Strona z internetu → Ollama pod localhost / w sieci prywatnej: Chrome (Local Network Access) pyta o zgodę, a odmowa
+  // daje ten sam TypeError — bez niej oba zapytania, także no-cors, padają i wyszłoby mylące „nie odpowiada".
+  const hostOf=(u)=>{ try{ return new URL(u).hostname.replace(/^\[|\]$/g,''); }catch(e){ return ''; } };
+  const isLoopback=(h)=>h==='localhost' || /\.localhost$/.test(h) || /^127\./.test(h) || h==='::1';
+  const isPrivate=(h)=>/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)|\.local$/.test(h) || (h.includes(':') && /^f[cd]/i.test(h));
+  async function lnaDenied(){
+    const to=hostOf(base()), from=hostOf((()=>{ try{ return location.origin; }catch(e){ return ''; } })());
+    const loop=isLoopback(to);
+    if(!from || !(loop || isPrivate(to)) || isLoopback(from) || (!loop && isPrivate(from))) return false;
+    const P=typeof navigator!=='undefined' && navigator.permissions;
+    if(!P || !P.query) return false;
+    for(const name of [loop ? 'loopback-network' : 'local-network', 'local-network-access']){
+      try{ return (await P.query({name})).state==='denied'; }catch(e){}   // starszy Chrome zna tylko ogólną nazwę
+    }
+    return false;
+  }
+  const blockedErr=()=>{ const short=I.t('ol.blocked','Przeglądarka nie pozwala tej stronie łączyć się z ')+base()+I.t('ol.blockedMid',' (dostęp do sieci lokalnej). Zezwól: ikona obok adresu → Ustawienia witryny → Dostęp do sieci lokalnej, potem odśwież stronę — albo otwórz CodeMap z localhost.');
+    return Object.assign(new Error(short), {code:'blocked', short}); };
   async function unreachable(e){
     if(e && e.name==='TimeoutError') return offlineErr();
+    if(await lnaDenied()) return blockedErr();
     try{ await fetch(base()+'/api/version', {mode:'no-cors', cache:'no-store', signal:AbortSignal.timeout?AbortSignal.timeout(2500):undefined}); return corsErr(); }
     catch(err){ return offlineErr(); }
   }
-  // stan połączenia dla ustawień: {ok, code: 'cors' | 'offline' | null, message, hint}
+  // stan połączenia dla ustawień: {ok, code: 'cors' | 'blocked' | 'offline' | null, message, hint}
   async function check(){
     try{ const list=await models(true); return {ok:true, code:null, models:list}; }
     catch(e){ return {ok:false, code:e.code||null, message:(e&&e.message)||String(e), hint:e.hint||''}; }

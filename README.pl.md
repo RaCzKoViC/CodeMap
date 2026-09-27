@@ -172,7 +172,9 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
 - **Ollama** — lokalny serwer modeli na Twoim komputerze. Gdy strona działa z innego adresu niż ten, który Ollama
   dopuszcza (np. GitHub Pages albo własny VPS), Ollama odpowiada `403` bez nagłówków CORS — CodeMap odróżnia to od
   wyłączonego serwera i pokazuje gotowe polecenie `OLLAMA_ORIGINS` dla Twojego systemu (Windows `setx`, macOS
-  `launchctl setenv`, Linux `systemctl edit`); potem uruchom Ollamę ponownie, zamykając ją także z zasobnika.
+  `launchctl setenv`, Linux `systemctl edit`); potem uruchom Ollamę ponownie, zamykając ją także z zasobnika. Gdy to
+  przeglądarka odmawia stronie dostępu do sieci lokalnej (uprawnienie witryny *Dostęp do sieci lokalnej* w Chrome),
+  CodeMap mówi o tym i wskazuje, gdzie na to zezwolić.
 - **Klucze API (chmura)** — dowolna liczba kluczy: Mistral, OpenAI, Anthropic (Claude), Google Gemini, Groq,
   OpenRouter, DeepSeek, xAI, Together. Dostawca jest **wykrywany po formacie klucza** i potwierdzany
   przyciskiem „Testuj" (lista modeli), model wybierany per klucz; działające klucze używane rotacyjnie.

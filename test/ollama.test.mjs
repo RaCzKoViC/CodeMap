@@ -166,6 +166,30 @@ describe('niedostępna Ollama: blokada CORS a wyłączony serwer', () => {
     assert.equal((await T.models(true).then(() => null, (x) => x)).code, 'offline');
     assert.equal(probes, 0);
   });
+  test('strona z internetu, przeglądarka odmówiła dostępu do sieci lokalnej → „blocked" (bez sondy); strona lokalna — bez pytania', async () => {
+    const at = (origin, states, baseUrl) => {
+      const asked = []; let probes = 0;
+      const fetch = async (url, init = {}) => { if (init.mode === 'no-cors') { probes++; throw new TypeError('Failed to fetch'); } throw new TypeError('Failed to fetch'); };
+      const permissions = { query: async ({ name }) => { asked.push(name); if (!(name in states)) throw new TypeError('bad name'); return { state: states[name] }; } };
+      const CM = loadCM(['util', 'i18n', 'ollama'], { fetch, localStorage: memStorage(), AbortSignal, location: { origin }, navigator: { permissions } });
+      if (baseUrl) CM.Ollama.setBase(baseUrl);
+      return { O: CM.Ollama, asked, probes: () => probes };
+    };
+    const a = at('https://raczkovic.github.io', { 'loopback-network': 'denied' });
+    const e = await a.O.models(true).then(() => null, (x) => x);
+    assert.equal(e.code, 'blocked'); assert.match(e.message, /sieci lokalnej/); assert.doesNotMatch(e.message, /OLLAMA_ORIGINS/);
+    assert.deepEqual(a.asked, ['loopback-network']); assert.equal(a.probes(), 0);
+    const old = at('https://raczkovic.github.io', { 'local-network-access': 'denied' });   // starszy Chrome: tylko ogólna nazwa
+    assert.equal((await old.O.check()).code, 'blocked'); assert.deepEqual(old.asked, ['loopback-network', 'local-network-access']);
+    const lan = at('https://raczkovic.github.io', { 'local-network': 'denied' }, 'http://192.168.1.20:11434');
+    assert.equal((await lan.O.check()).code, 'blocked'); assert.deepEqual(lan.asked, ['local-network']);
+    const granted = at('https://raczkovic.github.io', { 'loopback-network': 'granted' });
+    assert.equal((await granted.O.check()).code, 'offline'); assert.equal(granted.probes(), 1);
+    const local = at('http://localhost:8787', { 'loopback-network': 'denied' });   // strona z localhost → Ollama bez zgody
+    assert.equal((await local.O.check()).code, 'offline'); assert.deepEqual(local.asked, []);
+    const lanPage = at('http://192.168.1.5:8080', { 'local-network': 'denied' }, 'http://192.168.1.20:11434');
+    assert.equal((await lanPage.O.check()).code, 'offline'); assert.deepEqual(lanPage.asked, []);
+  });
   test('czat i pobieranie modelu też rozróżniają CORS; przerwanie (AbortError) przechodzi bez zmian', async () => {
     const O = loadAt((url, init) => { if (init.mode === 'no-cors') return new Response(null); if (init.signal && init.signal.aborted) throw Object.assign(new Error('a'), { name: 'AbortError' }); throw new TypeError('Failed to fetch'); }, 'null');   // strona otwarta z dysku ma origin "null"
     O.setModel('x');

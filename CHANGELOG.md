@@ -53,7 +53,10 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   samym `TypeError`, więc po nieudanym zapytaniu idzie próba `mode:'no-cors'` — gdy przechodzi, serwer żyje i odrzuca
   tę stronę (`code:'cors'`). Komunikat i Ustawienia → AI pokazują gotowe polecenie `OLLAMA_ORIGINS` z adresem tej
   strony dla Windows / macOS / Linux (do zaznaczenia jednym kliknięciem); przekroczony czas to od razu „nie odpowiada".
-  Nowe `CM.Ollama.check()` → `{ok, code: null | 'cors' | 'offline', models}`.
+  Trzeci przypadek: strona z internetu, a Chrome odmówił jej dostępu do sieci lokalnej (uprawnienie `loopback-network` /
+  `local-network`, w starszych wersjach `local-network-access` = `denied`) — wtedy `code:'blocked'` i wskazówka, gdzie
+  zezwolić, zamiast mylącego „nie odpowiada". Nowe `CM.Ollama.check()` →
+  `{ok, code: null | 'cors' | 'blocked' | 'offline', models}`.
 - **Tryb JSON modeli lokalnych z bezpiecznym zapasem** (`CM.ChatBotCore.withJsonFallback`): gdy WebLLM odrzuci gramatykę
   JSON (błąd CSP / `unsafe-eval` / WebAssembly / schematu), czat i agent 📚 wyłączają tryb JSON (`localJsonOk=false`)
   i ponawiają to samo zapytanie raz bez `responseFormat`; przerwanie przez użytkownika nie jest ponawiane.
