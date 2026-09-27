@@ -14,14 +14,15 @@ if (version && !/^\d+\.\d+\.\d+$/.test(version)) { console.error('Wersja musi by
 
 // --- index.html: ?v=<stamp> ---
 let html = rd('index.html');
-const stamps = [...new Set([...html.matchAll(/\?v=([0-9]{8}[a-z]?)"/g)].map((m) => m[1]))];
+const stamps = [...new Set([...html.matchAll(/\?v=([0-9]{8}[a-z{]*)"/g)].map((m) => m[1]))];   // „{” — naprawa po starym błędzie z > 26 podbiciami
 if (stamps.length !== 1) { console.error(`Oczekiwano jednego stempla ?v= w index.html, znaleziono: ${stamps.join(', ') || 'brak'}`); process.exit(1); }
 const old = stamps[0];
 const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
 let next;
+// sufiks: a…z, potem za…zz, zza… — rośnie leksykograficznie i zostaje w [a-z] (wcześniej po „z” szło „{”)
 if (old.startsWith(today)) {
-  const letter = old.slice(8) || '`';   // '`' + 1 = 'a'
-  next = today + String.fromCharCode(letter.charCodeAt(0) + 1);
+  const suf = old.slice(8).replace(/[^a-z]/g, 'z');
+  next = today + (!suf ? 'a' : suf.endsWith('z') ? suf + 'a' : suf.slice(0, -1) + String.fromCharCode(suf.charCodeAt(suf.length - 1) + 1));
 } else next = today + 'a';
 const count = (html.match(new RegExp(`\\?v=${old}"`, 'g')) || []).length;
 html = html.replaceAll(`?v=${old}"`, `?v=${next}"`);
