@@ -288,7 +288,10 @@ js/loaders.js              # folder / pliki / archiwa / PDF / GitHub / GitLab / 
 js/git-remote.js           # historia commitów z API GitHub / GitLab / Bitbucket
 js/storage.js              # migawki i sesja (IndexedDB)
 js/ui.js                   # panele szczegółów, filtry, historia, diff
-js/settings.js             # ustawienia, samouczek, instrukcja
+js/settings.js             # okno ustawień: rejestr zakładek, zakładki ogólne, interaktywny samouczek
+js/settings-strings.js     # teksty ustawień i samouczka (PL / EN)
+js/settings-ai.js          # zakładka AI: dostawcy, klucze API, WebLLM, Ollama, indeks kodu (RAG)
+js/settings-docs.js        # wbudowana specyfikacja i instrukcja obsługi
 js/inspect.js              # analiza statyczna (16 reguł + reguły architektury, health score)
 js/localai.js  js/ollama.js  js/chatbot.js  js/runner.js   # AI: WebLLM, Ollama, ChatBot, sandbox
 js/mindmap.js  js/mmdraw.js  # tryb MindMap + warstwa rysowania
