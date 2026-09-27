@@ -1174,6 +1174,22 @@ body.light .mm-tpl-frame .mm-node-body,body.light .mm-tpl-frame .mm-tpl-chip-lbl
 .det-ver .ic{color:#a78bfa;flex-shrink:0}
 .det-ver span{font-family:var(--mono)}
 /* hotspots list */
+/* podatne zależności (vulns-ui.js) */
+.vu-modal{max-width:min(96vw,980px)}
+.vu-send{margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);font-size:13px}
+.vu-sum{margin-bottom:6px}
+.vu-clean{padding:10px 0;color:#34d399}
+.vu-wrap{overflow:auto;max-height:52vh;margin:6px 0 10px}
+table.vu-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.vu-table th{text-align:left;color:var(--text-mute);font-weight:500;padding:4px 6px;border-bottom:1px solid rgba(148,163,184,.2);position:sticky;top:0;background:var(--panel,#0f172a)}
+.vu-table td{padding:5px 6px;border-bottom:1px solid rgba(148,163,184,.1);vertical-align:top}
+.vu-row{cursor:pointer}
+.vu-row:hover{background:rgba(148,163,184,.07)}
+.vu-ids a,.vu-det .vu-id{display:inline-block;margin:0 6px 2px 0;color:var(--accent,#22d3ee);text-decoration:none;font-size:12px}
+.vu-ids a:hover,.vu-det .vu-id:hover{text-decoration:underline}
+.tag.vu-lvl{background:transparent;border:1px solid;font-size:10.5px;padding:0 6px}
+.vu-det{margin-bottom:6px;font-size:12.5px}
+.vu-status{margin-right:auto}
 /* macierz zależności (dsm-ui.js) */
 .dsm-modal{max-width:min(96vw,1100px)}
 .dsm-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}

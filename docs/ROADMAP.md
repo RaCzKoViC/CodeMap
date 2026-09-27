@@ -152,7 +152,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Dług wskazany przez własną analizę: 57 złożonych plików bez testów (najpierw app-core, loaders, drive, sync),
   47 pustych `catch`, 76 zduplikowanych fragmentów; cel: zdrowie 45 → 60+.
 
-## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — W TOKU 2026-09-27
+## Faza 10 — analiza, której nie ma konkurencja w przeglądarce — WYKONANA 2026-09-27 (poza wykresem trendu w aplikacji)
 
 - ✅ Sprzężenie zmian (change coupling): `GitCore.coupling` z osi czasu historii (stopień jak w code-maat, bez masowych
   commitów), sekcja „Zmieniany razem z" w panelu z oznaczeniem „bez importu", reguła Inspect „ukryte sprzężenie zmian",
@@ -166,7 +166,9 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   (Projekt → Macierz zależności, klik w komórkę = pary importów), reguła `pkgcycle` (wysoka), akcja `dependencyMatrix`.
 - ✅ CODEOWNERS a rzeczywista własność z git: `js/codeowners.js` (wzorce GitHuba, ostatnie dopasowanie, `@login`/e-mail →
   autorzy historii), reguły `unowned` (po folderach) i `ownerdrift`, sekcja w panelu, nakładka, akcja `codeOwners`.
-- Podatne zależności (OSV.dev, tylko nazwy i wersje pakietów, opcjonalnie).
+- ✅ Podatne zależności (OSV.dev, tylko nazwy i wersje pakietów, na żądanie): `js/vulns.js` (pliki blokad → `graph.lockDeps`,
+  także przechodnie; querybatch + szczegóły, ważność GHSA / CVSS 3, wersja z poprawką), okno z podglądem wysyłki
+  `js/vulns-ui.js`, nakładka, reguła `vulndep` (na pliku blokady / manifestu), CLI `--osv`.
 
 ## Faza 11 — AI dalej lokalnie
 

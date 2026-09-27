@@ -9,6 +9,7 @@ CM.Graph = (function(){
       this.edges = [];
       this.externals = new Map();
       this.depVersions = new Map();   // dependency name -> {version, source} from manifests
+      this.lockDeps = new Map();       // eco:nazwa@wersja → {name, version, eco, file} z plików blokad (CM.Vulns)
       this.packages = [];              // pakiety z manifestów (package.json, Cargo.toml, go.mod, pubspec, pyproject) — CM.DSM
       this.langStats = new Map();
       this.meta = {name:'projekt', source:'', createdAt:Date.now()};
@@ -115,7 +116,12 @@ CM.Graph = (function(){
     // parse package/dependency manifests -> versions; wpisy do rozwiązywania importów (aliasy, pakiety) → manifests
     _scanManifest(name, content, dir, manifests){
       const n = name.toLowerCase();
-      const setV = (k,v,src)=>{ if(k) this.depVersions.set(k, {version:String(v||'').replace(/^[\^~>=<\s]+/,'').trim(), source:src}); };
+      const file = dir ? dir+'/'+name : name;
+      // exact: wersja przypięta (npm bez operatora zakresu, pip `==`, go.mod) — inaczej to dolna granica zakresu
+      const setV = (k,v,src)=>{ if(!k) return; const raw=String(v||'').trim(), version=raw.replace(/^[\^~>=<\s]+/,'').trim();
+        const exact=src==='go' || (src==='pip' ? /^==/.test(raw) : src==='npm' ? /^\d+\.\d+\.\d+[\w.+-]*$/.test(raw) : false);
+        this.depVersions.set(k, {version, source:src, file, exact}); };
+      const lock = (nm, v, eco)=>{ if(!nm || !v || nm.startsWith('__')) return; const k=eco+':'+nm+'@'+v; if(!this.lockDeps.has(k)) this.lockDeps.set(k, {name:nm, version:String(v), eco, file}); };
       const entry = A.manifestEntry(name, content, dir); if(entry) manifests.push(entry);
       try{
         if(n==='package.json'){
@@ -125,7 +131,7 @@ CM.Graph = (function(){
           }
         } else if(n==='requirements.txt'){
           for(const line of content.split(/\r?\n/)){ const t=line.trim(); if(!t||t[0]==='#'||t.startsWith('-')) continue;
-            const m=/^([A-Za-z0-9._-]+)\s*(?:[=<>!~]+\s*([0-9][\w.\-]*))?/.exec(t); if(m) setV(m[1].toLowerCase(), m[2]||'', 'pip'); }
+            const m=/^([A-Za-z0-9._-]+)\s*(?:([=<>!~]+)\s*([0-9][\w.\-]*))?/.exec(t); if(m) setV(m[1].toLowerCase(), m[3]?(m[2]||'')+m[3]:'', 'pip'); }
         } else if(n==='cargo.toml'){
           let inDeps=false;
           for(const line of content.split(/\r?\n/)){ const t=line.trim();
@@ -138,6 +144,29 @@ CM.Graph = (function(){
           for(const line of content.split(/\r?\n/)){ const t=line.trim();
             if(/^require\s*\(/.test(t)){ inReq=true; continue; } if(inReq&&t===')'){ inReq=false; continue; }
             const m=/^(?:require\s+)?([\w./\-]+)\s+v([\w.\-]+)/.exec(t); if(m&&(inReq||/^require\s/.test(t))) setV(m[1], 'v'+m[2], 'go'); }
+        }
+        // pliki blokad: dokładne wersje, także zależności przechodnie (podatne zależności — CM.Vulns / OSV.dev)
+        else if(n==='package-lock.json' || n==='npm-shrinkwrap.json'){
+          const j = A.looseJSON(content), pk = j.packages;
+          if(pk && typeof pk==='object'){ for(const k in pk){ const m=/(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)$/.exec(k); if(m && pk[k] && pk[k].version && !pk[k].link) lock(m[1], pk[k].version, 'npm'); } }
+          else if(j.dependencies){ const walk=(o)=>{ for(const k in o){ const d=o[k]; if(d && d.version){ lock(k, d.version, 'npm'); if(d.dependencies) walk(d.dependencies); } } }; walk(j.dependencies); }
+        } else if(n==='yarn.lock'){   // v1: `"a@^1", a@^1.1:` + `  version "1.2.3"`; berry: `"a@npm:^1":` + `  version: 1.2.3`
+          let names=null;
+          for(const line of content.split(/\r?\n/)){
+            if(line && !/^\s/.test(line) && line[0]!=='#'){ names=[...new Set(line.replace(/:\s*$/,'').split(/,\s*/).map(s=>s.trim().replace(/^"|"$/g,'').replace(/@(?:npm:)?[^@]*$/,'')).filter(Boolean))]; continue; }
+            const m=/^\s+version:?\s+"?([^"\s]+)"?/.exec(line); if(m && names){ for(const nm of names) lock(nm, m[1], 'npm'); names=null; }
+          }
+        } else if(n==='cargo.lock' || n==='poetry.lock'){
+          let nm=null;
+          for(const line of content.split(/\r?\n/)){ const t=line.trim();
+            if(t==='[[package]]'){ nm=null; continue; }
+            let m=/^name\s*=\s*"([^"]+)"/.exec(t); if(m){ nm=m[1]; continue; }
+            m=/^version\s*=\s*"([^"]+)"/.exec(t); if(m && nm){ lock(n==='poetry.lock'?nm.toLowerCase():nm, m[1], n==='cargo.lock'?'cargo':'pip'); nm=null; } }
+        } else if(n==='pipfile.lock'){
+          const j = A.looseJSON(content);
+          for(const grp of ['default','develop']){ const o=j[grp]; if(o && typeof o==='object') for(const k in o){ const v=String(o[k] && o[k].version || '').replace(/^==/,''); if(v) lock(k.toLowerCase(), v, 'pip'); } }
+        } else if(n==='go.sum'){
+          for(const line of content.split(/\r?\n/)){ const m=/^(\S+)\s+(v[^\s/]+?)(?:\/go\.mod)?\s+h1:/.exec(line); if(m) lock(m[1], m[2], 'go'); }
         }
       }catch(e){}
     }
@@ -368,6 +397,8 @@ CM.Graph = (function(){
         format:'codemap', version:2, meta:this.meta,
         gitInfo:this.gitInfo||undefined, testInfo:this.testInfo||undefined, prInfo:this.prInfo||undefined, tour:this.tour||undefined,
         packages:this.packages&&this.packages.length?this.packages:undefined,
+        lockDeps:this.lockDeps&&this.lockDeps.size&&this.lockDeps.size<=20000?[...this.lockDeps.values()]:undefined,
+        depVersions:this.depVersions&&this.depVersions.size?[...this.depVersions].map(([k,v])=>[k,v]):undefined, vulnInfo:this.vulnInfo||undefined,
         nodes, edges:this.edges.filter(e=>e.type!=='contains').map(e=>(e.typeOnly ? {source:e.source,target:e.target,type:e.type,typeOnly:true} : {source:e.source,target:e.target,type:e.type})),
       };
     }
@@ -405,6 +436,9 @@ CM.Graph = (function(){
       g._computeImportDegrees();
       g._restoreSymbols();
       g.computeAggregates();
+      g.lockDeps=new Map(); if(Array.isArray(obj.lockDeps)) for(const d of obj.lockDeps) if(d&&typeof d.name==='string'&&typeof d.version==='string'&&typeof d.eco==='string') g.lockDeps.set(d.eco+':'+d.name+'@'+d.version, {name:d.name, version:d.version, eco:d.eco, file:String(d.file||'')});
+      if(Array.isArray(obj.depVersions)) for(const e of obj.depVersions) if(Array.isArray(e)&&typeof e[0]==='string'&&e[1]&&typeof e[1]==='object') g.depVersions.set(e[0], {version:String(e[1].version||''), source:String(e[1].source||''), file:String(e[1].file||''), exact:!!e[1].exact});
+      g.vulnInfo=obj.vulnInfo&&Array.isArray(obj.vulnInfo.items)?obj.vulnInfo:null;
       g.packages=Array.isArray(obj.packages)?obj.packages.filter(p=>p&&typeof p.name==='string'&&typeof p.dir==='string').map(p=>({name:p.name, eco:String(p.eco||'npm'), dir:p.dir})):[];
       g.gitInfo=obj.gitInfo||null; g.testInfo=obj.testInfo||null; g.prInfo=obj.prInfo||null; g.tour=(obj.tour && Array.isArray(obj.tour.steps))?obj.tour:null;
       return g;

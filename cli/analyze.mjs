@@ -20,6 +20,7 @@ export const DEFAULTS = Object.freeze({
   coverage: null,    // null = autodetekcja, false = bez pokrycia, [ścieżki] = te raporty
   maxContent: null,  // null = CM.Loaders.MAX_CONTENT_FILES (jak w przeglądarce)
   exclude: [],       // globy (względem analizowanego katalogu) pomijane przy wczytywaniu
+  osv: false,        // podatne zależności z api.osv.dev (sieć: tylko nazwy i wersje pakietów) — wyłącznie na żądanie
 });
 const MAX_COV = 256 * 1024 * 1024;   // jak tests-ui.js
 
@@ -93,6 +94,15 @@ export async function runAnalysis(dir, opts = {}) {
     }
   }
   const T3 = performance.now();
+
+  // 4b. podatne zależności (OSV.dev) — tylko z opcją osv; błąd sieci = ostrzeżenie, analiza idzie dalej
+  if (o.osv) {
+    try {
+      const list = CM.Vulns.collect(graph);
+      if (list.length) { const r = await CM.Vulns.query(list, { fetch: globalThis.fetch }); CM.Vulns.applyToGraph(graph, r); }
+      else CM.Vulns.applyToGraph(graph, { at: Date.now(), checked: 0, vulnerable: [] });
+    } catch (e) { warnings.push('OSV.dev: ' + ((e && e.message) || String(e))); }
+  }
 
   // 5. analiza statyczna (reguły Inspect, health score)
   const rep = await CM.Inspect.run(graph);

@@ -125,6 +125,10 @@ Click **“✨ See demo”** or open `index.html#demo`.
   `@login` / e-mail owners resolved to history authors; Inspect rules **code without an owner** (one entry per folder)
   and **CODEOWNERS drift** (the declared owner has < 10 % of a file's changes, someone else ≥ 50 %); a details-panel
   section, the **Owner (CODEOWNERS)** coloring and the `codeOwners` ChatBot action.
+- **Vulnerable dependencies (OSV.dev)** — Project → Vulnerable dependencies: exact versions from lockfiles (package-lock,
+  yarn.lock, Cargo.lock, poetry.lock, Pipfile.lock, go.sum — transitive too) or manifests; the window shows what will be
+  sent (names and versions only) before anything leaves; results with severity (GHSA / CVSS 3), fix version, links to
+  osv.dev, the **Vulnerabilities** coloring and the Inspect rule **Vulnerable dependencies** (CLI: `--osv`).
 
 ### Tests and coverage
 - CodeMap links **tests to the code they test** on its own — by name (including mirrored paths `test/` ↔ `src/`,
@@ -216,6 +220,7 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   `--export dot|mermaid|graphml`. CI thresholds: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
+- `--osv` — vulnerable dependencies from api.osv.dev (package names and versions only) as findings in every report.
 - **Health trend**: `--history N` — N commits spread evenly over the history (HEAD first parent), each tree read
   straight from `.git` (no checkout, no git binary) and analyzed like the folder, without git-history rules and coverage
   so the points are comparable; a table in the summary, `history` in `--json`, a section with per-rule changes in `--md`.
@@ -262,6 +267,7 @@ used only when you explicitly ask for it:
 | WebLLM | esm.run, huggingface.co | downloading the library and model weights; inference runs locally |
 | PHP Runner | cdn.jsdelivr.net | downloading the php-wasm interpreter |
 | Symbols (tree-sitter) — once enabled | cdn.jsdelivr.net | downloading the web-tree-sitter parser and WASM grammars; parsing runs locally in a Web Worker |
+| Vulnerable dependencies — on request, after a preview of what is sent | api.osv.dev | package names, ecosystems and versions only (from lockfiles / manifests) — no code, paths or project name |
 | Ollama | 127.0.0.1:11434 | local — including code snippets in 📚 mode and their embeddings (RAG) |
 | account (optional) | your own server | maps, snapshots, settings; the Vault **only as ciphertext** |
 | opening a `#repo=` / `#gist=` link | the same APIs as loading a repository; api.github.com and gist.githubusercontent.com | the repository address / gist id, **without a token** |
@@ -300,6 +306,7 @@ js/doctor.js  js/doctor-ui.js   # hotspot doctor: file record + prompt (pure), f
 js/cochange.js                  # change coupling (GitCore.coupling): "changes together with" panel section, changeCoupling action
 js/dsm.js  js/dsm-ui.js         # packages and dependency matrix: units, providers → consumers order, cycles (pure) + the DSM window
 js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: patterns, owners → git authors, unowned / drift (pure) + panel, coloring, action
+js/vulns.js  js/vulns-ui.js     # vulnerable dependencies: lockfile/manifest versions, OSV.dev querybatch, CVSS 3 (pure) + window, coloring
 js/tour.js  js/tour-ui.js       # code tours: automatic / model-planned from structure, CodeTour, #tour= links; player on the map
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators

@@ -49,6 +49,8 @@ CM.Inspect = (function(){
     'unowned':'plików bez właściciela: {n}',
     'r.ownerdrift':'Rozjazd CODEOWNERS z historią git','r.ownerdrift.d':'Deklarowany właściciel (osoba rozpoznana w historii) ma < 10 % zmian pliku, a ktoś inny ≥ 50 % z co najmniej 5 — CODEOWNERS nie wskazuje osoby, która naprawdę zna ten kod.',
     'drift':'CODEOWNERS: {o} · git: {who} {s} % z {c} zmian',
+    'r.vulndep':'Podatne zależności (OSV.dev)','r.vulndep.d':'Zależności ze znanymi podatnościami wg OSV.dev — sprawdzane tylko na żądanie (wysyłane są wyłącznie nazwy i wersje pakietów). Wersje z plików blokad (także przechodnie) albo z manifestów; ważność wg bazy (GHSA) albo CVSS 3.',
+    'vuln':'{p} {v}: podatności {n} — {ids}{fix}{tr}','vulnFix':' · poprawka: {f}','vulnTr':' · przechodnia',
   },
   en:{
     'title':'Static analysis',
@@ -90,6 +92,8 @@ CM.Inspect = (function(){
     'unowned':'files without an owner: {n}',
     'r.ownerdrift':'CODEOWNERS drift from git history','r.ownerdrift.d':'The declared owner (a person found in the history) has < 10 % of the file\'s changes while someone else has ≥ 50 % of at least 5 — CODEOWNERS does not point to the person who actually knows this code.',
     'drift':'CODEOWNERS: {o} · git: {who} {s} % of {c} changes',
+    'r.vulndep':'Vulnerable dependencies (OSV.dev)','r.vulndep.d':'Dependencies with known vulnerabilities according to OSV.dev — checked on request only (just package names and versions are sent). Versions from lockfiles (transitive too) or manifests; severity from the database (GHSA) or CVSS 3.',
+    'vuln':'{p} {v}: vulnerabilities {n} — {ids}{fix}{tr}','vulnFix':' · fixed in: {f}','vulnTr':' · transitive',
   }};
   function t(k,sub){ const l=I.getLang(); const d=STR[l]||STR.pl; let s=(d&&k in d)?d[k]:(STR.pl[k]||k); if(sub) for(const p in sub) s=s.replace('{'+p+'}',sub[p]); return s; }
 
@@ -106,7 +110,7 @@ CM.Inspect = (function(){
   // real programming languages only — manifests/docs/styles being "orphans" is normal, not a smell
   const CODE_RE=/^(js|jsx|ts|tsx|mjs|cjs|vue|svelte|py|java|go|rb|php|cs|cpp|cxx|cc|c|h|hpp|rs|kt|kts|swift|scala|dart|lua|pl|r|jl|ex|exs|erl|hs|ml|fs|clj|groovy|zig|nim|v|sol)$/i;
   // kolejność reguł w raporcie (= wszystkie identyfikatory reguł; CLI waliduje nimi --fail-on)
-  const ORDER=['archviolation','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','ownerdrift','unowned','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+  const ORDER=['archviolation','vulndep','pkgcycle','cycles','god','unstable','fanout','gitHotspot','huge','complex','lowcov','untested','silo','hiddencoupling','ownerdrift','unowned','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
 
   // returns {findings:[{rule,sev,items:[{id,name,path,detail,sev,related?}],count}], score, files, ms}
   // item.sev = ważność tej pozycji (f.sev = pierwszej; liczy się do wyniku), related = id powiązanych węzłów (SARIF)
@@ -215,6 +219,17 @@ CM.Inspect = (function(){
       for(const [a,b,p] of hidden.slice(0,LIMIT)) add(F,'hiddencoupling','low',a, t('coupled',{b:b.name, n:p.shared, d:Math.round(p.degree*100)}), [b.id]);
       if(hidden.length>LIMIT){ const f=F.get('hiddencoupling'); if(f) f.count=hidden.length; }
     }catch(e){ /* brak osi czasu w starszej mapie — reguła pominięta */ } }
+
+    // ---- podatne zależności: wynik sprawdzenia OSV.dev zapisany na grafie (CM.Vulns.applyToGraph) ----
+    if(graph.vulnInfo && Array.isArray(graph.vulnInfo.items)){ try{
+      const SEV={CRITICAL:'high', HIGH:'high', MODERATE:'med', MEDIUM:'med', LOW:'low'};
+      const items=graph.vulnInfo.items.slice().sort((a,b)=>((CM.Vulns&&CM.Vulns.RANK[b.level])||0)-((CM.Vulns&&CM.Vulns.RANK[a.level])||0));
+      for(const it of items){
+        const n=graph.nodes.get(it.file)||graph.nodes.get('ext:'+it.name)||graph.root;
+        const ids=it.vulns.slice(0,3).map(v=>v.id+(v.level?' ('+v.level+')':'')).join(', ')+(it.vulns.length>3?', …':'');
+        add(F,'vulndep',SEV[it.level]||'med',n, t('vuln',{p:it.name, v:it.version, n:it.vulns.length, ids, fix:it.fixed?t('vulnFix',{f:it.fixed}):'', tr:it.direct===false?t('vulnTr'):''}));
+      }
+    }catch(e){ /* uszkodzony wynik w zapisanej mapie — reguła pominięta */ } }
 
     // ---- CODEOWNERS a własność z historii git (CM.CodeOwners) ----
     if(CM.CodeOwners){ try{

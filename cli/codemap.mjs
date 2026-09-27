@@ -3,7 +3,7 @@
 //   codemap analyze [ścieżka=.] [--json f] [--md f] [--sarif f] [--map f] [--export dot|mermaid|graphml --out f]
 //                   [--min-score N] [--fail-on high|med|low|info|<reguły>] [--max-findings N]
 //                   [--no-git] [--git-max N] [--coverage f]… [--no-coverage] [--exclude glob]… [--max-content N]
-//                   [--history N] [--lang pl|en] [--quiet] [--no-color]
+//                   [--history N] [--osv] [--lang pl|en] [--quiet] [--no-color]
 // Kody wyjścia: 0 = OK, 1 = próg niespełniony, 2 = błąd użycia lub wykonania.
 // Kod wyjścia przez process.exitCode (nie process.exit): na Node 26 twarde exit() po strumieniach bywa asercją libuv.
 import fs from 'node:fs';
@@ -34,7 +34,7 @@ export function parseArgs(argv, RULES) {
   const o = { cmd: null, dir: null, lang, json: null, md: null, sarif: null, map: null, export: null, out: null,
     minScore: null, failOn: [], maxFindings: null, git: DEFAULTS.git, gitMax: DEFAULTS.gitMax, coverage: [], noCoverage: false,
     exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false,
-    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null };
+    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null, osv: false };
   const num = (flag, v) => { const n = Number(v); if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw new CliError(tr('eNum', { o: flag, v })); return n; };
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i], val = null;
@@ -76,6 +76,7 @@ export function parseArgs(argv, RULES) {
       case '--no-coverage': o.noCoverage = true; break;
       case '--exclude': o.exclude.push(need()); break;
       case '--max-content': o.maxContent = Math.floor(num(a, need())); break;
+      case '--osv': o.osv = true; break;
       case '--history': o.history = Math.max(1, Math.min(200, Math.floor(num(a, need())))); break;
       case '-q': case '--quiet': o.quiet = true; break;
       case '--color': o.color = true; break;
@@ -137,7 +138,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 
     const aOpts = { lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
-      maxContent: o.maxContent, exclude: o.exclude };
+      maxContent: o.maxContent, exclude: o.exclude, osv: o.osv };
     const res = await runAnalysis(o.dir || '.', aOpts);
     const { CM, graph, report } = res;
     // przegląd zmian: pliki z git diff <base>...HEAD → ryzyko (CM.PRCore), opcjonalnie wynik bazowy

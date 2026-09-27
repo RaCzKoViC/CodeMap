@@ -44,6 +44,16 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   pomijane; właściciele `@login` i e-mail rozwiązywani na autorów (login, część lokalna e-maila / noreply, nazwisko),
   zespoły `@org/x` nieoceniane. Reguły Inspect **„kod bez właściciela"** (jedna pozycja na folder) i **„rozjazd
   CODEOWNERS z historią git"**; sekcja w panelu pliku, kolorowanie „Właściciel (CODEOWNERS)", akcja ChatBota `codeOwners`.
+- **Podatne zależności (OSV.dev)** (`js/vulns.js` + `js/vulns-ui.js`, CLI `--osv`): pliki blokad parsowane przy budowie
+  grafu do `graph.lockDeps` (package-lock v1–v3, yarn.lock v1 i berry, Cargo.lock, poetry.lock, Pipfile.lock, go.sum —
+  dokładne wersje, także przechodnie; zapis mapy je zachowuje), dla ekosystemu bez blokady — manifesty (przypięte wersje
+  albo dolna granica zakresu, oznaczona); `requirements.txt` zachowuje teraz operator (`==` = przypięta). Zapytania
+  `querybatch` (≤ 1000) + szczegóły (≤ 200, 8 naraz): ważność z bazy (GHSA) albo policzona z wektora CVSS 3.x, najmniejsza
+  wersja z poprawką powyżej bieżącej. Okno najpierw pokazuje, co wyjdzie (tylko nazwy, ekosystemy, wersje), wysyła po
+  kliknięciu; tabela z linkami do osv.dev (budowanymi z identyfikatora — mapa z cudzego linku nie wstrzyknie adresu),
+  nakładka „Podatności", sekcja przy węźle zależności i pliku blokady, reguła Inspect **„podatne zależności"** (ważność
+  wg najwyższej podatności, pozycja na pliku blokady / manifestu, więc SARIF ma lokalizację), akcja ChatBota
+  `vulnerabilities`. Tabela „co opuszcza urządzenie" w README uzupełniona.
 - **Reguła Inspect „ukryte sprzężenie zmian"**: pliki kodu zmieniane razem w ≥ 50 % commitów (min. 5 wspólnych) bez
   importu w żadną stronę; bez testów (test ↔ kod zmieniają się razem z natury). Trafia też do CLI, SARIF i komentarza PR.
 

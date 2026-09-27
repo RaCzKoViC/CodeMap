@@ -125,6 +125,10 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   na dowolnej głębokości), właściciele `@login` / e-mail rozwiązywani na autorów historii; reguły Inspect **kod bez
   właściciela** (jedna pozycja na folder) i **rozjazd CODEOWNERS** (deklarowany właściciel ma < 10 % zmian pliku, ktoś
   inny ≥ 50 %); sekcja w panelu, kolorowanie **Właściciel (CODEOWNERS)** i akcja ChatBota `codeOwners`.
+- **Podatne zależności (OSV.dev)** — Projekt → Podatne zależności: dokładne wersje z plików blokad (package-lock, yarn.lock,
+  Cargo.lock, poetry.lock, Pipfile.lock, go.sum — także przechodnie) albo z manifestów; okno najpierw pokazuje, co wyjdzie
+  (tylko nazwy i wersje), dopiero potem wysyła; wynik z ważnością (GHSA / CVSS 3), wersją z poprawką, linkami do osv.dev,
+  kolorowaniem **Podatności** i regułą Inspect **podatne zależności** (CLI: `--osv`).
 
 ### Testy i pokrycie
 - CodeMap sam wiąże **testy z testowanym kodem** — po nazwie (także ścieżki lustrzane `test/` ↔ `src/`,
@@ -216,6 +220,7 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
   `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (kody wyjścia 0 / 1 / 2); przegląd zmian: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
+- `--osv` — podatne zależności z api.osv.dev (tylko nazwy i wersje pakietów) jako znaleziska w każdym raporcie.
 - **Trend zdrowia**: `--history N` — N commitów rozłożonych równo na historii (pierwszy rodzic HEAD), każde drzewo
   czytane wprost z `.git` (bez checkoutu i binarki git) i analizowane jak folder, bez reguł historii git i pokrycia,
   żeby punkty były porównywalne; tabela w podsumowaniu, `history` w `--json`, sekcja ze zmianami reguł w `--md`.
@@ -261,6 +266,7 @@ na Twoje wyraźne żądanie:
 | WebLLM | esm.run, huggingface.co | pobranie biblioteki i wag modelu; inferencja lokalnie |
 | Runner PHP | cdn.jsdelivr.net | pobranie interpretera php-wasm |
 | Symbole (tree-sitter) — po włączeniu | cdn.jsdelivr.net | pobranie parsera web-tree-sitter i gramatyk WASM; parsowanie lokalnie w Web Workerze |
+| Podatne zależności — na żądanie, po podglądzie tego, co wyjdzie | api.osv.dev | tylko nazwy pakietów, ekosystemy i wersje (z plików blokad / manifestów) — bez kodu, ścieżek i nazwy projektu |
 | Ollama | 127.0.0.1:11434 | lokalnie — także fragmenty kodu w trybie 📚 i ich embeddingi (RAG) |
 | konto (opcjonalne) | Twój własny serwer | mapy, migawki, ustawienia; Sejf **tylko jako szyfrogram** |
 | otwarcie linku `#repo=` / `#gist=` | te same API co wczytanie repozytorium; api.github.com i gist.githubusercontent.com | adres repozytorium / id gista, **bez tokenu** |
@@ -299,6 +305,7 @@ js/doctor.js  js/doctor-ui.js   # Doktor hotspotów: kartoteka pliku + prompt (c
 js/cochange.js                  # sprzężenie zmian (GitCore.coupling): sekcja „Zmieniany razem z" w panelu, akcja changeCoupling
 js/dsm.js  js/dsm-ui.js         # pakiety i macierz zależności: jednostki, kolejność dostawcy → konsumenci, cykle (czyste) + okno DSM
 js/codeowners.js  js/codeowners-ui.js  # CODEOWNERS: wzorce, właściciele → autorzy git, bez właściciela / rozjazd (czyste) + panel, kolorowanie, akcja
+js/vulns.js  js/vulns-ui.js     # podatne zależności: wersje z blokad/manifestów, querybatch OSV.dev, CVSS 3 (czyste) + okno, kolorowanie
 js/tour.js  js/tour-ui.js       # trasy po kodzie: automatyczne / z modelu ze struktury, CodeTour, linki #tour=; odtwarzacz na mapie
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów

@@ -538,6 +538,34 @@ const coRes = await evalJs(`(async()=>{ try{
 check(coRes && !coRes.error && coRes.sec && coRes.ala && coRes.drift && coRes.cur === 'codeowners' && coRes.legend
   && /reguły 1, pliki kodu bez właściciela 1, rozjazdy z git 1/.test(coRes.chat),
   `CODEOWNERS: panel z rozjazdem, nakładka, akcja ChatBota: ${JSON.stringify(coRes)}`);
+// podatne zależności (faza 10): okno pokazuje, co wyjdzie do OSV.dev, zanim cokolwiek wyśle; podstawiony fetch (bez
+// sieci) → tabela, nakładka „Podatności", sekcja przy węźle lodash, reguła Inspect vulndep; linki tylko z identyfikatora
+const vuRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  const F=(p,c)=>({path:p,size:c.length,content:c,mtime:Date.now()});
+  const lock=JSON.stringify({lockfileVersion:3, packages:{'node_modules/lodash':{version:'4.17.15'}}});
+  await CMApp.loadFiles([F('package.json','{"dependencies":{"lodash":"^4.17.15"}}'), F('package-lock.json',lock), F('src/a.js',"import _ from 'lodash';\\n")], {name:'vu-demo', source:'smoke'});
+  for(let i=0;i<50;i++){ if(CMApp.graph&&CMApp.graph.meta&&CMApp.graph.meta.name==='vu-demo'&&CMApp.graph.nodes.size>3) break; await sleep(100); }
+  const calls=[], orig=window.fetch;
+  window.fetch=async(url,init)=>{ calls.push(String(url)); if(String(url).endsWith('/querybatch')) return new Response(JSON.stringify({results:[{vulns:[{id:'GHSA-35jh-r3h4-6jhm'}]}]}));
+    return new Response(JSON.stringify({id:'GHSA-35jh-r3h4-6jhm', summary:'Command injection', database_specific:{severity:'HIGH'}, affected:[{package:{name:'lodash',ecosystem:'npm'}, ranges:[{events:[{introduced:'0'},{fixed:'4.17.21'}]}]}]})); };
+  try{
+    document.getElementById('btn-vulns').click(); await sleep(200);
+    const body=document.getElementById('vu-body'), before=calls.length, send=/liczba: 1; npm 1/.test(body.textContent);
+    document.querySelector('#vu-foot .tb-btn.primary').click();
+    for(let i=0;i<40 && !document.querySelector('#vu-body .vu-row');i++) await sleep(50);
+    const rows=document.querySelectorAll('#vu-body .vu-row').length, link=(document.querySelector('#vu-body .vu-ids a')||{}).href||'';
+    const ov=CM.Overlays.current(), rep=await CM.Inspect.run(CMApp.graph), vd=rep.findings.find(f=>f.rule==='vulndep');
+    document.querySelector('#modal-vulns .modal-x').click();
+    CMApp.focusNode('ext:lodash'); await sleep(200);
+    const det=!!document.querySelector('#details-body .det-vulns');
+    CMApp.exec('colorBy',{mode:'lang'});
+    return {before, send, calls:calls.length, rows, link, ov, rule:vd?vd.count:0, sev:vd?vd.sev:null, det};
+  } finally { window.fetch=orig; }
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(vuRes && !vuRes.error && vuRes.before === 0 && vuRes.send && vuRes.calls === 2 && vuRes.rows === 1 && vuRes.link === 'https://osv.dev/vulnerability/GHSA-35jh-r3h4-6jhm'
+  && vuRes.ov === 'vulns' && vuRes.rule === 1 && vuRes.sev === 'high' && vuRes.det,
+  `podatne zależności: zgoda przed wysyłką, tabela, nakładka, panel, reguła vulndep (podstawiony fetch): ${JSON.stringify(vuRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
