@@ -5,6 +5,15 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Poprawione — Faza 16
+- **Węzły w dokładnie tym samym miejscu rozsuwają się** (`js/physics.js`): dwa błędy — kierunek „rozsunięcia" liczony
+  z tej samej sumy współrzędnych był identyczny dla obu węzłów (szły razem), a Barnes-Hut przybliżał komórkę, której
+  środek masy wypadał w samym węźle, siłą bez kierunku (zero) i nie schodził do liści. Teraz kierunek antysymetryczny
+  z pary (lo, hi), a przy zerowej odległości od środka masy zawsze schodzi niżej. Test regresji: para i trójka w (0, 0).
+- **Serwer nie obcina metadanych albumu** (`server/vault.js`): zaszyfrowany opis sejfu / ulubionych ponad 8 KB był po
+  cichu ucinany — zapisany JSON był uszkodzony, a kolejne wysyłki plików kończyły się błędem „plain". Limit 1 MB
+  (`MAX_VAULT_META_BYTES`), ponad nim 413 `toobig` bez zmiany zapisu; aplikacja pokazuje czytelny komunikat.
+
 ## [1.6.0] — 2026-09-27
 
 CodeMap dla agentów AI (faza 15): serwer MCP z 19 narzędziami, generowany `ARCHITECTURE.md` i `codemap check` przed

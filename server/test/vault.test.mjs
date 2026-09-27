@@ -96,3 +96,18 @@ test('manifest synchronizacji pokazuje meta i pliki albumów; konta są rozdziel
   assert.equal((await call(bob, 'DELETE', '/api/vault/vault/files/' + encodeURIComponent('zdjęcie 1.jpg.enc'))).statusCode, 404);
   assert.ok(existsSync(join(BLOB_DIR, String(ala.id), 'vault')));
 });
+
+test('meta większe niż 8 KB zapisuje się w całości (regresja: było obcinane), ponad limit → 413 bez zmiany zapisu', async () => {
+  const ewa = await user('ewa@example.com');   // osobne konto — stan ala/bob należy do testów wyżej
+  const big =JSON.stringify({ enc: true, salt: 's', files: Array.from({ length: 400 }, (_, i) => ({ n: 'plik-' + i + '.jpg.enc', iv: 'x'.repeat(24), s: i * 1000 })) });
+  assert.ok(big.length > 20000);
+  assert.equal((await call(ewa, 'PUT', '/api/vault/fav/meta', { json: big, updatedAt: 77 })).statusCode, 200);
+  const got = (await call(ewa, 'GET', '/api/vault/fav')).json().meta;
+  assert.equal(got.json, big, 'całe meta, poprawny JSON');
+  assert.equal(JSON.parse(got.json).files.length, 400);
+  const huge = JSON.stringify({ enc: true, pad: 'y'.repeat(1024 * 1024 + 10) });
+  const r = await call(ewa, 'PUT', '/api/vault/fav/meta', { json: huge, updatedAt: 78 });
+  assert.equal(r.statusCode, 413); assert.equal(r.json().error, 'toobig');
+  assert.equal((await call(ewa, 'GET', '/api/vault/fav')).json().meta.updatedAt, 77, 'poprzednie meta nietknięte');
+  assert.equal((await put(ewa, '/api/vault/fav/files/po-duzym-meta.enc', [1, 2])).statusCode, 200, 'album dalej przyjmuje pliki');
+});

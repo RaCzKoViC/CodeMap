@@ -29,17 +29,24 @@
       let m=0,sx=0,sy=0; if(c.body){ m++; sx+=c.body.x; sy+=c.body.y; } if(c.extra){ for(const e of c.extra){ m++; sx+=e.x; sy+=e.y; } } c.m=m; if(m){ c.cx=sx/m; c.cy=sy/m; } };
     mass(rootCell);
     const t2=theta*theta; const stack=[];
+    // węzły w (prawie) tym samym punkcie: kierunek z pary (lo, hi) i znak z kolejności — n i b rozchodzą się
+    // w PRZECIWNE strony (wcześniej kierunek zależał od tej samej sumy współrzędnych, więc oba szły razem)
+    let ix=null;
+    const order=(m)=>{ if(!ix){ ix=new Map(); nodes.forEach((x,k)=>ix.set(x,k)); } return ix.get(m); };
+    const apart=(n,b)=>{ const i=order(n), j=order(b), lo=Math.min(i,j), hi=Math.max(i,j), s=i<j?1:-1;
+      const ang=((lo*0.6180339887+hi*0.3819660113)%1)*Math.PI*2; return [Math.cos(ang)*0.3*s, Math.sin(ang)*0.3*s]; };
     for(const n of nodes){ if(n.fixed) continue;
       stack.length=0; stack.push(rootCell);
       while(stack.length){ const c=stack.pop(); if(!c.m) continue;
-        if(c.kids){ const dx=n.x-c.cx, dy=n.y-c.cy; const d2=dx*dx+dy*dy||0.01;
-          if((c.s*c.s)/d2 < t2){ const mag=strength*c.m/d2, inv=1/Math.sqrt(d2); n.vx+=dx*inv*mag; n.vy+=dy*inv*mag; }
+        if(c.kids){ const dx=n.x-c.cx, dy=n.y-c.cy; const d2=dx*dx+dy*dy;
+          // środek masy w samym węźle (komórka z nim i jego „bliźniakiem") — przybliżenie dałoby siłę bez kierunku
+          if(d2>=0.01 && (c.s*c.s)/d2 < t2){ const mag=strength*c.m/d2, inv=1/Math.sqrt(d2); n.vx+=dx*inv*mag; n.vy+=dy*inv*mag; }
           else stack.push(c.kids[0],c.kids[1],c.kids[2],c.kids[3]);
           continue; }
         const bodies = c.extra ? (c.body?[c.body].concat(c.extra):c.extra) : (c.body?[c.body]:null);
         if(!bodies) continue;
         for(const b of bodies){ if(b===n) continue;
-          let dx=n.x-b.x, dy=n.y-b.y, d2=dx*dx+dy*dy; if(d2<0.01){ dx=(Math.sin(n.x+b.y)*0.3)||0.1; dy=(Math.cos(n.y+b.x)*0.3)||0.1; d2=dx*dx+dy*dy||0.01; }
+          let dx=n.x-b.x, dy=n.y-b.y, d2=dx*dx+dy*dy; if(d2<0.01){ [dx,dy]=apart(n,b); d2=dx*dx+dy*dy; }
           const minD=n.r+b.r+12, overlap=d2<minD*minD?3.2:1;   // nachodzące na siebie figury odpychają się mocniej
           const mag=strength*overlap/d2, inv=1/Math.sqrt(d2); n.vx+=dx*inv*mag; n.vy+=dy*inv*mag;
         }

@@ -233,11 +233,12 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
 - ✅ `codemap check`: indeks gita vs HEAD (bez checkoutu), ryzyko, zależni, zmiana wyniku, nowe znaleziska; kod 1 przy
   nowych naruszeniach warstw i cyklach; `--install-hook` (pre-commit, także `commit -a`), narzędzie MCP `staged_check`.
 
-## Faza 16 — jakość własna 3 i dopracowanie
+## Faza 16 — jakość własna 3 i dopracowanie — W TOKU 2026-09-27
 
 - Zdrowie CodeMap 62 → 75+: najbardziej złożone pliki (renderer, analysis, loaders, chatbot), 22 pliki z dynamicznym
   `innerHTML` → bezpieczne budowanie elementów, duplikaty w testach → wspólne fixture'y.
-- Znane błędy: dwa węzły w dokładnie tym samym miejscu nie rozsuwają się (physics); serwer po cichu obcina metadane albumu.
+- ✅ Znane błędy: dwa węzły w dokładnie tym samym miejscu nie rozsuwają się (physics — kierunek antysymetryczny +
+  Barnes-Hut schodzi do liści); serwer po cichu obcinał metadane albumu (teraz limit 1 MB i 413).
 - Dostępność: nawigacja po mapie klawiaturą, tekstowe podsumowanie dla czytników ekranu.
 - Lista kontrolna ręcznego sprawdzenia agenta WebLLM (WebGPU).
 

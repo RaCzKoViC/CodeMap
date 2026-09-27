@@ -2,6 +2,7 @@
 import { db, now } from './db.js';
 import { handleUpload, sendRowBlob, deleteRowBlob } from './blobs.js';
 import { sha256hex } from './util.js';
+import { CFG } from './config.js';
 
 const ALBUMS = new Set(['vault', 'fav']);
 
@@ -47,7 +48,9 @@ export async function registerVault(app) {
     try { parsed = JSON.parse(json); } catch (e) { /* nie-JSON → odrzucone niżej jako 'plain' */ }
     // Chmura przyjmuje wyłącznie albumy zaszyfrowane — serwer nigdy nie widzi treści plików.
     if (!parsed || parsed.enc !== true) return reply.code(400).send({ error: 'plain' });
-    q.putMeta.run(req.user.id, album, String(json).slice(0, 8192), Number(updatedAt) || now());
+    // za duże meta → 413 zamiast obcięcia (ucięty JSON psuł album: kolejne wysyłki plików kończyły się „plain")
+    if (Buffer.byteLength(String(json)) > CFG.maxVaultMeta) return reply.code(413).send({ error: 'toobig', max: CFG.maxVaultMeta });
+    q.putMeta.run(req.user.id, album, String(json), Number(updatedAt) || now());
     return { ok: true };
   });
 

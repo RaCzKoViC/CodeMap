@@ -8,6 +8,8 @@ export const CFG = {
   emailFrom: process.env.EMAIL_FROM || 'CodeMap <no-reply@localhost>',
   defaultQuota: Number(process.env.DEFAULT_QUOTA_BYTES || 2 * 1024 * 1024 * 1024),
   maxUpload: Number(process.env.MAX_UPLOAD_BYTES || 220_000_000),
+  // zaszyfrowane metadane albumu (sejf / ulubione: wpisy plików, sól, IV) — album z setkami plików to dziesiątki KB
+  maxVaultMeta: Number(process.env.MAX_VAULT_META_BYTES || 1024 * 1024),
   // publiczne linki do map: rozmiar jednej mapy (= limit klienta dla Gista / linku) i liczba aktywnych linków na konto
   maxShare: Number(process.env.MAX_SHARE_BYTES || 25 * 1024 * 1024),
   maxSharesPerUser: Number(process.env.MAX_SHARES_PER_USER || 100),

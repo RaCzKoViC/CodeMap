@@ -16,6 +16,17 @@ describe('bhRepulse', () => {
     assert.ok(Math.abs(a.vx + b.vx) < 1e-9, 'siły przeciwne');
     assert.equal(a.vy, 0); assert.equal(b.vy, 0);
   });
+  test('węzły w dokładnie tym samym punkcie dostają przeciwne siły i rozsuwają się w symulacji (regresja)', () => {
+    const a = nd(5, 5), b = nd(5, 5);
+    P.bhRepulse([a, b], 100, 0.9);
+    assert.ok(Math.hypot(a.vx, a.vy) > 0, 'jest siła');
+    assert.ok(Math.abs(a.vx + b.vx) < 1e-9 && Math.abs(a.vy + b.vy) < 1e-9, 'przeciwne kierunki');
+    const trio = [nd(0, 0), nd(0, 0), nd(0, 0)], s = st();
+    for (let i = 0; i < 60 && P.step(trio, [], s); i++);
+    const d = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+    assert.ok(d(trio[0], trio[1]) > 10 && d(trio[0], trio[2]) > 10 && d(trio[1], trio[2]) > 10, JSON.stringify(trio.map((n) => [n.x, n.y])));
+    assert.ok(finite(trio));
+  });
   test('nakładające się figury odpychają się mocniej (×3,2) niż odległe', () => {
     const near = [nd(0, 0), nd(10, 0)], far = [nd(0, 0), nd(100, 0)];
     P.bhRepulse(near, 100, 0.9); P.bhRepulse(far, 100, 0.9);

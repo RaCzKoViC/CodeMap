@@ -11,6 +11,7 @@ CM.Sync = (function(){
     'vaultNeedPass':'Ustaw hasło albumu, aby synchronizować go z chmurą.',
     'vaultPassDiffers':'Album w chmurze ma inne hasło niż lokalny — ujednolić hasła i spróbuj ponownie.',
     'vaultPushed':'Wysłano do chmury: ','vaultPulled':'Pobrano z chmury: ','vaultNothing':'Wszystko aktualne.',
+    'vaultMetaBig':'Opis albumu jest za duży dla chmury (limit serwera) — podziel album; nic nie zostało nadpisane.',
   },
   en:{
     'synced':'Synced with the cloud.','syncFail':'Sync failed — will retry later.',
@@ -20,6 +21,7 @@ CM.Sync = (function(){
     'vaultNeedPass':'Set an album password to sync it with the cloud.',
     'vaultPassDiffers':'The cloud album uses a different password than the local one — unify passwords and retry.',
     'vaultPushed':'Uploaded to cloud: ','vaultPulled':'Downloaded from cloud: ','vaultNothing':'Everything up to date.',
+    'vaultMetaBig':'The album description is too large for the cloud (server limit) — split the album; nothing was overwritten.',
   }};
   function t(k){ const d=STR[I.getLang()]||STR.pl; return (k in d)?d[k]:(STR.pl[k]||k); }
 
@@ -231,7 +233,8 @@ CM.Sync = (function(){
       try{ const rm=JSON.parse(remote.meta.json);
         if(rm.salt && meta.salt && rm.salt!==meta.salt){ U.toast(t('vaultPassDiffers'),'error'); return; } }catch(e){ /* złe meta w chmurze — nadpiszemy lokalnym */ }
     }
-    await api('/api/vault/'+album+'/meta',{method:'PUT',json:{json:JSON.stringify(meta), updatedAt:Date.now()}});
+    try{ await api('/api/vault/'+album+'/meta',{method:'PUT',json:{json:JSON.stringify(meta), updatedAt:Date.now()}}); }
+    catch(e){ if(e.status===413){ U.toast(t('vaultMetaBig'),'error'); return; } throw e; }   // serwer już nie obcina — odrzuca
     const remoteByName=new Map((remote.files||[]).map(f=>[f.name,f]));
     const local=await D.listRaw(album);              // [{name,size,ts}] — ts = lastModified pliku OPFS
     let sent=0;
