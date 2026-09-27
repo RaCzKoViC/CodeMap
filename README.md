@@ -1,5 +1,7 @@
 # CodeMap — Kartografia Kodu 🗺️
 
+[English](README.md) · **Polski**
+
 [![Licencja MIT](https://img.shields.io/badge/licencja-MIT-22d3ee.svg)](LICENSE)
 [![Wydanie](https://img.shields.io/github/v/release/RaCzKoViC/CodeMap?label=wydanie&color=22d3ee)](https://github.com/RaCzKoViC/CodeMap/releases)
 [![GitHub Pages](https://github.com/RaCzKoViC/CodeMap/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/RaCzKoViC/CodeMap/actions/workflows/deploy-pages.yml)
