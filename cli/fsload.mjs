@@ -11,6 +11,19 @@ const NEVER = /^(\.git|node_modules)$/i;   // tu nawet raportów pokrycia nie sz
 const COV_MAX_SEGS = 5;
 
 /**
+ * Ścieżka pliku (względna, z `/`) z listy — np. drzewa commita (cli/history.mjs) — przechodzi te same reguły co przy
+ * wczytywaniu z dysku: żaden katalog-przodek ani sam plik nie jest pomijany (CM.Loaders.shouldSkip) ani wykluczony
+ * globem `--exclude`.
+ */
+export function acceptPath(CM, rel, exclude) {
+  const L = CM.Loaders, ex = (exclude || []).filter(Boolean);
+  const bad = (r) => L.shouldSkip(r) || (ex.length > 0 && CM.Rules.matchGlob(ex, r));
+  const segs = rel.split('/');
+  for (let i = 1; i < segs.length; i++) if (bad(segs.slice(0, i).join('/'))) return false;
+  return !bad(rel);
+}
+
+/**
  * @param {string} root  katalog projektu (absolutny)
  * @param {object} CM    moduły z cli/runtime.mjs (Loaders, Rules)
  * @param {{maxContent?:number, exclude?:string[]}} opts

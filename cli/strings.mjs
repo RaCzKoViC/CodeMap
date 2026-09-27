@@ -24,6 +24,8 @@ Analiza:
   --no-coverage          bez raportów pokrycia
   --exclude <glob>       pomiń pliki/katalogi pasujące do globu (względem ścieżki; można powtórzyć)
   --max-content <N>      limit plików z czytaną treścią (domyślnie {max}, jak w przeglądarce)
+  --history <N>          trend zdrowia: N commitów rozłożonych równo na historii (pierwszy rodzic HEAD),
+                         drzewa czytane wprost z .git; tabela w podsumowaniu, pole „history" w --json, sekcja w --md
 
 Progi (kod wyjścia 1, gdy niespełnione):
   --min-score <N>        health score poniżej N
@@ -108,6 +110,8 @@ Analysis:
   --no-coverage          no coverage reports
   --exclude <glob>       skip files/folders matching the glob (relative to the path; repeatable)
   --max-content <N>      cap on files whose content is read (default {max}, as in the browser)
+  --history <N>          health trend: N commits spread evenly over history (HEAD first parent), trees read
+                         straight from .git; table in the summary, "history" field in --json, section in --md
 
 Thresholds (exit code 1 when not met):
   --min-score <N>        health score below N

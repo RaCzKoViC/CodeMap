@@ -209,6 +209,9 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
   `--export dot|mermaid|graphml`. CI thresholds: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
+- **Health trend**: `--history N` — N commits spread evenly over the history (HEAD first parent), each tree read
+  straight from `.git` (no checkout, no git binary) and analyzed like the folder, without git-history rules and coverage
+  so the points are comparable; a table in the summary, `history` in `--json`, a section with per-rule changes in `--md`.
 - npm package (not published yet — the name `codemap` is taken, so it goes under a scope): `npm run npm-pack -- --name @scope/codemap`
   builds a 170 KB package (CLI + 17 analysis modules), installs it in a temp dir and runs the installed `codemap analyze`;
   then `npm publish dist/npm/<file>.tgz --access public` and `npx @scope/codemap analyze .`.

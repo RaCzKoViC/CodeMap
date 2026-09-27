@@ -666,9 +666,19 @@
       return out;
     }
 
+    // pełne drzewo commita bez checkoutu: {commit, files:[{path, sha}]} (bez submodułów) — CLI `--history`
+    async function snapshot(ref){
+      const sha = await startSha(ref), c = await readCommit(sha);
+      if(!c) throw missing(sha);
+      const out = []; await diffTrees(null, c.tree, '', out);
+      return {commit:c, files:out.map((f)=>({path:f.path, sha:f.sha}))};
+    }
+
     return {
       head, stats, shallow:shallow.size > 0,
-      readObject, refs, walk,
+      readObject, refs, walk, snapshot,
+      async commit(ref){ return readCommit(await startSha(ref)); },
+      async blob(sha){ const o = await readObject(sha); return o.type === 'blob' ? o.data : null; },
       async log(opts){ return (await walk(opts)).commits; },
     };
   }

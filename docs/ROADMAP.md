@@ -158,7 +158,9 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   commitów), sekcja „Zmieniany razem z" w panelu z oznaczeniem „bez importu", reguła Inspect „ukryte sprzężenie zmian",
   akcja ChatBota `changeCoupling` (`js/cochange.js`). Na historii CodeMap wskazuje m.in. i18n.js i ai-bridge.js — moduły
   zależne przez globalne `CM.*` i klucze tekstów, których import nie pokazuje.
-- Trend zdrowia w czasie: `codemap analyze --history N` (wynik i znaleziska dla kolejnych commitów), wykres w aplikacji.
+- ✅ Trend zdrowia w czasie: `codemap analyze --history N` (`cli/history.mjs`: N commitów równo na historii pierwszego
+  rodzica, drzewa z `.git` przez `GitLocal.snapshot` bez checkoutu, analiza bez reguł historii git i pokrycia; tabela,
+  `history` w JSON, sekcja w Markdown). Na CodeMap: 44 → 55 w 93 commitach. Zostaje wykres w aplikacji.
 - Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami.
 - CODEOWNERS a rzeczywista własność z git (rozjazdy, pliki bez właściciela).
 - Podatne zależności (OSV.dev, tylko nazwy i wersje pakietów, opcjonalnie).

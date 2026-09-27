@@ -3,7 +3,7 @@
 //   codemap analyze [ścieżka=.] [--json f] [--md f] [--sarif f] [--map f] [--export dot|mermaid|graphml --out f]
 //                   [--min-score N] [--fail-on high|med|low|info|<reguły>] [--max-findings N]
 //                   [--no-git] [--git-max N] [--coverage f]… [--no-coverage] [--exclude glob]… [--max-content N]
-//                   [--lang pl|en] [--quiet] [--no-color]
+//                   [--history N] [--lang pl|en] [--quiet] [--no-color]
 // Kody wyjścia: 0 = OK, 1 = próg niespełniony, 2 = błąd użycia lub wykonania.
 // Kod wyjścia przez process.exitCode (nie process.exit): na Node 26 twarde exit() po strumieniach bywa asercją libuv.
 import fs from 'node:fs';
@@ -14,6 +14,7 @@ import { toSummary, SEVS, SEV_RANK } from './report.mjs';
 import { strings, countOf, CliError } from './strings.mjs';
 import { loadCodeMap } from './runtime.mjs';
 import { changedFiles, prReport, baseline, diffFindings, prMarkdown } from './pr.mjs';
+import { healthHistory, historyTable, historyMarkdown } from './history.mjs';
 
 const SEV_ALIAS = { high: 'high', error: 'high', critical: 'high', med: 'med', medium: 'med', warning: 'med',
   low: 'low', note: 'low', info: 'info' };
@@ -33,7 +34,7 @@ export function parseArgs(argv, RULES) {
   const o = { cmd: null, dir: null, lang, json: null, md: null, sarif: null, map: null, export: null, out: null,
     minScore: null, failOn: [], maxFindings: null, git: DEFAULTS.git, gitMax: DEFAULTS.gitMax, coverage: [], noCoverage: false,
     exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false,
-    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null };
+    base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null };
   const num = (flag, v) => { const n = Number(v); if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw new CliError(tr('eNum', { o: flag, v })); return n; };
   for (let i = 0; i < argv.length; i++) {
     let a = argv[i], val = null;
@@ -75,6 +76,7 @@ export function parseArgs(argv, RULES) {
       case '--no-coverage': o.noCoverage = true; break;
       case '--exclude': o.exclude.push(need()); break;
       case '--max-content': o.maxContent = Math.floor(num(a, need())); break;
+      case '--history': o.history = Math.max(1, Math.min(200, Math.floor(num(a, need())))); break;
       case '-q': case '--quiet': o.quiet = true; break;
       case '--color': o.color = true; break;
       case '--no-color': o.color = false; break;
@@ -153,6 +155,16 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     const log = (s) => { if (!o.quiet) process.stderr.write(s + '\n'); };
+    // trend zdrowia w czasie (cli/history.mjs) — przed zapisem wyjść, bo trafia do JSON i Markdown
+    let hist = null;
+    if (o.history) {
+      if (!res.repoRoot) throw new CliError(lang === 'en' ? '--history needs a git repository' : '--history wymaga repozytorium git');
+      hist = await healthHistory(res.repoRoot, res.sub, o.history, { lang, exclude: o.exclude, maxContent: o.maxContent,
+        onPoint: (p, i, n) => { if (!o.quiet && process.stderr.isTTY) process.stderr.write(`\r  ${lang === 'en' ? 'history' : 'historia'} ${i}/${n} ${p.sha.slice(0, 7)} ${p.score}   `); } });
+      if (!o.quiet && process.stderr.isTTY) process.stderr.write('\r' + ' '.repeat(48) + '\r');
+      report.history = { commits: hist.chain, points: hist.points };
+      res.markdown += '\n' + historyMarkdown(hist, lang);
+    }
     const written = [];
     if (o.json) { writeOut(o.json, JSON.stringify(report, null, 2) + '\n'); written.push(['JSON', o.json]); }
     if (o.md) { writeOut(o.md, res.markdown); written.push(['Markdown', o.md]); }
@@ -173,6 +185,7 @@ export async function main(argv = process.argv.slice(2)) {
         stream.write('  ' + tr('prLine', { base: p.base }).padEnd(18) + tr('prVal', { risk: p.risk, lvl, n: p.changed.length + p.outside.length, a: p.add, d: p.del, dep: p.impacted }) + '\n'); }
       if (report.baseline) { const b = report.baseline, d = b.delta;
         stream.write('  ' + tr('blLine', { base: b.ref }).padEnd(18) + tr('blVal', { b: b.score, s: report.score, sign: d > 0 ? '+' : d < 0 ? '−' : '±', d: Math.abs(d), nf: b.newFindings, rf: b.resolvedFindings }) + '\n'); }
+      if (hist) stream.write('\n' + historyTable(hist, lang) + '\n');
       for (const [what, file] of written) if (file !== '-') stream.write('  ' + tr('written', { what, file }) + '\n');
     }
     for (const w of report.warnings) log(`codemap: ${tr('warn')}: ${w}`);

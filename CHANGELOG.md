@@ -27,6 +27,11 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 - **Panel szczegółów — „Zmieniany razem z"** (`js/cochange.js`): lista plików z paskiem stopnia i liczbą wspólnych
   commitów, oznaczenie **„bez importu"** (ukryta zależność), klik przechodzi do pliku, „Pokaż na mapie" podświetla grupę;
   akcja ChatBota `changeCoupling {query?}` (dla pliku albo najsilniejsze pary projektu).
+- **Trend zdrowia w czasie — `codemap analyze --history N`** (`cli/history.mjs`): N commitów rozłożonych równo na
+  historii pierwszego rodzica HEAD; drzewo każdego czytane wprost z `.git` (`GitLocal.snapshot` / `commit` / `blob` —
+  bez checkoutu i bez binarki git), analiza jak dla folderu (te same reguły wczytywania — `acceptPath` w fsload.mjs,
+  graf, testy ↔ kod, Inspect) bez reguł historii git i pokrycia, żeby punkty były porównywalne. Tabela z paskami w
+  podsumowaniu, `history` w `--json`, sekcja w `--md` z największymi zmianami reguł. Na CodeMap: 44 → 55 (93 commity).
 - **Reguła Inspect „ukryte sprzężenie zmian"**: pliki kodu zmieniane razem w ≥ 50 % commitów (min. 5 wspólnych) bez
   importu w żadną stronę; bez testów (test ↔ kod zmieniają się razem z natury). Trafia też do CLI, SARIF i komentarza PR.
 

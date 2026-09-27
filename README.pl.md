@@ -209,6 +209,9 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
   `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (kody wyjścia 0 / 1 / 2); przegląd zmian: `--base <ref>`, `--baseline`, `--pr-md`,
   `--max-score-drop`.
+- **Trend zdrowia**: `--history N` — N commitów rozłożonych równo na historii (pierwszy rodzic HEAD), każde drzewo
+  czytane wprost z `.git` (bez checkoutu i binarki git) i analizowane jak folder, bez reguł historii git i pokrycia,
+  żeby punkty były porównywalne; tabela w podsumowaniu, `history` w `--json`, sekcja ze zmianami reguł w `--md`.
 - Paczka npm (jeszcze nieopublikowana — nazwa `codemap` jest zajęta, więc idzie pod zakresem): `npm run npm-pack -- --name @zakres/codemap`
   buduje paczkę 170 KB (CLI + 17 modułów analizy), instaluje ją w katalogu tymczasowym i uruchamia zainstalowane
   `codemap analyze`; potem `npm publish dist/npm/<plik>.tgz --access public` i `npx @zakres/codemap analyze .`.
