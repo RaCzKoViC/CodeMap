@@ -242,6 +242,7 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
 ### CLI i CI
 - `node cli/codemap.mjs analyze [ścieżka]` (albo `npm link` → `codemap`) — ta sama analiza co panel „Analiza
   statyczna", bez przeglądarki i bez zależności npm: historia git z `.git`, testy i pokrycie, reguły architektury.
+  Pliki ignorowane przez `.gitignore` (także zagnieżdżone i `.git/info/exclude`) są pomijane; `--no-gitignore` je włącza.
 - Raporty: terminal, `--json`, `--md`, `--sarif` (GitHub code scanning), `--map` (mapa do otwarcia w aplikacji),
   `--export dot|mermaid|graphml`. Progi dla CI: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (kody wyjścia 0 / 1 / 2); przegląd zmian: `--base <ref>`, `--baseline`, `--pr-md`,

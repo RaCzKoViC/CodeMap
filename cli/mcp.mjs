@@ -45,7 +45,7 @@ export function createServer(opts = {}) {
   const log = opts.log || ((m) => process.stderr.write('codemap mcp: ' + m + '\n'));
   let state = null, pending = null, clientProtocol = PROTOCOLS[0];
   const analyze = () => {
-    pending = runAnalysis(dir, { lang, git: opts.git !== false, exclude: opts.exclude || [], osv: !!opts.osv, modules: MCP_MODULES })
+    pending = runAnalysis(dir, { lang, git: opts.git !== false, exclude: opts.exclude || [], gitignore: opts.gitignore !== false, osv: !!opts.osv, modules: MCP_MODULES })
       .then((r) => { state = { ...r, rag: null }; log(`analysis ready — ${r.report.stats.files} files, score ${r.report.score}`); return state; })
       .catch((e) => { log('analysis failed: ' + ((e && e.message) || e)); throw e; });
     return pending;

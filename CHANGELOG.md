@@ -75,6 +75,14 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   `self.` (`s.self`); metoda-owijka `m(){ m(x) }` łączy się z importowanym `m`. Precyzja na monorepo 85,8 % → 93,9 %.
 - `./x` bez pliku źródłowego rozwiązuje się do `x.d.ts`; typy z JSDoc `import('./x').T` są zależnościami tylko typu.
 
+### Zmienione
+- **CLI respektuje `.gitignore`** (`cli/gitignore.mjs`): pliki i katalogi ignorowane przez gita nie trafiają do analizy,
+  map, ARCHITECTURE.md, propozycji reguł ani serwera MCP (lokalne build/, prywatne foldery). Składnia gita (`!`, `/` na
+  końcu, zakotwiczenie, `**`, `[...]`, `\`), zagnieżdżone `.gitignore`, wzorce z katalogów nadrzędnych przy analizie
+  podkatalogu, `.git/info/exclude`; raporty pokrycia z ignorowanych katalogów nadal zbierane. Test porównuje wzorce
+  z `git check-ignore`. `--no-gitignore` (i `gitignore: false` w `runAnalysis`) przywraca poprzednie zachowanie;
+  `stats.gitignored` w raporcie JSON.
+
 ### Zmienione — Faza 13 (wydajność)
 - **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym
   z `vm.constants.DONT_CONTEXTIFY` (Node ≥ 20.18 / 22.8) — globalny obiekt jest zwykłym obiektem, bez interceptorów

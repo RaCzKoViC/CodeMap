@@ -33,6 +33,7 @@ Analiza:
                          domyślnie autodetekcja (coverage/lcov.info, coverage-final.json, cobertura.xml…)
   --no-coverage          bez raportów pokrycia
   --exclude <glob>       pomiń pliki/katalogi pasujące do globu (względem ścieżki; można powtórzyć)
+  --no-gitignore         analizuj też pliki ignorowane przez .gitignore (domyślnie pomijane)
   --max-content <N>      limit plików z czytaną treścią (domyślnie {max}, jak w przeglądarce)
   --osv                  podatne zależności z api.osv.dev (wysyłane są tylko nazwy i wersje pakietów)
   --architecture <plik>  ARCHITECTURE.md z mapy: warstwy, pakiety, punkty wejścia, rdzeń, hotspoty, własność, testy, cykle
@@ -132,6 +133,7 @@ Analysis:
                          auto-detected by default (coverage/lcov.info, coverage-final.json, cobertura.xml…)
   --no-coverage          no coverage reports
   --exclude <glob>       skip files/folders matching the glob (relative to the path; repeatable)
+  --no-gitignore         also analyze files ignored by .gitignore (skipped by default)
   --max-content <N>      cap on files whose content is read (default {max}, as in the browser)
   --osv                  vulnerable dependencies from api.osv.dev (only package names and versions are sent)
   --architecture <file>  ARCHITECTURE.md from the map: layers, packages, entry points, core, hotspots, ownership, tests, cycles

@@ -154,7 +154,9 @@ npm link && codemap analyze .                         # polecenie `codemap` w PA
 
 `-` jako plik = standardowe wyjście (np. `--json - | jq .score`); podsumowanie idzie wtedy na stderr.
 Wczytywanie plików stosuje reguły aplikacji: pomijane `node_modules`, `dist`, `build`, `coverage`, `.git`,
-`vendor`, `target`, `.venv`, `__pycache__` itd., treść tylko plików tekstowych do 600 KB. Różnice:
+`vendor`, `target`, `.venv`, `__pycache__` itd., treść tylko plików tekstowych do 600 KB. CLI pomija też pliki
+ignorowane przez `.gitignore` (zagnieżdżone, z katalogów nadrzędnych do korzenia repozytorium, `.git/info/exclude`;
+raporty pokrycia z ignorowanych katalogów są nadal zbierane) — `--no-gitignore` wyłącza. Różnice:
 kolejność alfabetyczna (deterministyczna), dowiązania symboliczne pomijane, archiwa i PDF-y nie są
 rozpakowywane. Historia git jest czytana z `.git` analizowanego katalogu albo najbliższego katalogu
 nadrzędnego (analiza podkatalogu monorepo), także gdy `.git` jest plikiem (`git worktree`, submoduł);

@@ -20,6 +20,7 @@ export const DEFAULTS = Object.freeze({
   coverage: null,    // null = autodetekcja, false = bez pokrycia, [ścieżki] = te raporty
   maxContent: null,  // null = CM.Loaders.MAX_CONTENT_FILES (jak w przeglądarce)
   exclude: [],       // globy (względem analizowanego katalogu) pomijane przy wczytywaniu
+  gitignore: true,   // pliki ignorowane przez .gitignore / .git/info/exclude pomijane (cli/gitignore.mjs)
   modules: [],       // dodatkowe moduły js/ w kontekście (serwer MCP: cli/runtime.mjs MCP_MODULES)
   osv: false,        // podatne zależności z api.osv.dev (sieć: tylko nazwy i wersje pakietów) — wyłącznie na żądanie
   loaded: null,      // {files, coverage, stats} zamiast czytania katalogu (cli/check.mjs: stan z gita)
@@ -44,7 +45,7 @@ export async function runAnalysis(dir, opts = {}) {
   const sub = repoRoot ? path.relative(repoRoot, root).split(path.sep).join('/') : '';
 
   // 1. pliki (albo gotowa lista z pamięci — `codemap check`: stan indeksu i HEAD z gita, bez checkoutu)
-  const loaded = o.loaded || loadProjectFiles(root, CM, { maxContent: o.maxContent, exclude: o.exclude });
+  const loaded = o.loaded || loadProjectFiles(root, CM, { maxContent: o.maxContent, exclude: o.exclude, gitignore: o.gitignore });
   if (loaded.stats.symlinks) warnings.push(tr('wSymlinks', { n: loaded.stats.symlinks }));
   const T1 = performance.now();
 

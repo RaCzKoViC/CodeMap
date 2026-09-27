@@ -242,6 +242,7 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
 ### CLI and CI
 - `node cli/codemap.mjs analyze [path]` (or `npm link` → `codemap`) — the same analysis as the “Static
   analysis” panel, with no browser and no npm dependencies: git history from `.git`, tests and coverage, architecture rules.
+  Files ignored by `.gitignore` (nested ones and `.git/info/exclude` too) are skipped; `--no-gitignore` includes them.
 - Reports: terminal, `--json`, `--md`, `--sarif` (GitHub code scanning), `--map` (a map to open in the app),
   `--export dot|mermaid|graphml`. CI thresholds: `--min-score`, `--fail-on cycles,archviolation|high`,
   `--max-findings` (exit codes 0 / 1 / 2); change review: `--base <ref>`, `--baseline`, `--pr-md`,

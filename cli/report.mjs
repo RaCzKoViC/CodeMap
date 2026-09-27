@@ -74,7 +74,7 @@ export function buildReport({ CM, graph, rep, loaded, timing, lang, name, sub, w
     score: rep.score,
     files: rep.files,
     stats: { files: rep.files, folders, lines, bytes, contentFiles: loaded.stats.content, contentCap: loaded.stats.maxContent,
-      withoutContent: loaded.stats.capped, excluded: loaded.stats.excluded, languages },
+      withoutContent: loaded.stats.capped, excluded: loaded.stats.excluded, gitignored: loaded.stats.gitignored || 0, languages },
     totals,
     findings,
     hotspots,

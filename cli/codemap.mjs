@@ -37,7 +37,7 @@ export function parseArgs(argv, RULES) {
   const tr = strings(lang);
   const o = { cmd: null, dir: null, lang, json: null, md: null, sarif: null, map: null, export: null, out: null,
     minScore: null, failOn: [], maxFindings: null, git: DEFAULTS.git, gitMax: DEFAULTS.gitMax, coverage: [], noCoverage: false,
-    exclude: [], maxContent: null, quiet: false, color: null, help: false, version: false,
+    exclude: [], gitignore: true, maxContent: null, quiet: false, color: null, help: false, version: false,
     base: null, baseline: false, prMd: null, prNumber: null, prTitle: '', prAuthor: '', prLink: '', maxScoreDrop: null, history: null, osv: false, architecture: null,
     failNone: false, installHook: false, uninstallHook: false };
   const num = (flag, v) => { const n = Number(v); if (v === '' || v == null || !Number.isFinite(n) || n < 0) throw new CliError(tr('eNum', { o: flag, v })); return n; };
@@ -77,6 +77,7 @@ export function parseArgs(argv, RULES) {
         break;
       case '--git': o.git = true; break;
       case '--no-git': o.git = false; break;
+      case '--no-gitignore': o.gitignore = false; break;
       case '--git-max': o.gitMax = Math.max(1, Math.floor(num(a, need()))); break;
       case '--coverage': o.coverage.push(need()); break;
       case '--no-coverage': o.noCoverage = true; break;
@@ -151,7 +152,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (o.cmd === 'mcp') {   // serwer MCP: stdout należy do protokołu; język domyślnie angielski (odbiorcą jest agent)
       const explicitLang = argv.some((a) => a === '--lang' || a.startsWith('--lang='));
       const { serve } = await import('./mcp.mjs');
-      await serve({ dir: o.dir || '.', lang: explicitLang ? lang : 'en', git: o.git, exclude: o.exclude, osv: o.osv, version: CM0.VERSION });
+      await serve({ dir: o.dir || '.', lang: explicitLang ? lang : 'en', git: o.git, exclude: o.exclude, gitignore: o.gitignore, osv: o.osv, version: CM0.VERSION });
       return 0;
     }
     if (o.cmd === 'check') {   // zmiany w indeksie vs HEAD przed commitem (cli/check.mjs)
@@ -159,7 +160,7 @@ export async function main(argv = process.argv.slice(2)) {
       return await checkCommand(o, { cliPath: fileURLToPath(import.meta.url), writeOut });
     }
     if (o.cmd === 'rules') {   // propozycja .codemap.rules.json z warstw macierzy zależności (CM.DSM.proposeRules)
-      const res = await runAnalysis(o.dir || '.', { lang, git: false, coverage: false, exclude: o.exclude, maxContent: o.maxContent });
+      const res = await runAnalysis(o.dir || '.', { lang, git: false, coverage: false, exclude: o.exclude, gitignore: o.gitignore, maxContent: o.maxContent });
       const p = proposeRules(res.CM, res.graph, { mode: o.unitMode, depth: o.depth, lang });
       writeOut(o.out || '-', p.text);
       if (!o.quiet) {
@@ -172,7 +173,7 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 
-    const aOpts = { lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
+    const aOpts = { lang, git: o.git, gitMax: o.gitMax, gitignore: o.gitignore, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),
       maxContent: o.maxContent, exclude: o.exclude, osv: o.osv, modules: o.architecture ? ['testgen'] : [] };   // konwencja testów w ARCHITECTURE.md
     const res = await runAnalysis(o.dir || '.', aOpts);
     const { CM, graph, report } = res;
