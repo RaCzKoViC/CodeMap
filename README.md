@@ -245,6 +245,15 @@ an interactive tutorial (CodeMap and MindMap), a built-in user manual, and an in
 - **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.5.1` — a report in the step summary, SARIF, thresholds; an example
   with code scanning is in [docs/github-action.md](docs/github-action.md) (in Polish). The same step runs in this repository's CI.
 
+### For AI agents (MCP)
+- `codemap mcp [path]` is an MCP server (stdio, no dependencies) that gives coding agents such as Claude Code or Cursor
+  the same analysis as read-only tools: `project_overview`, `find_files`, `code_search` (BM25), `file_info`,
+  `dependencies`, `dependents`, `change_impact` (paths or a git `base` — risk with reasons, impacted files, reviewers),
+  `hotspots`, `findings`, `cycles`, `owners`, `tests`, `change_coupling`, `ask_map` (natural-language questions),
+  `test_skeleton` and `refresh`; `--osv` adds `vulnerable_dependencies` (only package names and versions go to OSV.dev).
+- Claude Code: `claude mcp add codemap -- node /path/to/CodeMap/cli/codemap.mjs mcp /path/to/project`; other clients
+  (`.mcp.json`): `{"mcpServers": {"codemap": {"command": "node", "args": ["/path/to/CodeMap/cli/codemap.mjs", "mcp", "."]}}}`.
+
 ### VS Code extension
 `integrations/vscode/` — the same analysis inside the editor: Inspect findings in **Problems** (line, rule,
 related files), the health score in the status bar, CodeLens above git hotspots, the CodeMap map in a panel

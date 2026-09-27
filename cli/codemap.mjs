@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // CodeMap CLI — ta sama analiza co w aplikacji, z wiersza poleceń i w CI (bez zależności npm).
+//   codemap mcp [ścieżka=.] [--osv] [--no-git] [--exclude glob]… — serwer MCP (cli/mcp.mjs) dla agentów AI
 //   codemap analyze [ścieżka=.] [--json f] [--md f] [--sarif f] [--map f] [--export dot|mermaid|graphml --out f]
 //                   [--min-score N] [--fail-on high|med|low|info|<reguły>] [--max-findings N]
 //                   [--no-git] [--git-max N] [--coverage f]… [--no-coverage] [--exclude glob]… [--max-content N]
@@ -135,6 +136,12 @@ export async function main(argv = process.argv.slice(2)) {
     if (o.version) { process.stdout.write(CM0.VERSION + '\n'); return 0; }
     if (o.help) { process.stdout.write(tr('help', { v: CM0.VERSION, max: CM0.Loaders.MAX_CONTENT_FILES, rules: CM0.Inspect.RULES.join(', ') }) + '\n'); return 0; }
     if (!o.cmd) { process.stderr.write(tr('help', { v: CM0.VERSION, max: CM0.Loaders.MAX_CONTENT_FILES, rules: CM0.Inspect.RULES.join(', ') }) + '\n\n' + tr('err') + ': ' + tr('eNoCmd') + '\n'); return 2; }
+    if (o.cmd === 'mcp') {   // serwer MCP: stdout należy do protokołu; język domyślnie angielski (odbiorcą jest agent)
+      const explicitLang = argv.some((a) => a === '--lang' || a.startsWith('--lang='));
+      const { serve } = await import('./mcp.mjs');
+      await serve({ dir: o.dir || '.', lang: explicitLang ? lang : 'en', git: o.git, exclude: o.exclude, osv: o.osv, version: CM0.VERSION });
+      return 0;
+    }
     if (o.cmd !== 'analyze') throw new CliError(tr('eCmd', { c: o.cmd }));
 
     const aOpts = { lang, git: o.git, gitMax: o.gitMax, coverage: o.noCoverage ? false : (o.coverage.length ? o.coverage : null),

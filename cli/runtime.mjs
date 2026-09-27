@@ -91,13 +91,16 @@ export function loadCM(files, extra = {}) {
   return ctx.CM;
 }
 
-/** CM z modułami analizy headless; lang = 'pl' | 'en' (teksty reguł Inspect, szczegóły znalezisk). */
-export function loadCodeMap({ lang = 'pl' } = {}) {
+/** Dodatkowe moduły serwera MCP (cli/mcp.mjs): wyszukiwanie BM25, narzędzia agenta, pytania o mapę, szkielety testów. */
+export const MCP_MODULES = ['rag', 'agent', 'mapquery', 'testgen'];
+
+/** CM z modułami analizy headless; lang = 'pl' | 'en' (teksty reguł Inspect, szczegóły znalezisk); modules — dodatkowe. */
+export function loadCodeMap({ lang = 'pl', modules = [] } = {}) {
   const ctx = createContext({
     navigator: { language: lang, languages: [lang], onLine: false, userAgent: 'codemap-cli', storage: { persist: async () => false } },
     fetch: () => Promise.reject(new Error('CodeMap CLI: brak sieci')),
   });
-  for (const f of CLI_MODULES) runFile(ctx, `js/${f}.js`);
+  for (const f of CLI_MODULES.concat(modules.filter((m) => !CLI_MODULES.includes(m)))) runFile(ctx, `js/${f}.js`);
   const CM = ctx.CM;
   CM.i18n.setLang(lang);
   return CM;

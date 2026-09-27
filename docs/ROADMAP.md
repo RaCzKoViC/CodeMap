@@ -218,10 +218,10 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
 - Dokładność grafu wywołań: tree-sitter porównany z „znajdź odwołania" kompilatora TypeScript.
 - Propozycja reguł architektury z warstw macierzy zależności — do zatwierdzenia jednym klikiem.
 
-## Faza 15 — CodeMap dla agentów AI
+## Faza 15 — CodeMap dla agentów AI — W TOKU 2026-09-27
 
-- Serwer MCP (`codemap mcp`, stdio): zależne pliki i wpływ zmiany, hotspoty, właściciele, cykle, pytania o mapę,
-  szkielety testów, podatne zależności — ta sama analiza co CLI.
+- ✅ Serwer MCP (`codemap mcp`, stdio, `cli/mcp.mjs`): 16 narzędzi tylko do odczytu (+ `vulnerable_dependencies` z `--osv`)
+  na tej samej analizie co CLI; narzędzia agenta z aplikacji (`CM.Agent.exec`), BM25 z `CM.RAG`; w paczce npm.
 - Generowany `ARCHITECTURE.md` (warstwy, pakiety, hotspoty, właściciele, konwencje), odświeżany w CI.
 - `codemap check --staged`: wpływ zmian i reguły architektury przed commitem (hook pre-commit).
 

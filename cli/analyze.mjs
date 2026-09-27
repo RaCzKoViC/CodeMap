@@ -20,6 +20,7 @@ export const DEFAULTS = Object.freeze({
   coverage: null,    // null = autodetekcja, false = bez pokrycia, [ścieżki] = te raporty
   maxContent: null,  // null = CM.Loaders.MAX_CONTENT_FILES (jak w przeglądarce)
   exclude: [],       // globy (względem analizowanego katalogu) pomijane przy wczytywaniu
+  modules: [],       // dodatkowe moduły js/ w kontekście (serwer MCP: cli/runtime.mjs MCP_MODULES)
   osv: false,        // podatne zależności z api.osv.dev (sieć: tylko nazwy i wersje pakietów) — wyłącznie na żądanie
 });
 const MAX_COV = 256 * 1024 * 1024;   // jak tests-ui.js
@@ -36,7 +37,7 @@ export async function runAnalysis(dir, opts = {}) {
   let st = null; try { st = fs.statSync(root); } catch { /* niżej */ }
   if (!st || !st.isDirectory()) throw new CliError(tr('eDir', { p: root }));
   const warnings = [];
-  const CM = loadCodeMap({ lang: o.lang });
+  const CM = loadCodeMap({ lang: o.lang, modules: o.modules || [] });
   const name = path.basename(root) || root;
   const repoRoot = findRepoRoot(root);
   const sub = repoRoot ? path.relative(repoRoot, root).split(path.sep).join('/') : '';

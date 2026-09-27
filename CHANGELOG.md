@@ -5,6 +5,17 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 15 (CodeMap dla agentów AI)
+- **Serwer MCP — `codemap mcp [ścieżka]`** (`cli/mcp.mjs`, bez zależności): JSON-RPC 2.0 po stdio (negocjacja wersji
+  protokołu 2025-06-18 / 2025-03-26 / 2024-11-05, na stdout tylko protokół), analiza startuje od razu, `refresh` po
+  zmianach. Narzędzia tylko do odczytu: `project_overview`, `find_files`, `code_search` (BM25 z fragmentów plików),
+  `file_info`, `dependencies`, `dependents`, `change_impact` (ścieżki albo `base` — ryzyko z powodami, pliki dotknięte,
+  recenzenci), `hotspots`, `findings` (filtr reguły / ważności / ścieżki), `cycles` (pliki i pakiety), `owners`, `tests`,
+  `change_coupling`, `ask_map`, `test_skeleton`; `--osv` dodaje `vulnerable_dependencies`. Teksty narzędzi domyślnie po
+  angielsku (odbiorcą jest agent). `loadCodeMap({modules})` / `runAnalysis({modules})` doładowują moduły MCP; paczka npm
+  je zawiera, a `npm-pack` sprawdza zainstalowany `codemap mcp`.
+
+
 ### Zmienione — Faza 13 (wydajność)
 - **CLI, GitHub Action, rozszerzenie VS Code i testy ok. 4× szybsze**: moduły analizy działają w kontekście `vm` utworzonym
   z `vm.constants.DONT_CONTEXTIFY` (Node ≥ 20.18 / 22.8) — globalny obiekt jest zwykłym obiektem, bez interceptorów

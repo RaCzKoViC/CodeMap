@@ -245,6 +245,16 @@ interaktywny samouczek (CodeMap i MindMap), wbudowana instrukcja, PWA do zainsta
 - **GitHub Action**: `uses: RaCzKoViC/CodeMap@v1.5.1` — raport w podsumowaniu kroku, SARIF, progi; przykład
   z code scanning w [docs/github-action.md](docs/github-action.md). Ten sam krok działa w CI tego repozytorium.
 
+### Dla agentów AI (MCP)
+- `codemap mcp [ścieżka]` to serwer MCP (stdio, bez zależności), który daje agentom programistycznym, np. Claude Code
+  albo Cursor, tę samą analizę jako narzędzia tylko do odczytu: `project_overview`, `find_files`, `code_search` (BM25),
+  `file_info`, `dependencies`, `dependents`, `change_impact` (ścieżki albo `base` z gita — ryzyko z powodami, pliki
+  dotknięte zmianą, recenzenci), `hotspots`, `findings`, `cycles`, `owners`, `tests`, `change_coupling`, `ask_map`
+  (pytania językiem naturalnym), `test_skeleton` i `refresh`; `--osv` dodaje `vulnerable_dependencies` (do OSV.dev idą
+  tylko nazwy i wersje pakietów).
+- Claude Code: `claude mcp add codemap -- node /ścieżka/do/CodeMap/cli/codemap.mjs mcp /ścieżka/do/projektu`; inni klienci
+  (`.mcp.json`): `{"mcpServers": {"codemap": {"command": "node", "args": ["/ścieżka/do/CodeMap/cli/codemap.mjs", "mcp", "."]}}}`.
+
 ### Rozszerzenie VS Code
 `integrations/vscode/` — ta sama analiza w edytorze: znaleziska Inspect w **Problems** (linia, reguła, powiązane
 pliki), health score w pasku stanu, CodeLens nad hotspotami git, mapa CodeMap w panelu i nawigacja w obie strony

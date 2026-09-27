@@ -6,6 +6,8 @@ const STR = {
 
 Użycie:
   codemap analyze [ścieżka=.] [opcje]
+  codemap mcp [ścieżka=.] [--osv] [--no-git] [--exclude glob]… [--lang pl|en]
+                         serwer MCP (stdio) dla agentów AI: te same analizy jako narzędzia tylko do odczytu
   codemap --help | --version
 
 Wyjścia (można kilka naraz; „-" = standardowe wyjście):
@@ -93,6 +95,8 @@ Reguły: {rules}`,
 
 Usage:
   codemap analyze [path=.] [options]
+  codemap mcp [path=.] [--osv] [--no-git] [--exclude glob]… [--lang pl|en]
+                         MCP server (stdio) for AI agents: the same analysis as read-only tools
   codemap --help | --version
 
 Outputs (several at once; "-" = standard output):
