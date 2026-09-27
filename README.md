@@ -74,6 +74,9 @@ Click **“✨ See demo”** or open `index.html#demo`.
   imports become edges. 12 grammars (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsed
   in a Web Worker; double-click a file to expand its symbols — while files are collapsed, calls connect the files.
 - Graph: neighbors, upstream and downstream **dependency impact**, **cycles** (Tarjan SCC), signatures for comparisons.
+- **Checked against the ecosystems' own tools**: `npm run corpus` compares CodeMap's import edges on pinned releases of
+  Express, Preact, ky, petite-vue, Flask and Gin with esbuild (JS/TS), grimp (Python) and `go list` (Go) — precision and
+  recall per repository, a CI job fails below 97 %. Today: 100 % / 100 %. TypeScript `import type` edges are marked `typeOnly`.
 
 ### Map
 - **13 layouts**: packed circles, structure tree, radial tree, treemap, icicle, sunburst, force,
@@ -360,6 +363,7 @@ The rules that keep the project simple:
 - a change to files in `js/` or `css/` = bump `?v=` in `index.html` and `CACHE` in `sw.js`;
 - edit `index.html` with a tool that preserves UTF-8;
 - before committing, run `npm run verify` (tests, lint, grammar probe, a `.git` probe checked against `git log`) and `node tools/smoke.mjs` (headless Chrome);
+  after changing import resolution, `npm run corpus` (needs git; Python and Go for the Flask and Gin oracles);
   after visual changes, `node tools/screenshots.mjs` refreshes the screenshots in `docs/`.
 
 Changelog: [CHANGELOG.md](CHANGELOG.md) (in Polish).

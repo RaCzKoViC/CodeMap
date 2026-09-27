@@ -99,8 +99,13 @@ CM.Analysis = (function(){
   function matchAll(re, str, cb){ let m; re.lastIndex=0; while((m = re.exec(str)) !== null){ cb(m); if(m.index===re.lastIndex) re.lastIndex++; } }
 
   function jsDeps(c, d){
-    // `export … from './x'` = reexport (barrel) — ta sama krawędź, flaga dla przyszłego grafu symboli
-    matchAll(/(import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>add(d,m[2], jsKind(m[2]), 'import', m[1]==='export' ? {reexport:true} : null));
+    // `export … from './x'` = reexport (barrel) — ta sama krawędź, flaga dla przyszłego grafu symboli;
+    // `import type` / `export type … from` (TypeScript) = zależność tylko w czasie kompilacji → typeOnly
+    matchAll(/(import|export)\s+(?:[\w*{}\s,]+\sfrom\s+)?['"]([^'"]+)['"]/g, c, m=>{
+      const extra = m[1]==='export' ? {reexport:true} : {};
+      if(/^(?:import|export)\s+type\s+(?!from\b)[\w*{]/.test(m[0])) extra.typeOnly = true;
+      add(d,m[2], jsKind(m[2]), 'import', (extra.reexport || extra.typeOnly) ? extra : null);
+    });
     matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], jsKind(m[1]), 'import'));
     matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g, c, m=>add(d,m[1], jsKind(m[1]), 'import'));
     // odwołania dynamiczne: worker / URL względem modułu / importScripts / require.resolve / glob Vite
@@ -220,6 +225,19 @@ CM.Analysis = (function(){
       else add(d, s, 'rel', 'import', extra);
     });
   }
+  // biblioteka standardowa Pythona (sys.stdlib_module_names bez prywatnych) — patrz pyRootFind
+  const PY_STD = new Set(('abc aifc argparse array ast asyncio atexit audioop base64 bdb binascii bisect builtins bz2 cProfile calendar cgi '+
+    'cgitb chunk cmath cmd code codecs codeop collections colorsys compileall concurrent configparser contextlib contextvars copy copyreg '+
+    'crypt csv ctypes curses dataclasses datetime dbm decimal difflib dis doctest email encodings ensurepip enum errno faulthandler fcntl '+
+    'filecmp fileinput fnmatch fractions ftplib functools gc genericpath getopt getpass gettext glob graphlib grp gzip hashlib heapq hmac '+
+    'html http imaplib imghdr importlib inspect io ipaddress itertools json keyword linecache locale logging lzma mailbox mailcap marshal '+
+    'math mimetypes mmap modulefinder msilib msvcrt multiprocessing netrc nis nntplib nt ntpath nturl2path numbers opcode operator optparse '+
+    'os ossaudiodev pathlib pdb pickle pickletools pipes pkgutil platform plistlib poplib posix posixpath pprint profile pstats pty pwd '+
+    'py_compile pyclbr pydoc pyexpat queue quopri random re readline reprlib resource rlcompleter runpy sched secrets select selectors '+
+    'shelve shlex shutil signal site smtplib sndhdr socket socketserver spwd sqlite3 sre_compile sre_constants sre_parse ssl stat '+
+    'statistics string stringprep struct subprocess sunau symtable sys sysconfig syslog tabnanny tarfile telnetlib tempfile termios '+
+    'textwrap threading time timeit tkinter token tokenize tomllib trace traceback tracemalloc tty turtle types typing unicodedata unittest '+
+    'urllib uu uuid venv warnings wave weakref webbrowser winreg winsound wsgiref xdrlib xml xmlrpc zipapp zipfile zipimport zlib zoneinfo').split(' '));
   // moduły biblioteki standardowej Elixira: bez krawędzi (chyba że projekt je definiuje) i bez externala
   const ELIXIR_STD = new Set(['Kernel','Enum','Map','List','String','Integer','Float','IO','File','Path','Agent','Task','GenServer','Supervisor',
     'DynamicSupervisor','PartitionSupervisor','Application','Logger','Process','Keyword','Access','Stream','Tuple','Atom','Base','Bitwise','Code',
@@ -318,6 +336,9 @@ CM.Analysis = (function(){
       }
       if(n === 'pubspec.yaml' || n === 'pubspec.yml'){   // name: app → `package:app/x.dart` → lib/x.dart
         const m = /^name:[ \t]*["']?([\w-]+)/m.exec(content); return m ? {kind:'package', eco:'dart', dir, name:m[1]} : null;
+      }
+      if(n === 'go.mod'){   // module github.com/a/b → import "github.com/a/b/x" = katalog x obok go.mod
+        const m = /^[ \t]*module[ \t]+["']?([^\s"']+)/m.exec(content); return m ? {kind:'package', eco:'go', dir, name:m[1]} : null;
       }
       if(n === 'cargo.toml'){   // [package] name = "x" → `use x::…` i korzeń src/ dla `crate::`
         let sec = '';
@@ -551,7 +572,12 @@ CM.Analysis = (function(){
   function expand(base, fam){
     const c = [];
     // kolejność: plik z rozszerzeniem → index w katalogu → dopiero goły cel (może być folderem)
-    if(fam === 'js'){ JS_EXT.filter(e=>e).forEach(e=>c.push(base+e)); JS_IDX.forEach(e=>c.push(base+e)); c.push(base); }
+    if(fam === 'js'){
+      JS_EXT.filter(e=>e).forEach(e=>c.push(base+e)); JS_IDX.forEach(e=>c.push(base+e)); c.push(base);
+      // TypeScript ESM (NodeNext): `./x.js` w źródle .ts wskazuje x.ts — rozszerzenie wyjścia, nie źródła
+      const m = base.match(/\.(m|c)?js(x?)$/);
+      if(m){ const stem = base.slice(0, -m[0].length); c.push(stem+'.'+(m[1]||'')+'ts'+m[2]); if(!m[1] && !m[2]) c.push(stem+'.tsx'); }
+    }
     else if(fam === 'css'){
       const dir = dirname(base), nm = basename(base);
       // plik → partial `_x` → index katalogu (`x/index`, `x/_index`) → goły cel
@@ -588,15 +614,34 @@ CM.Analysis = (function(){
     }
     return best;
   }
-  // Python: moduł + podmoduły z `names` (`from pkg import a` → pkg/a.py), gdy celem jest pakiet (__init__.py)
+  // Python: `from pkg import a, b` → podmoduły pkg/a.py, pkg/b.py; sam pakiet (__init__.py) tylko wtedy, gdy któraś
+  // nazwa nie jest podmodułem (czyli symbolem z __init__) — tak jak grimp / import-linter
   function pyWithNames(base, dep, idx){
     if(!base || !dep.names || basename(base.path) !== '__init__.py') return base;
-    const out = [base], pkgDir = dirname(base.path);
+    const out = [], pkgDir = dirname(base.path); let sym = false;
     for(const nm of dep.names){
       const h = tryExact(idx.byPath, [pkgDir+'/'+nm+'.py', pkgDir+'/'+nm+'/__init__.py'].map(normPath));
-      if(h && !out.includes(h)) out.push(h);
+      if(!h) sym = true; else if(!out.includes(h)) out.push(h);
     }
-    return out;
+    if(sym || !out.length) out.unshift(base);
+    return out.length === 1 ? out[0] : out;
+  }
+  // Python: moduł biblioteki standardowej (`import typing`, `import json`) — w Pythonie 3 nie ma importów względnych
+  // bez kropki, więc lokalny plik o tej nazwie wchodzi w grę tylko w korzeniu źródeł: katalogu, który sam nie jest
+  // pakietem (bez __init__.py). flask/typing.py czy flask/json/ to flask.typing i flask.json, nie stdlib.
+  function pyRootFind(idx, cands){
+    let best = null;
+    for(let c of cands){
+      c = normPath(c);
+      const arr = idx.byBase.get(basename(c).toLowerCase()); if(!arr) continue;
+      for(const n of arr){
+        if(n.type !== 'file') continue;
+        const x = n.path === c ? '' : n.path.endsWith('/'+c) ? n.path.slice(0, -c.length-1) : null;
+        if(x === null || idx.byPath.has(x ? x+'/__init__.py' : '__init__.py')) continue;
+        if(!best || n.path.length < best.path.length) best = n;
+      }
+    }
+    return best;
   }
 
   function suffixFolder(idx, spec){
@@ -684,10 +729,20 @@ CM.Analysis = (function(){
       case 'module': {
         if(fam==='py'){   // katalog importera (uruchomienie jako skrypt) → korzeń → bliższy pakiet → najkrótsza ścieżka
           const p = spec.replace(/\./g,'/'); const c = [p+'.py', p+'/__init__.py'];
+          if(PY_STD.has(spec.split('.')[0])) return pyWithNames(pyRootFind(idx, c), dep, idx);
           return pyWithNames(tryExact(idx.byPath, c.map(x=>joinPath(dir, x))) || suffixFind(idx, c, dir), dep, idx);
         }
         if(fam==='java'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.java', p+'.kt', p+'.scala', p+'.groovy'], dir); }
-        if(fam==='go'){ return suffixFolder(idx, spec); }
+        if(fam==='go'){
+          // z go.mod: prefiks ścieżki modułu (najdłuższy) → dokładny katalog pakietu; każda inna ścieżka to stdlib albo
+          // zależność (`encoding/json` ≠ internal/json). Bez go.mod w skanie — dopasowanie końcówki ścieżki jak dawniej.
+          if(!idx.gomod.length) return suffixFolder(idx, spec);
+          let mod = null;
+          for(const m of idx.gomod) if((spec === m.name || spec.startsWith(m.name+'/')) && (!mod || m.name.length > mod.name.length)) mod = m;
+          if(!mod) return null;
+          const sub = spec.slice(mod.name.length+1);
+          return idx.folderByPath.get(normPath(mod.dir ? (sub ? mod.dir+'/'+sub : mod.dir) : sub)) || null;
+        }
         if(fam==='hs'){ const p = spec.replace(/\./g,'/'); return suffixFind(idx, [p+'.hs', p+'.lhs'], dir); }
         if(fam==='lua'){   // a/b.lua | a/b/init.lua: od korzenia projektu (package.path), względem pliku, potem gdziekolwiek
           const p = spec.replace(/\./g,'/'); const c = [p+'.lua', p+'/init.lua'];
@@ -728,6 +783,14 @@ CM.Analysis = (function(){
     if(spec.includes('::')) return spec.split('::')[0];
     return spec.split('/')[0].split('.')[0] || spec;
   }
+  // Go: ścieżka modułu, jak klucz w go.mod — github.com/a/b[/vN], golang.org/x/net, gopkg.in/yaml.v3, go.uber.org/zap
+  // (dawniej wszystko z GitHuba zlewało się w jedno „github"); stdlib (pierwszy segment bez kropki) — pierwszy segment
+  function goModuleName(spec){
+    const p = spec.split('/');
+    if(!p[0].includes('.')) return p[0];
+    const n = /^(github\.com|gitlab\.com|bitbucket\.org|golang\.org|codeberg\.org)$/.test(p[0]) ? 3 : 2;
+    return p.slice(0, n + (p[n] && /^v\d+$/.test(p[n]) ? 1 : 0)).join('/');
+  }
   // nierozwiązany wpis, który reprezentuje pakiet/moduł spoza projektu (→ węzeł zależności zewnętrznej)
   const EXTERNAL_KINDS = new Set(['bare','module','cs-ns','php-ns','dart-pkg']);
   function isExternal(dep){
@@ -757,15 +820,18 @@ CM.Analysis = (function(){
     const importsByDir = new Map();   // katalog package.json → {dir, imports} (subpath imports `#x`)
     for(const m of (manifests||[])) if(m && m.kind === 'package' && (!m.eco || m.eco === 'npm') && m.imports) importsByDir.set(normPath(m.dir||''), {dir: normPath(m.dir||''), imports: m.imports});
     const idx = {byPath, byBase, folderByPath, files, alias, decl, pkgs: packageIndex(manifests), importsByDir,
-      cargo: pkgsOf('cargo'), dart: new Map(pkgsOf('dart').map(p => [p.name, p])),
+      cargo: pkgsOf('cargo'), dart: new Map(pkgsOf('dart').map(p => [p.name, p])), gomod: pkgsOf('go'),
       aliasFor(filePath){ const d = dirname(filePath); if(!aliasCache.has(d)) aliasCache.set(d, aliasFor(alias, filePath)); return aliasCache.get(d); }};
     const edges = [];
-    const seen = new Set();
+    const seen = new Map();
     const externals = new Map();
-    function addEdge(s,t,type){
+    // typeOnly: każdy import między tą parą plików jest `import type` — wystarczy jeden zwykły, by flaga znikła
+    function addEdge(s,t,type,typeOnly){
       if(s===t) return;
-      const k = type+'|'+s+'|'+t; if(seen.has(k)) return; seen.add(k);
-      edges.push({id:'imp'+edges.length, source:s, target:t, type});
+      const k = type+'|'+s+'|'+t, old = seen.get(k);
+      if(old){ if(old.typeOnly && !typeOnly) delete old.typeOnly; return; }
+      const e = {id:'imp'+edges.length, source:s, target:t, type}; if(typeOnly) e.typeOnly = true;
+      seen.set(k, e); edges.push(e);
     }
     for(const f of nodes){
       if(f.type!=='file' || !f.deps || !f.deps.length) continue;
@@ -773,9 +839,9 @@ CM.Analysis = (function(){
         if(dep.kind === 'decl') continue;                          // deklaracja (namespace) — tylko cel dla innych
         const tgt = resolveDep(f, dep, idx);                       // węzeł, tablica węzłów (glob, namespace) albo null
         const tgts = Array.isArray(tgt) ? tgt : (tgt ? [tgt] : []);
-        if(tgts.length){ for(const t of tgts) addEdge(f.id, t.id, dep.etype==='reference'?'reference':'import'); }
+        if(tgts.length){ for(const t of tgts) addEdge(f.id, t.id, dep.etype==='reference'?'reference':'import', dep.typeOnly); }
         else if(isExternal(dep)){
-          const name = externalName(dep.spec);
+          const name = family(f.lang) === 'go' ? goModuleName(dep.spec) : externalName(dep.spec);
           if(!name) continue;
           if(!externals.has(name)) externals.set(name, {name, count:0, importers:[]});
           const ex = externals.get(name); ex.count++; if(!ex.importers.includes(f.id)) ex.importers.push(f.id);
@@ -795,5 +861,5 @@ CM.Analysis = (function(){
   }
 
   return {analyzeContent, analyzeFile, extractDeps, extractSymbols, buildEdges, manifestEntry, family, stripNonCode, looseJSON,
-          normPath, dirname, basename, joinPath, externalName};
+          normPath, dirname, basename, joinPath, externalName, goModuleName};
 })();

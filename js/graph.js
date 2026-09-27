@@ -362,7 +362,7 @@ CM.Graph = (function(){
       return {
         format:'codemap', version:2, meta:this.meta,
         gitInfo:this.gitInfo||undefined, testInfo:this.testInfo||undefined, prInfo:this.prInfo||undefined, tour:this.tour||undefined,
-        nodes, edges:this.edges.filter(e=>e.type!=='contains').map(e=>({source:e.source,target:e.target,type:e.type})),
+        nodes, edges:this.edges.filter(e=>e.type!=='contains').map(e=>(e.typeOnly ? {source:e.source,target:e.target,type:e.type,typeOnly:true} : {source:e.source,target:e.target,type:e.type})),
       };
     }
 
@@ -388,7 +388,7 @@ CM.Graph = (function(){
         }
       }
       // import/reference edges
-      for(const e of (obj.edges||[])) g.edges.push({id:'e'+g.edges.length, source:e.source, target:e.target, type:e.type});
+      for(const e of (obj.edges||[])){ const x = {id:'e'+g.edges.length, source:e.source, target:e.target, type:e.type}; if(e.typeOnly) x.typeOnly = true; g.edges.push(x); }
       // langStats
       for(const n of g.nodes.values()){
         if(n.type==='file'){

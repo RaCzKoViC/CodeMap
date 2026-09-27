@@ -31,9 +31,11 @@
     "symbols-probe": "node tools/symbols-probe.mjs",
     "git-probe": "node tools/git-probe.mjs",
     "vscode-test": "npm --prefix integrations/vscode test",
-    "vscode-smoke": "npm --prefix integrations/vscode run smoke"
+    "vscode-smoke": "npm --prefix integrations/vscode run smoke",
+    "corpus": "node tools/corpus.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "eslint": "^9.39.0",
     "globals": "^16.4.0",
     "tree-sitter-wasms": "^0.1.12",

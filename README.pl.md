@@ -74,6 +74,9 @@ Kliknij **„✨ Zobacz demo"** lub otwórz `index.html#demo`.
   jako krawędzie. 12 gramatyk (JS/JSX, TS/TSX, Python, Go, Java, Rust, C, C++, C#, PHP, Ruby), parsowanie
   w Web Workerze; dwuklik na pliku rozwija jego symbole, przy zwiniętych plikach wywołania łączą pliki.
 - Graf: sąsiedzi, **wpływ zależności** w górę i w dół, **cykle** (Tarjan SCC), sygnatury do porównań.
+- **Sprawdzane narzędziami samych ekosystemów**: `npm run corpus` porównuje krawędzie importów CodeMap na przypiętych
+  wydaniach Express, Preact, ky, petite-vue, Flask i Gin z esbuildem (JS/TS), grimp (Python) i `go list` (Go) — precyzja
+  i kompletność per repozytorium, zadanie CI pada poniżej 97 %. Dziś: 100 % / 100 %. Krawędzie z `import type` (TS) mają flagę `typeOnly`.
 
 ### Mapa
 - **13 układów**: upakowane koła, drzewo strukturalne, radialny, treemap, icicle, sunburst, siła (force),
@@ -359,6 +362,7 @@ Zasady, które utrzymują projekt prostym:
 - zmiana plików `js/` lub `css/` = bump `?v=` w `index.html` i `CACHE` w `sw.js`;
 - `index.html` edytuj narzędziem zachowującym UTF-8;
 - przed commitem `npm run verify` (testy, lint, sonda gramatyk, sonda `.git` zgodna z `git log`) i `node tools/smoke.mjs` (headless Chrome);
+  po zmianach w rozwiązywaniu importów `npm run corpus` (wymaga gita; Python i Go dla wyroczni Flask i Gin);
   po zmianach w wyglądzie `node tools/screenshots.mjs` odświeża zrzuty w `docs/`.
 
 Historia zmian: [CHANGELOG.md](CHANGELOG.md).

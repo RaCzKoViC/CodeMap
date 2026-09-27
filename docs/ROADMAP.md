@@ -140,6 +140,38 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Dług z faz 1–3: [x] 20 nieosiągalnych układów (usunięte, test UI = apply), [x] migracja `codemap_settings` (`js/prefs.js`), [x] `package.json#imports`,
   [x] wykrywanie zmiany nazwy z edycją (podobieństwo linii, zgodne z `git log -M`).
 
+## Faza 9 — dowód, że mapa mówi prawdę — W TOKU 2026-09-27
+
+- ✅ Korpus referencyjny (`tools/corpus.mjs`): repozytoria z galerii przypięte do tagów, krawędzie importów CodeMap
+  porównane z wyrocznią ekosystemu — esbuild (metafile: rozwiązane importy JS/TS), grimp (Python), `go list` (Go,
+  poziom pakietów) — precyzja i kompletność per repozytorium, lista rozbieżności do poprawek, próg w CI (zadanie
+  `corpus`, 97 %). Pierwszy przebieg: 79 % / 80 %; po poprawkach (TS `.js`→`.ts`, stdlib Pythona, `from . import x`,
+  Go z `go.mod`, krawędzie `typeOnly`) 100 % / 100 % na 5 repozytoriach (gin sprawdza CI — lokalnie brak Go).
+- Próg regresji benchmarku względem poprzedniego wyniku (dziś benchmark tylko informacyjny).
+- Dług wskazany przez własną analizę: 57 złożonych plików bez testów (najpierw app-core, loaders, drive, sync),
+  47 pustych `catch`, 76 zduplikowanych fragmentów; cel: zdrowie 45 → 60+.
+
+## Faza 10 — analiza, której nie ma konkurencja w przeglądarce
+
+- Sprzężenie zmian (change coupling): pliki zmieniane razem bez importu — nakładka i reguła „ukryta zależność".
+- Trend zdrowia w czasie: `codemap analyze --history N` (wynik i znaleziska dla kolejnych commitów), wykres w aplikacji.
+- Widok pakietów w monorepo + macierz zależności (DSM), cykle między pakietami.
+- CODEOWNERS a rzeczywista własność z git (rozjazdy, pliki bez właściciela).
+- Podatne zależności (OSV.dev, tylko nazwy i wersje pakietów, opcjonalnie).
+
+## Faza 11 — AI dalej lokalnie
+
+- Agent z narzędziami dla WebLLM (wymuszony JSON wywołania).
+- Szkielety testów dla hotspotów bez testów (rozszerzenie Doktora).
+- Asystent przeglądu PR (mapa wpływu + fragmenty zmian) i porównanie przed/po w aplikacji.
+- Pytania o mapę językiem naturalnym → filtr / nakładka.
+
+## Faza 12 — dystrybucja (wymaga kont właściciela)
+
+- npm (paczka gotowa: `npm run npm-pack`), VS Code Marketplace + Open VSX, GitHub Marketplace dla Action.
+- Strona z dokumentacją i przewodnikami na Pages, nagrania ekranu.
+- Backend na serwerze (konfiguracja w `deploy/`).
+
 ## Kolejność
 
 Faza 0 w całości, potem harness testowy z fazy 1 (bez niego przebudowa `app.js` i parserów jest ryzykowna).
@@ -149,3 +181,6 @@ bez serwera i bez wysyłania kodu na zewnątrz.
 
 Po fazie 4 (plan z 2026-09-27): domknięcie fazy 4 i v1.1.0 → faza 5 (PR) → z fazy 8 wcześniej jakość
 własnego kodu z progiem w CI i angielskie README → tryb na żywo → agent z narzędziami → WebGL.
+
+Po v1.4.0 (plan z 2026-09-27): faza 9 (korpus referencyjny, potem dług) i sprzężenie zmian z fazy 10 → reszta fazy 10
+→ faza 11; faza 12 równolegle, gdy właściciel założy konta.

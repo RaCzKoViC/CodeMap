@@ -5,6 +5,30 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Dodane — Faza 9 (dowód, że mapa mówi prawdę)
+- **Korpus referencyjny** (`tools/corpus.mjs`, `npm run corpus`): sześć repozytoriów z galerii przypiętych do wydań
+  (Express 5.2.1, Preact 10.29.8, ky 2.1.0, petite-vue 0.4.1, Flask 3.1.3, Gin 1.12.0) — krawędzie importów z CLI
+  CodeMap porównane z wyrocznią ekosystemu: esbuild (metafile, resolver z tsconfig i package.json), grimp (graf
+  modułów Pythona, jak import-linter) i `go list -json` (Go, poziom pakietów). Precyzja i kompletność per
+  repozytorium, lista rozbieżności, `--json`, tabela w podsumowaniu CI; nowe zadanie CI `corpus` z progiem 97 % i
+  `--require-all` (pominięta wyrocznia = błąd). Wynik lokalnie: 5/5 repozytoriów 100 % / 100 % (273 krawędzie).
+- **Krawędzie `typeOnly`**: `import type` / `export type … from` (TypeScript) oznaczone na krawędzi (zapis mapy i
+  wczytanie zachowują flagę); zwykły import tej samej pary plików ją zdejmuje. Korpus porównuje je z esbuildem
+  uczciwie (esbuild usuwa `import type` z definicji).
+
+### Poprawione — rozbieżności znalezione korpusem
+- **TypeScript ESM (NodeNext)**: `import './x.js'` w źródle .ts wskazuje `x.ts` / `x.tsx` (`.mjs` → `.mts`,
+  `.cjs` → `.cts`) — w ky CodeMap nie widział żadnej z 50 krawędzi.
+- **Python — biblioteka standardowa**: `import typing` / `import json` wewnątrz pakietu to stdlib, a nie
+  `flask/typing.py` czy `flask/json/` (Python 3 nie ma importów względnych bez kropki); lokalny moduł o nazwie z
+  stdlib wchodzi w grę tylko w korzeniu źródeł (katalogu bez `__init__.py`). Flask: precyzja 57 % → 100 %.
+- **Python — `from . import x`**: krawędź do podmodułu `x.py`; do `__init__.py` pakietu tylko wtedy, gdy któraś
+  nazwa jest symbolem, a nie podmodułem (jak grimp / import-linter).
+- **Go z `go.mod`**: import z prefiksem ścieżki modułu → dokładny katalog pakietu (korzeń modułu też); każda inna
+  ścieżka to stdlib albo zależność — dawniej `encoding/json` trafiał do dowolnego katalogu `…/json` w projekcie.
+- **Go — nazwy zależności zewnętrznych** = ścieżka modułu jak w `go.mod` (`github.com/gin-gonic/gin`,
+  `golang.org/x/net`, `…/validator/v10`) zamiast jednego zbiorczego „github"; wersje z `go.mod` wreszcie się łączą.
+
 ## [1.4.0] — 2026-09-27
 
 Jakość własna i bezpieczeństwo (faza 8): egzekwowane CSP, SRI, podział trzech największych plików, testy renderera

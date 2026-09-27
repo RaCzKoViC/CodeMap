@@ -209,6 +209,14 @@ describe('externalName', () => {
     assert.equal(A.externalName('lodash/fp'), 'lodash');
     assert.equal(A.externalName('java.util.List'), 'java');
   });
+  test('Go: ścieżka modułu jak w go.mod (host + właściciel + repo, sufiks /vN), stdlib — pierwszy segment', () => {
+    assert.equal(A.goModuleName('github.com/gin-gonic/gin/binding'), 'github.com/gin-gonic/gin');
+    assert.equal(A.goModuleName('github.com/go-playground/validator/v10'), 'github.com/go-playground/validator/v10');
+    assert.equal(A.goModuleName('golang.org/x/net/http2'), 'golang.org/x/net');
+    assert.equal(A.goModuleName('google.golang.org/protobuf/proto'), 'google.golang.org/protobuf');
+    assert.equal(A.goModuleName('gopkg.in/yaml.v3'), 'gopkg.in/yaml.v3');
+    assert.equal(A.goModuleName('net/http'), 'net');
+  });
 });
 
 describe('package.json#imports (subpath imports `#x`)', () => {

@@ -295,8 +295,9 @@ describe('Python: rozwiązywanie modułów', () => {
   let g;
   beforeEach(() => { g = buildPoly(); });
   test('import utils → utils.py z katalogu importera, nie najkrótsza ścieżka o tej nazwie', () => {
-    assert.deepEqual(targetsOf(g, 'py2/pkg_b/sub/mod.py'), ['py2/pkg_b/__init__.py', 'py2/pkg_b/shared.py', 'py2/pkg_b/sub/__init__.py', 'py2/pkg_b/sub/utils.py']);
-    assert.deepEqual(targetsOf(g, 'py2/pkg_a/core.py'), ['py2/pkg_a/utils.py', 'py2/pkg_b/sub/__init__.py', 'py2/pkg_b/sub/utils.py']);
+    // `from . import utils` → sam podmoduł; `from .. import shared, missing` → shared.py + pakiet (missing to symbol z __init__)
+    assert.deepEqual(targetsOf(g, 'py2/pkg_b/sub/mod.py'), ['py2/pkg_b/__init__.py', 'py2/pkg_b/shared.py', 'py2/pkg_b/sub/utils.py']);
+    assert.deepEqual(targetsOf(g, 'py2/pkg_a/core.py'), ['py2/pkg_a/utils.py', 'py2/pkg_b/sub/utils.py']);
   });
   test('poza katalogiem: bliższy pakiet (wspólny prefiks ścieżki) przed najkrótszą ścieżką; brak wspólnego → najkrótsza', () => {
     assert.deepEqual(targetsOf(g, 'py2/pkg_b/tools/run.py'), ['py2/pkg_b/sub/utils.py']);
@@ -306,6 +307,50 @@ describe('Python: rozwiązywanie modułów', () => {
     assert.ok(!g.externals.has('missing') && !g.externals.has('utils'));
     const s = build();   // sample-project: `from . import helpers` w __init__.py — dawne „znane ograniczenie"
     assert.ok(edgeKeys(s).has('py/pkg/__init__.py|py/pkg/helpers.py|import'));
+  });
+});
+
+// semantyka ustalona korpusem referencyjnym (tools/corpus.mjs: esbuild, grimp, go list) — każdy przypadek to
+// rozbieżność znaleziona na prawdziwym repozytorium (ky, flask, gin)
+describe('zgodność z wyroczniami korpusu', () => {
+  const F = (path, content) => ({ path, content, size: content.length, mtime: 1 });
+  const g = new Graph().build([
+    // ky: TypeScript ESM importuje `./x.js`, a na dysku jest x.ts; `import type` = tylko kompilacja
+    F('ts/a.ts', "import {b} from './b.js';\nimport type {T} from './types.js';\nexport type {U} from './u.js';\nimport './view.js';\n"),
+    F('ts/m.ts', "import type {T} from './types.js';\nimport {v} from './types.js';\nimport type from './b.js';\n"),
+    F('ts/b.ts', 'export const b = 1;\n'), F('ts/types.ts', 'export type T = 1; export const v = 1;\n'),
+    F('ts/u.ts', 'export type U = 1;\n'), F('ts/view.tsx', 'export default 1;\n'),
+    // flask: `import typing` / `import json` wewnątrz pakietu to stdlib, nie flask/typing.py ani flask/json/
+    F('src/lib/__init__.py', ''), F('src/lib/typing.py', ''), F('src/lib/json/__init__.py', ''), F('src/lib/cli.py', ''),
+    F('src/lib/app.py', 'import typing as t\nimport json\nfrom . import cli\nfrom . import typing as ft\n'),
+    F('scripts/logging.py', ''), F('scripts/run.py', 'import logging\n'),   // katalog skryptu (bez __init__) — lokalny moduł wygrywa
+    // gin: ścieżki spoza modułu z go.mod to stdlib/zależności, nie katalog o tej samej końcówce
+    F('go.mod', 'module example.com/m\n\ngo 1.22\n'),
+    F('main.go', 'package m\n\nimport (\n\t"encoding/json"\n\t"example.com/m/internal/json"\n\t"github.com/x/y/render"\n)\n'),
+    F('internal/json/json.go', 'package json\n'), F('render/render.go', 'package render\n'),
+    F('sub/s.go', 'package sub\n\nimport "example.com/m"\n'),
+  ], { name: 'corpus', source: 'test' });
+  const edge = (s, t) => g.edges.find((e) => e.source === s && e.target === t && e.type === 'import');
+  test('TS: ./x.js → x.ts / x.tsx', () => {
+    assert.deepEqual(targetsOf(g, 'ts/a.ts'), ['ts/b.ts', 'ts/types.ts', 'ts/u.ts', 'ts/view.tsx']);
+  });
+  test('TS: import type / export type … from → typeOnly; zwykły import tej samej pary zdejmuje flagę; `import type from` to zwykły import', () => {
+    assert.equal(edge('ts/a.ts', 'ts/types.ts').typeOnly, true);
+    assert.equal(edge('ts/a.ts', 'ts/u.ts').typeOnly, true);
+    assert.equal(edge('ts/a.ts', 'ts/b.ts').typeOnly, undefined);
+    assert.equal(edge('ts/m.ts', 'ts/types.ts').typeOnly, undefined);
+    assert.equal(edge('ts/m.ts', 'ts/b.ts').typeOnly, undefined);
+    const back = Graph.fromJSON(JSON.parse(JSON.stringify(g.toJSON())));
+    assert.equal(back.edges.find((e) => e.source === 'ts/a.ts' && e.target === 'ts/types.ts').typeOnly, true);
+  });
+  test('Python: stdlib wewnątrz pakietu nie trafia do modułu pakietu; from . import x → tylko x.py', () => {
+    assert.deepEqual(targetsOf(g, 'src/lib/app.py'), ['ext:json', 'ext:typing', 'src/lib/cli.py', 'src/lib/typing.py']);
+    assert.ok(g.externals.has('json') && g.externals.has('typing'));
+    assert.deepEqual(targetsOf(g, 'scripts/run.py'), ['scripts/logging.py']);
+  });
+  test('Go: prefiks modułu z go.mod → dokładny katalog; korzeń modułu → __root__; reszta zewnętrzna', () => {
+    assert.deepEqual(targetsOf(g, 'main.go'), ['ext:encoding', 'ext:github.com/x/y', 'internal/json']);
+    assert.deepEqual(targetsOf(g, 'sub/s.go'), ['__root__']);
   });
 });
 

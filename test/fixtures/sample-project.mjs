@@ -57,7 +57,6 @@ export const EXPECTED_EDGES = [
   ['src/lib/util.js', 'src/app.js', 'import'],      // cykl
   ['src/store/index.js', 'src/store/reducer.js', 'import'],
   ['py/pkg/mod.py', 'py/pkg/helpers.py', 'import'],
-  ['py/pkg/mod.py', 'py/pkg/__init__.py', 'import'],
   ['py/pkg/__init__.py', 'py/pkg/helpers.py', 'import'],   // `from . import helpers` — nazwy po `import` to podmoduły (Faza 2)
   ['styles/main.css', 'styles/theme.css', 'import'],
   ['styles/main.css', 'styles/vars.css', 'import'],

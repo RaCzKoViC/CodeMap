@@ -47,6 +47,33 @@ jobs:
           path: bench.json
           if-no-files-found: ignore
 
+  # korpus referencyjny (faza 9): krawędzie importów CodeMap vs wyrocznie ekosystemów (esbuild, grimp, go list) na
+  # przypiętych wydaniach prawdziwych repozytoriów; spadek poniżej progu albo pominięta wyrocznia = regres analizatora
+  corpus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - run: npm ci
+      - name: Korpus referencyjny (precyzja i kompletność ≥ 97 %)
+        run: node tools/corpus.mjs --require-all --min-precision 0.97 --min-recall 0.97 --show 40 --json corpus.json --summary
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corpus
+          path: corpus.json
+          if-no-files-found: ignore
+
   backend:
     runs-on: ubuntu-latest
     defaults:
