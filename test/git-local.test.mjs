@@ -146,6 +146,18 @@ function gitExactRenames(dir) {
   return res;
 }
 
+// zmiany nazw według `git log -M` (domyślny próg 50 %): sha → ['stara → nowa']
+function gitRenamesM(dir) {
+  const out = String(git(dir, ['log', '-M', '--no-merges', '--name-status', '-z', '--format=%x01%H']));
+  const res = new Map();
+  for (const chunk of out.split('\x01').filter(Boolean)) {
+    const tok = chunk.slice(40).split('\0').map((t) => t.replace(/^\n/, '')), list = [];
+    for (let i = 0; i < tok.length; i++) if (/^R\d{3}$/.test(tok[i])) { list.push(tok[i + 1] + ' → ' + tok[i + 2]); i += 2; }
+    res.set(chunk.slice(0, 40), list.sort());
+  }
+  return res;
+}
+
 describe('GitLocal na prawdziwych repozytoriach', { skip: SKIP }, () => {
   let MAIN, info = {}, loose;
   before(async () => {
@@ -214,7 +226,7 @@ describe('GitLocal na prawdziwych repozytoriach', { skip: SKIP }, () => {
     assert.deepEqual(last.files.map((f) => f.path + ':' + f.status), ['src/lib/deep/nested/x.txt:D']);
   });
 
-  test('5. git mv bez zmian → R (także pusty plik); zmiana nazwy z edycją → D + A; plik → katalog', () => {
+  test('5. git mv bez zmian → R (także pusty plik); zmiana nazwy z edycją → R z podobieństwem; plik → katalog', () => {
     const c3 = loose.commits.find((c) => c.sha === info.c3);
     assert.deepEqual(c3.files.map(({ path, status, from }) => ({ path, status, from })), [
       { path: 'docs/empty-moved.txt', status: 'R', from: 'empty.txt' },
@@ -222,11 +234,19 @@ describe('GitLocal na prawdziwych repozytoriach', { skip: SKIP }, () => {
     ]);
     for (const f of c3.files) assert.equal(f.sha, f.oldSha);
     const c4 = loose.commits.find((c) => c.sha === info.c4);
-    assert.deepEqual(c4.files.map((f) => f.path + ':' + f.status), ['README.md:D', 'README.txt:A', 'thing:D', 'thing/inner.txt:A']);
-    // nasze R = dokładne zmiany nazw gita (-M100%)
+    // zmiana nazwy z edycją (jak git -M50%): README.md → README.txt (wspólna 1 z 3 linii → 67 %); plik → katalog
+    // o niepodobnej treści zostaje jako D + A
+    assert.deepEqual(c4.files.map((f) => f.path + ':' + f.status + (f.from ? '<' + f.from : '')), ['README.txt:R<README.md', 'thing:D', 'thing/inner.txt:A']);
+    assert.equal(c4.files[0].similarity, 67);
+    // nasze R ze 100 % podobieństwa (albo bez pola — dokładne, po sha) = dokładne zmiany nazw gita (-M100%)
     const exact = gitExactRenames(MAIN);
     for (const c of loose.commits.filter((x) => !x.merge)) {
-      assert.deepEqual(c.files.filter((f) => f.status === 'R').map((f) => f.from + ' → ' + f.path).sort(), exact.get(c.sha) || [], c.message);
+      assert.deepEqual(c.files.filter((f) => f.status === 'R' && (f.similarity == null || f.similarity === 100)).map((f) => f.from + ' → ' + f.path).sort(), exact.get(c.sha) || [], c.message);
+    }
+    // zbiór zmian nazw zgodny z domyślnym `git log -M` (50 %)
+    const gm = gitRenamesM(MAIN);
+    for (const c of loose.commits.filter((x) => !x.merge)) {
+      assert.deepEqual(c.files.filter((f) => f.status === 'R').map((f) => f.from + ' → ' + f.path).sort(), gm.get(c.sha) || [], 'git -M: ' + c.message);
     }
   });
 

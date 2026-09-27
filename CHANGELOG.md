@@ -19,6 +19,10 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   zakresem właściciela (`npm publish dist/npm/<plik>.tgz --access public`).
 
 ### Zmienione — Faza 8 (jakość własna)
+- Historia git: **zmiana nazwy z edycją** (jak `git log -M`, próg 50 %) — pary usunięty × dodany w commicie porównywane
+  po liniach (wielozbiór skrótów, bez białych znaków; tylko tekst ≤ 1 MB), zachłannie od najlepszej pary; pole
+  `similarity` przy R. Autorzy, zmiany i hotspoty idą za plikiem także po przeniesieniu z edycją. Limity: 400 par
+  na commit, 4000 odczytów blobów na historię. Test: zbiór zmian nazw zgodny z `git log -M` na repozytorium testowym.
 - **Wersjonowanie ustawień** (`js/prefs.js`, `codemap_settings._v = 2`): migracja przy odczycie — `_menuTint` → `_menuRgb`,
   układ spoza listy (także 20 usuniętych) → `pack`, pola po usuniętych kontrolkach wypadają; dotyczy też bloba z synchronizacji
   z innego urządzenia. Sprawdzone na starym blobie w przeglądarce; 3 testy.

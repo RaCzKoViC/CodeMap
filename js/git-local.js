@@ -526,10 +526,62 @@
       }
       return drop.size ? files.filter((_, i)=>!drop.has(i)) : files;
     }
+    // zmiany nazw z edycją (jak git -M50%): pozostałe pary usunięty × dodany w commicie, podobieństwo linii
+    // (2·wspólne / suma, wielozbiór skrótów linii), tylko tekst ≤ 1 MB, zachłannie od najlepszej pary, przy remisie ta
+    // sama nazwa pliku. Limity: najwyżej SIM_PAIRS par na commit i SIM_BUDGET odczytów blobów na całą historię.
+    const SIM_MIN = 0.5, SIM_PAIRS = 400, SIM_MAX = 1 << 20; let simBudget = 4000;
+    const bagCache = new Map();
+    async function lineBag(sha){
+      if(bagCache.has(sha)) return bagCache.get(sha);
+      if(simBudget-- <= 0) return null;
+      let bag = null;
+      try{
+        const o = await readObject(sha), d = o && o.type === 'blob' ? o.data : null;
+        if(d && d.length <= SIM_MAX && d.subarray(0, 8000).indexOf(0) < 0){   // NUL w nagłówku = binarny
+          bag = new Map(); let n = 0, h = 0x811c9dc5, empty = true;
+          for(let i = 0; i <= d.length; i++){
+            const c = i < d.length ? d[i] : 10;
+            if(c === 10){ if(!empty){ bag.set(h >>> 0, (bag.get(h >>> 0) || 0) + 1); n++; } h = 0x811c9dc5; empty = true; }
+            else if(c !== 13 && c !== 32 && c !== 9){ h ^= c; h = Math.imul(h, 0x01000193); empty = false; }   // bez białych znaków
+          }
+          bag.n = n;
+        }
+      }catch(e){ bag = null; }
+      if(bagCache.size > 2000) bagCache.clear();
+      bagCache.set(sha, bag);
+      return bag;
+    }
+    function similarity(a, b){
+      if(!a || !b || !(a.n + b.n)) return 0;
+      let common = 0; const [s, l] = a.size < b.size ? [a, b] : [b, a];
+      for(const [k, c] of s){ const d = l.get(k); if(d) common += Math.min(c, d); }
+      return 2 * common / (a.n + b.n);
+    }
+    async function pairSimilar(files){
+      const dels = [], adds = [];
+      files.forEach((f, i)=>{ if(f.status === 'D' && f.oldSha) dels.push(i); else if(f.status === 'A' && f.sha) adds.push(i); });
+      if(!dels.length || !adds.length || dels.length * adds.length > SIM_PAIRS) return files;
+      const base = (p)=>p.slice(p.lastIndexOf('/') + 1), pairs = [];
+      const bags = new Map();
+      for(const i of dels.concat(adds)){ const f = files[i], sha = f.status === 'D' ? f.oldSha : f.sha; if(!bags.has(sha)) bags.set(sha, await lineBag(sha)); }
+      for(const i of dels) for(const j of adds){
+        const s = similarity(bags.get(files[i].oldSha), bags.get(files[j].sha));
+        if(s >= SIM_MIN) pairs.push({i, j, s, same: base(files[i].path) === base(files[j].path)});
+      }
+      if(!pairs.length) return files;
+      pairs.sort((x, y)=>(y.s - x.s) || (y.same - x.same));
+      const usedD = new Set(), usedA = new Set();
+      for(const p of pairs){
+        if(usedD.has(p.i) || usedA.has(p.j)) continue;
+        usedD.add(p.i); usedA.add(p.j);
+        const f = files[p.j]; f.status = 'R'; f.from = files[p.i].path; f.oldSha = files[p.i].oldSha; f.similarity = Math.round(p.s * 100);
+      }
+      return files.filter((_, i)=>!usedD.has(i));
+    }
     async function changedFiles(treeSha, parentTree){
       const files = await diffTrees(parentTree, treeSha, '', []);
       files.sort((x, y)=>(x.path < y.path ? -1 : x.path > y.path ? 1 : 0));
-      return pairRenames(files);
+      return pairSimilar(pairRenames(files));
     }
 
     async function startSha(ref){

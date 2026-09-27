@@ -138,7 +138,7 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
   [x] paczka CLI gotowa (`tools/npm-pack.mjs`, sprawdzona instalacja) — sama publikacja wymaga konta npm właściciela
   (nazwa `codemap` zajęta → zakres, np. `@raczkovic/codemap`).
 - Dług z faz 1–3: [x] 20 nieosiągalnych układów (usunięte, test UI = apply), [x] migracja `codemap_settings` (`js/prefs.js`), [x] `package.json#imports`,
-  wykrywanie zmiany nazwy z edycją (podobieństwo treści).
+  [x] wykrywanie zmiany nazwy z edycją (podobieństwo linii, zgodne z `git log -M`).
 
 ## Kolejność
 
