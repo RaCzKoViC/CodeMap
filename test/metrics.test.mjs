@@ -132,11 +132,12 @@ describe('findDuplicates', () => {
     const f1 = M.fingerprints(text), f2 = M.fingerprints(text);
     assert.deepEqual(host([...f1]), host([...f2]));
     // winnowing wybiera średnio 2/(w+1) k-gramów; unikalne odciski ≤ liczba k-gramów
-    const grams = text.match(/[A-Za-z_$][\w$]*|\d[\w.]*|[^\s\w]/g).length - 4;
-    assert.ok(f1.length > grams * 0.25 && f1.length < grams * 0.6, 'fingerprint count ' + f1.length + ' of ' + grams + ' k-grams');
+    const { k, w } = M.DUP_DEFAULTS, dens = 2 / (w + 1);
+    const grams = text.match(/[A-Za-z_$][\w$]*|\d[\w.]*|[^\s\w]/g).length - (k - 1);
+    assert.ok(f1.length > grams * dens * 0.6 && f1.length < grams * dens * 1.5, 'fingerprint count ' + f1.length + ' of ' + grams + ' k-grams');
     assert.equal(M.fingerprints('} ) ; } } ) ; } }').length, 0, 'punctuation-only k-grams are noise');
     assert.equal(M.fingerprints('a b').length, 0, 'shorter than k tokens');
-    assert.equal(M.fingerprints('a b c d e').length, 1, 'exactly one k-gram');
+    assert.equal(M.fingerprints(Array.from({ length: k }, (_, i) => 'id' + i).join(' ')).length, 1, 'exactly one k-gram');
     // hasz obecny w > maxBucket plikach nie tworzy par
     const clones = Array.from({ length: 4 }, (_, i) => fileNode('c' + i + '.js', [...FILL_D.slice(0, 8), ...BLOCK]));
     assert.equal(M.findDuplicates(clones, { maxBucket: 3 }).length, 0);
