@@ -5,6 +5,15 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-09-27
+
+CodeMap dla agentów AI (faza 15): serwer MCP z 19 narzędziami, generowany `ARCHITECTURE.md` i `codemap check` przed
+commitem (hook pre-commit, także jako narzędzie agenta). Dokładność 2.0 (faza 14): monorepo w korpusie na poziomie
+pakietów, martwy kod zgodny z knip (JS/TS) i vulture (Python), graf wywołań sprawdzany checkerem TypeScriptu,
+propozycja reguł architektury z macierzy zależności do zatwierdzenia jednym kliknięciem. Wydajność (faza 13): CLI
+4× szybsze, duplikaty i trend zdrowia w workerach, benchmark analizy dużych repozytoriów w CI. CLI respektuje
+`.gitignore`.
+
 ### Dodane — Faza 15 (CodeMap dla agentów AI)
 - **Serwer MCP — `codemap mcp [ścieżka]`** (`cli/mcp.mjs`, bez zależności): JSON-RPC 2.0 po stdio (negocjacja wersji
   protokołu 2025-06-18 / 2025-03-26 / 2024-11-05, na stdout tylko protokół), analiza startuje od razu, `refresh` po

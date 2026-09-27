@@ -226,7 +226,7 @@ Pomiar na samym CodeMap (268 plików): wykrywanie duplikatów to 2,0 z 2,1 s ca�
 
 ## Faza 15 — CodeMap dla agentów AI — WYKONANA 2026-09-27
 
-- ✅ Serwer MCP (`codemap mcp`, stdio, `cli/mcp.mjs`): 18 narzędzi tylko do odczytu (+ `vulnerable_dependencies` z `--osv`)
+- ✅ Serwer MCP (`codemap mcp`, stdio, `cli/mcp.mjs`): 19 narzędzi tylko do odczytu (+ `vulnerable_dependencies` z `--osv`)
   na tej samej analizie co CLI; narzędzia agenta z aplikacji (`CM.Agent.exec`), BM25 z `CM.RAG`; w paczce npm.
 - ✅ Generowany `ARCHITECTURE.md` (`--architecture`, wejście akcji, narzędzie MCP `architecture`): warstwy, pakiety,
   punkty wejścia, rdzeń, hotspoty, właściciele, konwencje testów, reguły i cykle; w CI jako artefakt `codemap-report`.
@@ -256,3 +256,4 @@ Po v1.4.0 (plan z 2026-09-27): faza 9 (korpus referencyjny, potem dług) i sprz�
 
 Po v1.5.1 (plan z 2026-09-27): faza 13 (zaczynając od duplikatów — zmierzone wąskie gardło) → faza 15 (MCP, wartość
 na zewnątrz; CLI ma już całą analizę) → faza 14 → faza 16; faza 12 nadal czeka na konta.
+Wydanie v1.6.0 (2026-09-27) zamyka fazy 13, 14 i 15; dalej faza 16.

@@ -1,7 +1,7 @@
 /* ===================== util.js — helpers ===================== */
 window.CM = window.CM || {};
 // Jedno źródło wersji aplikacji (Ustawienia → O aplikacji, CHANGELOG, tag w git).
-CM.VERSION = '1.5.1';
+CM.VERSION = '1.6.0';
 window.CM_VERSION = CM.VERSION;
 
 CM.util = (function(){
