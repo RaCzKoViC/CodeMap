@@ -276,7 +276,8 @@ CM.Graph = (function(){
 
     // ---- import-cycle detection (Tarjan SCC over file import/reference edges) ----
     importCycles(){
-      const isFile=(id)=>{ const n=this.nodes.get(id); return n && n.type==='file'; };
+      // pliki dokumentacji wypadają: linki README.md ↔ README.pl.md to nawigacja, nie zależność
+      const isFile=(id)=>{ const n=this.nodes.get(id); return n && n.type==='file' && !(n.langInfo && n.langInfo.cat==='doc'); };
       const adj=new Map();
       for(const e of this.edges){
         if(e.type!=='import' && e.type!=='reference') continue;

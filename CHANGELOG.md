@@ -20,6 +20,19 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   wczytania, 1–5 ms klatki); w CI punktem odniesienia jest artefakt `bench` ostatniego zielonego przebiegu main,
   porównanie trafia do podsumowania.
 
+### Zmienione — precyzja reguł Inspect (fałszywe alarmy z analizy samego CodeMap)
+- **Duplikaty = ciągłe bloki**: para plików tylko z ciągłym wspólnym blokiem ≥ 50 tokenów (odciski winnowing z
+  pozycjami, wyrównanie po przekątnej — jak jscpd), a nie suma rozsianych wspólnych idiomów; opis „tokeny: N,
+  bloki: K". Tylko kod: dokumenty (README i jego tłumaczenie), konfiguracje, dane i pliki generowane odpadają.
+  Na repozytorium CodeMap: 78 par → 28, każda z prawdziwym blokiem.
+- **Pliki generowane** (`Metrics.isGenerated`): lockfile albo znacznik w nagłówku (`@generated`, `DO NOT EDIT`,
+  `auto-generated`, `GENEROWANE`) — poza regułą „ogromny plik" i duplikatami.
+- **„God" = hub**: duży stopień i jednocześnie fan-in ≥ 3 oraz fan-out ≥ 3 (hub-like modularization); plik
+  wejściowy z samym fan-out (index.html) to „fan-out", a pomocnik testów z samym fan-in nie jest zgłaszany.
+- **Ryzyko**: `innerHTML = ''` (czyszczenie elementu) i porównania nie liczą się jako wstawianie HTML.
+- **Cykle bez dokumentacji**: linki README.md ↔ README.pl.md to nawigacja, nie cykl zależności (także `noCycles`).
+- Wynik zdrowia CodeMap: 45 → 53 bez zmian w kodzie aplikacji (same poprawki reguł; `test/inspect.test.mjs`).
+
 ### Poprawione — rozbieżności znalezione korpusem
 - **TypeScript ESM (NodeNext)**: `import './x.js'` w źródle .ts wskazuje `x.ts` / `x.tsx` (`.mjs` → `.mts`,
   `.cjs` → `.cts`) — w ky CodeMap nie widział żadnej z 50 krawędzi.

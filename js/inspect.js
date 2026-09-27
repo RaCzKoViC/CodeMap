@@ -28,8 +28,8 @@ CM.Inspect = (function(){
     'r.todo':'Zagęszczenie TODO / FIXME','r.todo.d':'Duża liczba znaczników TODO/FIXME/HACK — dług techniczny zapisany wprost.',
     'r.deep':'Głębokie zagnieżdżenie folderów','r.deep.d':'Ścieżki o dużej głębokości utrudniają nawigację i świadczą o przerośniętej strukturze.',
     'r.crowded':'Przeładowane foldery','r.crowded.d':'Folder z bardzo dużą liczbą plików bezpośrednio w środku — brak pogrupowania.',
-    'r.dupcode':'Zduplikowany kod (wspólne fragmenty)','r.dupcode.d':'Pary plików dzielące wiele identycznych fragmentów tokenów (winnowing na treści, białe znaki nieistotne) — kandydaci do wyciągnięcia wspólnego modułu.',
-    'dupShare':'{a} i {b} dzielą {n} fragmentów',
+    'r.dupcode':'Zduplikowany kod (wspólne bloki)','r.dupcode.d':'Pary plików z ciągłym identycznym blokiem kodu ≥ 50 tokenów (winnowing z wyrównaniem pozycji, jak jscpd; białe znaki nieistotne; bez dokumentów, konfiguracji i plików generowanych) — kandydaci do wyciągnięcia wspólnej funkcji.',
+    'dupShare':'{a} i {b} — wspólny kod, tokeny: {n}, bloki: {k}',
     'r.emptycatch':'Puste bloki catch (połykanie wyjątków)','r.emptycatch.d':'`catch { }` bez obsługi ukrywa błędy. (Heurystyka na pierwszych 4000 znakach pliku.)',
     'r.risky':'Ryzykowne API (bezpieczeństwo)','r.risky.d':'Użycia eval / innerHTML= / document.write — potencjalne wektory XSS. (Heurystyka na pierwszych 4000 znakach.)',
     'r.debug':'Pozostałości debugowania','r.debug.d':'Liczne console.log / debugger w kodzie produkcyjnym. (Heurystyka na pierwszych 4000 znakach.)',
@@ -62,8 +62,8 @@ CM.Inspect = (function(){
     'r.todo':'TODO / FIXME density','r.todo.d':'Many TODO/FIXME/HACK markers — technical debt written down.',
     'r.deep':'Deep folder nesting','r.deep.d':'Very deep paths hamper navigation and hint at an overgrown structure.',
     'r.crowded':'Crowded folders','r.crowded.d':'A folder with very many files directly inside — no grouping.',
-    'r.dupcode':'Duplicated code (shared fragments)','r.dupcode.d':'Pairs of files sharing many identical token fragments (content winnowing, whitespace-insensitive) — candidates for extracting a common module.',
-    'dupShare':'{a} and {b} share {n} fragments',
+    'r.dupcode':'Duplicated code (shared blocks)','r.dupcode.d':'Pairs of files with a contiguous identical code block of ≥ 50 tokens (winnowing with position alignment, like jscpd; whitespace-insensitive; docs, config and generated files excluded) — candidates for extracting a shared function.',
+    'dupShare':'{a} and {b} — shared code, tokens: {n}, blocks: {k}',
     'r.emptycatch':'Empty catch blocks (exception swallowing)','r.emptycatch.d':'`catch { }` with no handling hides errors. (Heuristic over the first 4000 chars.)',
     'r.risky':'Risky APIs (security)','r.risky.d':'Uses of eval / innerHTML= / document.write — potential XSS vectors. (Heuristic over the first 4000 chars.)',
     'r.debug':'Debug leftovers','r.debug.d':'Multiple console.log / debugger in production code. (Heuristic over the first 4000 chars.)',
@@ -129,15 +129,19 @@ CM.Inspect = (function(){
       const fi=fin.get(f.id)||0, fo=fout.get(f.id)||0, deg=fi+fo;
       const m=f.metrics;
       const base=(f.name||'').replace(/\.[^.]+$/,'');
-      if(deg>=godThr) add(F,'god','high',f, deg+' '+t('deps')+' (fan-in '+fi+' / fan-out '+fo+')');
+      // „god" = węzeł-hub (hub-like modularization): dużo zależności w OBIE strony; plik wejściowy (fan-in 0, np.
+      // index.html) to co najwyżej fan-out, a pomocnik testów czy util z samym fan-in nie jest hubem
+      const hub=deg>=godThr && fi>=3 && fo>=3 && !f.isTest && !f.testHelper;
+      if(hub) add(F,'god','high',f, deg+' '+t('deps')+' (fan-in '+fi+' / fan-out '+fo+')');
       else if(fo>=15) add(F,'fanout','med',f, 'fan-out '+fo);
-      if(fi>=8&&fo>=8&&deg<godThr) add(F,'unstable','med',f, 'fan-in '+fi+' / fan-out '+fo);
+      if(fi>=8&&fo>=8&&!hub) add(F,'unstable','med',f, 'fan-in '+fi+' / fan-out '+fo);
       if(hasDeps && deg===0 && !f.isTest && CODE_RE.test(f.lang||'') && !ENTRY_RE.test(base)) add(F,'orphan','low',f, (m?m.lines+' '+t('loc'):U.fmtBytes(f.size||0)));
       if(m){
         const minified = m.longest>2500 || (m.lines>1 && m.chars/m.lines>600);
         if(minified){ add(F,'minified','info',f, m.longest+' ch/line'); }
         else{
-          if(m.lines>=800) add(F,'huge', m.lines>=2000?'high':'med', f, m.lines+' '+t('loc'));
+          const gen=CM.Metrics&&CM.Metrics.isGenerated ? CM.Metrics.isGenerated(f) : false;   // lockfile, „DO NOT EDIT"
+          if(m.lines>=800 && !gen) add(F,'huge', m.lines>=2000?'high':'med', f, m.lines+' '+t('loc'));
           if(m.complexity>=150) add(F,'complex', m.complexity>=400?'high':'med', f, 'CC≈'+m.complexity);
           if(m.todos>=10) add(F,'todo','low',f, m.todos+' × TODO/FIXME');
           if(!f.isTest && isCode(f)){
@@ -151,7 +155,8 @@ CM.Inspect = (function(){
         if(pv && !minified && CODE_JS.test(f.lang||'')){
           const ec=(pv.match(/catch\s*(\([^)]*\))?\s*\{\s*\}/g)||[]).length;
           if(ec) add(F,'emptycatch','low',f, t('ln',{n:ec}));
-          const risky=(pv.match(/\beval\s*\(|\.innerHTML\s*=|document\.write\s*\(|dangerouslySetInnerHTML/g)||[]).length;
+          // innerHTML = '' (czyszczenie elementu) nie wstawia treści — nie liczy się jako ryzyko
+          const risky=(pv.match(/\beval\s*\(|\.innerHTML\s*=(?!=|\s*(''|""|``)\s*[;,)}\n])|document\.write\s*\(|dangerouslySetInnerHTML/g)||[]).length;
           if(risky) add(F,'risky','med',f, t('ln',{n:risky}));
           const dbg=(pv.match(/console\.log\s*\(|(^|\n)\s*debugger\b/g)||[]).length;
           if(dbg>=5) add(F,'debug','low',f, t('ln',{n:dbg}));
@@ -199,7 +204,7 @@ CM.Inspect = (function(){
       const pairs=CM.Metrics.pairDuplicates(cand, fps);
       for(const p of pairs.slice(0,LIMIT)){
         const a=graph.nodes.get(p.a), b=graph.nodes.get(p.b); if(!a||!b) continue;
-        add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.shared}), [b.id]);
+        add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.tokens!=null?p.tokens:p.shared,k:p.blocks||1}), [b.id]);
       }
       if(pairs.length>LIMIT){ const f=F.get('dupcode'); if(f) f.count=pairs.length; }
     }catch(e){} }
