@@ -216,6 +216,16 @@ CM.util = (function(){
   }
   function setHTML(node, h){ if(node) node.innerHTML = h&&h[RAW]!=null ? h[RAW] : String(h==null?'':h); return node; }
 
+  // literał regex w JS zaczynający się w `i`: `/` po operatorze, nawiasie, przecinku albo na początku linii (nie
+  // dzielenie; `before` = tekst przed nim) → indeks za zamykającym `/` (poza klasą [...]), -1 gdy to nie literał
+  // (Inspect i CM.DeadCode wygaszają wzorce, żeby `innerHTML` czy `export` w regexie nie liczyły się jako kod)
+  function regexLiteralEnd(src, i, before){
+    if(src[i]!=='/' || !/(^|[=(,:;!&|?{}[\n]|\breturn)\s*$/.test(before)) return -1;
+    let j=i+1, cls=false;
+    while(j<src.length && src[j]!=='\n' && (cls || src[j]!=='/')){ if(src[j]==='\\') j++; else if(src[j]==='[') cls=true; else if(src[j]===']') cls=false; j++; }
+    return j<src.length && src[j]==='/' ? j+1 : -1;
+  }
+
   // plik wskazany zapytaniem (agent, Doktor hotspotów): pełna ścieżka 100 > końcówka „/q” 90 > nazwa 80 > fragment 50;
   // nodes = węzły z polem path (kolejność rozstrzyga remisy), wynik = najlepszy węzeł albo null
   function matchPath(nodes, q){
@@ -246,7 +256,7 @@ CM.util = (function(){
   function lsDel(k){ try{ localStorage.removeItem(k); return true; }catch(e){ return false; } }
   function lsJSON(k, def){ try{ const v=localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
 
-  return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,escapeHtml,escapeText,html,raw,setHTML,
+  return {$,$$,el,debounce,throttle,hashString,fmtBytes,fmtNum,fmtDate,relTime,escapeHtml,escapeText,html,raw,setHTML,regexLiteralEnd,
           clamp,lerp,dist2,hexToRgb,rgba,mix,colorFromString,download,toast,pMap,makeCamera,mistralKeySlots,
           matchPath,matchNode,lsSet,lsDel,lsJSON};
 })();

@@ -19,12 +19,8 @@ CM.DeadCode = (function(){
     let out = '', i = 0;
     while(i < c.length){
       const q = c[i];
-      // literał regex: `/` po operatorze, nawiasie, przecinku albo na początku linii (nie dzielenie) — do `/` poza [...]
-      if(q === '/' && /(^|[=(,:;!&|?{}[\n]|\breturn)\s*$/.test(out.slice(-12))){
-        let j = i + 1, cls = false;
-        while(j < c.length && c[j] !== '\n' && (cls || c[j] !== '/')){ if(c[j] === '\\') j++; else if(c[j] === '[') cls = true; else if(c[j] === ']') cls = false; j++; }
-        if(j < c.length && c[j] === '/'){ out += '/' + ' '.repeat(j - i - 1) + '/'; i = j + 1; continue; }
-      }
+      const re = q === '/' ? CM.util.regexLiteralEnd(c, i, out.slice(-12)) : -1;   // literał regex → spacje
+      if(re > 0){ out += '/' + ' '.repeat(re - i - 2) + '/'; i = re; continue; }
       if(q !== '"' && q !== "'" && q !== '`'){ out += q; i++; continue; }
       out += q; i++;
       while(i < c.length && c[i] !== q && (q === '`' || c[i] !== '\n')){

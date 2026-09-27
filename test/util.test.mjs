@@ -101,3 +101,16 @@ describe('html`` / raw / setHTML — jedno miejsce wstawiania HTML-a', () => {
     assert.equal(s('<b>zaufany</b>'), '<b>zaufany</b>');
   });
 });
+
+describe('regexLiteralEnd — literał regex a dzielenie', () => {
+  test('po `=`, `(`, `,`, `return` i na początku linii to regex (także z / w klasie); po nazwie / liczbie — dzielenie', () => {
+    const U = CM.util, end = (s, i) => U.regexLiteralEnd(s, i, s.slice(0, i));
+    assert.equal(end('x = /ab[/]c/g;', 4), 12);
+    assert.equal(end('f(/x/)', 2), 5);
+    assert.equal(end('return /y/', 7), 10);
+    assert.equal(end('/z/.test(a)', 0), 3);
+    assert.equal(end('a = b / c / d', 6), -1);
+    assert.equal(end('n = 10 / 2', 7), -1);
+    assert.equal(end('x = /nie-zamknięty\n/', 4), -1);
+  });
+});

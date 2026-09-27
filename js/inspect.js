@@ -112,11 +112,8 @@ CM.Inspect = (function(){
       if(c==='/'&&d==='*'){ const e=src.indexOf('*/',i+2); i=e<0?n:e+2; out+='C'; continue; }
       // literał regex (`/` po operatorze, nawiasie albo na początku linii — nie dzielenie) → pusty `/ /`: wzorzec z
       // `innerHTML` czy `eval` to tekst, nie wywołanie
-      if(c==='/' && /(^|[=(,:;!&|?{}[\n]|\breturn)\s*$/.test(out.slice(-12))){
-        let j=i+1, cls=false;
-        while(j<n && src[j]!=='\n' && (cls || src[j]!=='/')){ if(src[j]==='\\') j++; else if(src[j]==='[') cls=true; else if(src[j]===']') cls=false; j++; }
-        if(j<n && src[j]==='/'){ out+='/ /'; i=j+1; continue; }
-      }
+      const re=c==='/' ? U.regexLiteralEnd(src, i, out.slice(-12)) : -1;
+      if(re>0){ out+='/ /'; i=re; continue; }
       // napis → pusty literał; szablon z ${…} → `$` (dane wstawiane do HTML-a — reguła ryzyka ma go widzieć)
       if(c==='"'||c==="'"||c==='`'){ const s0=i; out+=c; i++; while(i<n&&src[i]!==c&&!(c!=='`'&&src[i]==='\n')){ if(src[i]==='\\') i++; i++; } if(c==='`'&&src.slice(s0,i).includes('${')) out+='$'; out+=c; i++; continue; }
       out+=c; i++;
