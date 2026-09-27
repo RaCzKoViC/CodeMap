@@ -32,7 +32,7 @@ jobs:
       - name: Złóż katalog publikacji (tylko frontend)
         run: |
           mkdir -p _site
-          cp index.html manifest.webmanifest sw.js icon-192.png icon-512.png icon-maskable-512.png LICENSE _site/
+          cp index.html runner.html manifest.webmanifest sw.js icon-192.png icon-512.png icon-maskable-512.png LICENSE _site/
           cp -r js css _site/
           ls -R _site | head -50
 
