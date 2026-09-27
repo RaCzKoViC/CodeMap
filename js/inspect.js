@@ -270,10 +270,13 @@ CM.Inspect = (function(){
     // ---- duplikaty kodu: winnowing na treści (CM.Metrics) — tylko pliki z preview ≥ 20 linii,
     //      powyżej 1500 plików próbka największych; odciski liczone w chunkach (tick co 64 plików) ----
     if(CM.Metrics && CM.Metrics.findDuplicates){ try{
-      const cand=CM.Metrics.duplicateCandidates(files);
-      const fps=new Array(cand.length);
-      for(let i=0;i<cand.length;i++){ fps[i]=CM.Metrics.fingerprints(cand[i]); if((i&63)===63) await tick(); }
-      const pairs=CM.Metrics.pairDuplicates(cand, fps);
+      let pairs;
+      if(CM.Metrics.findDuplicatesAsync && typeof Worker!=='undefined' && typeof document!=='undefined') pairs=await CM.Metrics.findDuplicatesAsync(files);   // przeglądarka: worker
+      else {                                                        // CLI / testy: w tym wątku, z oddechem co 64 pliki
+        const cand=CM.Metrics.duplicateCandidates(files), fps=new Array(cand.length);
+        for(let i=0;i<cand.length;i++){ fps[i]=CM.Metrics.fingerprints(cand[i]); if((i&63)===63) await tick(); }
+        pairs=CM.Metrics.pairDuplicates(cand, fps);
+      }
       for(const p of pairs.slice(0,LIMIT)){
         const a=graph.nodes.get(p.a), b=graph.nodes.get(p.b); if(!a||!b) continue;
         add(F,'dupcode','med',a, t('dupShare',{a:a.name,b:b.name,n:p.tokens!=null?p.tokens:p.shared,k:p.blocks||1}), [b.id]);

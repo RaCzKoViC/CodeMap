@@ -185,3 +185,13 @@ describe('findDuplicates', () => {
     assert.ok(M.isGenerated({ path: 'package-lock.json' }) && M.isGenerated(goGen) && !M.isGenerated(code));
   });
 });
+
+describe('findDuplicatesAsync', () => {
+  test('bez Workera (Node) — ten sam wynik co findDuplicates, jako Promise', async () => {
+    const a = fileNode('src/a.js', [...FILL_A, ...BLOCK]), b = fileNode('src/b.js', [...FILL_B, ...BLOCK]);
+    const p = M.findDuplicatesAsync([a, b]);
+    assert.equal(typeof p.then, 'function');
+    assert.deepEqual(host(await p), host(M.findDuplicates([a, b])));
+    assert.deepEqual(host(await M.findDuplicatesAsync([])), []);
+  });
+});

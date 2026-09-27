@@ -11,6 +11,9 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
   „kontekstyfikacji", przez które każde odwołanie do globalnych (np. `Math.imul` w odciskach duplikatów, wołane
   miliony razy) było ok. 10× wolniejsze niż w przeglądarce. Na repozytorium CodeMap: analiza 2,9 s → 0,7 s (odciski
   duplikatów 3,1 s → 0,19 s, graf 0,52 → 0,21 s); starszy Node — dotychczasowy kontekst.
+- **Duplikaty kodu w aplikacji liczone w workerze** (`js/dup-worker.js`, `CM.Metrics.findDuplicatesAsync`): odciski i
+  parowanie poza wątkiem interfejsu, z pamięcią odcisków po skrócie treści pliku — ponowna analiza (tryb na żywo, drugi
+  Inspect) liczy od nowa tylko zmienione pliki; bez Workera (CLI, testy) albo gdy worker nie wstanie — jak dotąd.
 
 ## [1.5.1] — 2026-09-27
 

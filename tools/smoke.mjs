@@ -638,6 +638,22 @@ const htRes = await evalJs(`(async()=>{ try{
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 check(htRes && !htRes.error && htRes.pts === 'c0:0,c1:1' && htRes.chain === 2 && htRes.menu && htRes.local && !htRes.btn,
   `trend zdrowia: liczenie w przeglądarce (atrapa repo), okno z menu, bez .git — podpowiedź CLI: ${JSON.stringify(htRes)}`);
+// duplikaty w workerze (faza 13): findDuplicatesAsync ładuje js/dup-worker.js i zwraca te same pary co liczenie
+// w wątku głównym; drugi przebieg bierze odciski z pamięci workera (po skrócie treści)
+const dupwRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
+  CMApp.loadDemo(); for(let i=0;i<60 && !(CMApp.graph&&CMApp.graph.nodes.size>20);i++) await sleep(100); await sleep(300);
+  const block=Array.from({length:24},(_,i)=>'export function fn'+i+'(a, b){ if(a > b){ return a - b; } return b - a + '+i+'; }').join('\\n');
+  const mk=(id,pre)=>({id, type:'file', name:id, path:id, preview:pre+'\\n'+block, hash:'h-'+id, langInfo:{text:true, cat:'code'}, metrics:{lines:26, longest:80, chars:2000}});
+  const files=[...CMApp.graph.nodes.values()].filter(n=>n.type==='file').concat([mk('x/a.js','// a'), mk('x/b.js','// b')]);
+  const t0=performance.now(); const pa=await CM.Metrics.findDuplicatesAsync(files); const t1=performance.now();
+  const pb=await CM.Metrics.findDuplicatesAsync(files); const t2=performance.now();
+  const sync=CM.Metrics.findDuplicates(files);
+  const loaded=performance.getEntriesByType('resource').some(e=>/js\\/dup-worker\\.js/.test(e.name));
+  return {pairs:pa.length, same:JSON.stringify(pa)===JSON.stringify(sync) && JSON.stringify(pb)===JSON.stringify(sync), loaded, ms:[Math.round(t1-t0), Math.round(t2-t1)]};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+check(dupwRes && !dupwRes.error && dupwRes.pairs >= 1 && dupwRes.same && dupwRes.loaded,
+  `duplikaty w workerze: te same pary co w wątku głównym, js/dup-worker.js załadowany: ${JSON.stringify(dupwRes)}`);
 check(exceptions.length === 0, `wyjątki JS:${exceptions.length}${exceptions.length ? '\n   ' + exceptions.join('\n   ') : ''}`);
 check(errors.length === 0, `błędy konsoli: ${errors.length}${errors.length ? '\n   ' + errors.join('\n   ') : ''}`);
 cleanup(failed ? 1 : 0);
