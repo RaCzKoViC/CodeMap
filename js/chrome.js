@@ -11,7 +11,8 @@
   // ---------------- PWA: offline service worker + install prompt ----------------
   let _installPrompt=null;
   function wirePWA(){
-    if('serviceWorker' in navigator){
+    // webview VS Code (integrations/vscode): bez service workera — ma własny SW hosta na tym samym originie
+    if('serviceWorker' in navigator && !window.acquireVsCodeApi){
       window.addEventListener('load', ()=>{
         const hadController=!!navigator.serviceWorker.controller;   // false on first ever load (so we don't toast then)
         navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -162,7 +163,7 @@
         const blk=$('#rng-trans'); if(blk&&blk.closest('.filter-block')) blk.closest('.filter-block').scrollIntoView({behavior:'smooth',block:'start'}); },
       resetAppearance:resetAppearance,
       uninstall:async()=>{
-        try{ if(navigator.serviceWorker){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.unregister(); } }catch(e){}
+        try{ if(navigator.serviceWorker && !window.acquireVsCodeApi){ const regs=await navigator.serviceWorker.getRegistrations(); for(const r of regs) await r.unregister(); } }catch(e){}
         try{ const ks=await caches.keys(); for(const k of ks) await caches.delete(k); }catch(e){}
       },
       clearAllData:async()=>{

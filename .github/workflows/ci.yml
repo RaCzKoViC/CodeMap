@@ -25,6 +25,8 @@ jobs:
         run: npm run check
       - name: Testy jednostkowe
         run: npm test
+      - name: Rozszerzenie VS Code (bundle, atrapa vscode, analiza w wątku)
+        run: npm run vscode-test
       - name: ESLint
         run: npm run lint
       - name: Smoke w headless Chrome (demo → mapa, 0 wyjątków)

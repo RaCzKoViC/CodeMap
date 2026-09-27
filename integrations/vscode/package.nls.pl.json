@@ -1,0 +1,21 @@
+{
+  "ext.description": "Kartografia kodu w edytorze: mapa zależności, analiza statyczna (cykle, god-files, duplikaty, reguły architektury), hotspoty i bus factor z historii git — znaleziska w Problems, interaktywna mapa CodeMap w panelu.",
+  "ext.virtual": "CodeMap czyta pliki i katalog .git z dysku.",
+  "command.analyze": "Analizuj workspace",
+  "command.openMap": "Otwórz mapę",
+  "command.revealInMap": "Pokaż plik na mapie",
+  "command.clear": "Wyczyść znaleziska",
+  "config.analyzeOnSave": "Ponawiaj analizę po zapisie pliku (z opóźnieniem 1,5 s; nowszy przebieg anuluje poprzedni).",
+  "config.minSeverity": "Najniższa ważność znalezisk CodeMap pokazywanych w **Problems**.",
+  "config.minSeverity.info": "Wszystkie znaleziska, także informacyjne (Hint).",
+  "config.minSeverity.low": "Niskie i wyższe (Information, Warning, Error).",
+  "config.minSeverity.med": "Średnie i wyższe (Warning, Error).",
+  "config.minSeverity.high": "Tylko wysokie (Error).",
+  "config.git": "Czytaj lokalną historię `.git`: hotspoty zmian, właściciele plików, bus factor, reguły *hotspoty zmian* i *wiedza w jednej głowie*.",
+  "config.exclude": "Globy (względem folderu workspace) pomijane przy analizie, np. `generated/**`. `node_modules`, `dist`, `build`, `coverage` i podobne są pomijane zawsze.",
+  "config.lang": "Język znalezisk, paska stanu i mapy.",
+  "config.lang.auto": "Język interfejsu VS Code (polski dla `pl`, w pozostałych przypadkach angielski).",
+  "config.lang.pl": "Polski.",
+  "config.lang.en": "Angielski.",
+  "config.codeLens": "Pokazuj CodeLens nad plikami-hotspotami (zmiany × złożoność, właściciel), gdy jest historia git."
+}

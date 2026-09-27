@@ -24,6 +24,9 @@
   function contextMenu(node, x, y){
     const items=[];
     if(node){
+      // pozycje od integracji (vscode-bridge.js: „Otwórz w edytorze") — w przeglądarce A.ctxExtra nie istnieje
+      const extra=[]; for(const f of (A.ctxExtra||[])){ try{ const it=f(node); if(it) extra.push(it); }catch(e){} }
+      if(extra.length) items.push(...extra, {sep:true});
       items.push({ic:'crosshair',label:I.t('ca.ctxCenter','Wyśrodkuj widok'),action:()=>A.focusNode(node.id)});
       items.push({ic:'eye',label:I.t('ca.ctxHighlightNeighbors','Podświetl sąsiadów'),action:()=>{ A.select(node); }});
       items.push({ic:'search',label:I.t('ca.ctxIsolate','Izoluj: pokaż tylko powiązane'),action:()=>isolateNode(node)});

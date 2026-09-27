@@ -30,7 +30,8 @@ const CORE_RULES = {
 };
 
 module.exports = [
-  { ignores: ['node_modules/**', 'server/node_modules/**', 'server/data/**', 'Sejf/**', 'docs/**', '_site/**'] },
+  { ignores: ['node_modules/**', 'server/node_modules/**', 'server/data/**', 'Sejf/**', 'docs/**', '_site/**',
+    'integrations/vscode/app/**', 'integrations/vscode/cli/**'] },   // kopie z bundle.mjs (lintowane w źródle)
   {
     files: ['js/**/*.js', 'sw.js'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: BROWSER_GLOBALS },
@@ -43,6 +44,17 @@ module.exports = [
   },
   {
     files: ['test/**/*.mjs', 'tools/**/*.mjs', 'cli/**/*.mjs', 'server/test/**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node },
+    rules: CORE_RULES,
+  },
+  {
+    // rozszerzenie VS Code: CommonJS (host rozszerzeń), testy i skrypty ESM
+    files: ['integrations/vscode/**/*.js', 'integrations/vscode/**/*.cjs'],
+    languageOptions: { ecmaVersion: 2023, sourceType: 'commonjs', globals: globals.node },
+    rules: CORE_RULES,
+  },
+  {
+    files: ['integrations/vscode/**/*.mjs'],
     languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node },
     rules: CORE_RULES,
   },

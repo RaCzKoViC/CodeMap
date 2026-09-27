@@ -1,0 +1,178 @@
+{
+  "name": "codemap",
+  "displayName": "CodeMap",
+  "description": "%ext.description%",
+  "version": "0.1.0",
+  "publisher": "raczkovic",
+  "license": "MIT",
+  "icon": "app/icon-192.png",
+  "homepage": "https://github.com/RaCzKoViC/CodeMap/tree/main/integrations/vscode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RaCzKoViC/CodeMap.git",
+    "directory": "integrations/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/RaCzKoViC/CodeMap/issues"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Visualization",
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "code map",
+    "dependency graph",
+    "static analysis",
+    "hotspots",
+    "architecture"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "%ext.virtual%"
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "codemap.analyze",
+        "title": "%command.analyze%",
+        "category": "CodeMap",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "codemap.openMap",
+        "title": "%command.openMap%",
+        "category": "CodeMap",
+        "icon": "$(type-hierarchy)"
+      },
+      {
+        "command": "codemap.revealInMap",
+        "title": "%command.revealInMap%",
+        "category": "CodeMap",
+        "icon": "$(target)"
+      },
+      {
+        "command": "codemap.clear",
+        "title": "%command.clear%",
+        "category": "CodeMap"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "codemap.revealInMap",
+          "when": "resourceScheme == file",
+          "group": "navigation@90"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "codemap.revealInMap",
+          "when": "resourceScheme == file",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "codemap.revealInMap",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "codemap.analyze",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "codemap.openMap",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CodeMap",
+      "properties": {
+        "codemap.analyzeOnSave": {
+          "type": "boolean",
+          "default": false,
+          "scope": "resource",
+          "markdownDescription": "%config.analyzeOnSave%"
+        },
+        "codemap.minSeverity": {
+          "type": "string",
+          "enum": [
+            "info",
+            "low",
+            "med",
+            "high"
+          ],
+          "enumDescriptions": [
+            "%config.minSeverity.info%",
+            "%config.minSeverity.low%",
+            "%config.minSeverity.med%",
+            "%config.minSeverity.high%"
+          ],
+          "default": "low",
+          "scope": "resource",
+          "markdownDescription": "%config.minSeverity%"
+        },
+        "codemap.git": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.git%"
+        },
+        "codemap.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "resource",
+          "markdownDescription": "%config.exclude%"
+        },
+        "codemap.lang": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "pl",
+            "en"
+          ],
+          "enumDescriptions": [
+            "%config.lang.auto%",
+            "%config.lang.pl%",
+            "%config.lang.en%"
+          ],
+          "default": "auto",
+          "markdownDescription": "%config.lang%"
+        },
+        "codemap.codeLens": {
+          "type": "boolean",
+          "default": true,
+          "scope": "resource",
+          "markdownDescription": "%config.codeLens%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "bundle": "node scripts/bundle.mjs",
+    "vscode:prepublish": "node scripts/bundle.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "smoke": "node test/webview-smoke.mjs",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  }
+}
