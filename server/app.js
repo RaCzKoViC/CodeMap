@@ -22,7 +22,9 @@ export function logPath(url) {
 export const LOGGER = { serializers: { req: (req) => ({ method: req.method, path: logPath(req.url), ip: req.ip }) } };
 
 export async function buildApp({ logger = LOGGER, serveStatic = !CFG.prod } = {}) {
-  const app = Fastify({ logger, trustProxy: true, bodyLimit: 4 * 1024 * 1024 });
+  // maxParamLength: nazwy plików Sejfu są nazwami użytkownika (do 255 znaków, vault.js) — domyślne 100 znaków
+  // parametru odrzucało dłuższe (414) jeszcze przed trasą i przerywało synchronizację albumu
+  const app = Fastify({ logger, trustProxy: true, bodyLimit: 4 * 1024 * 1024, routerOptions: { maxParamLength: 300 } });
 
   // Odpowiedzi API (mapy, szyfrogramy Sejfu, dane konta, publiczne linki) nigdy nie lądują w cache HTTP.
   app.addHook('onSend', (req, reply, payload, done) => {
