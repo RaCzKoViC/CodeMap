@@ -130,7 +130,8 @@ Największa wartość przy małym koszcie: łączy graf zależności, historię 
 - Własny health score CodeMap (29/100 na kopii z GitHuba: duplikaty, złożone pliki bez testów, bardzo długie
   pliki): podział `chatbot.js` / `settings.js` / `mindmap.js`, testy renderera i ChatBota, usunięcie
   duplikatów (`escapeHtml` ×8), próg CLI w naszym CI.
-- Bezpieczeństwo: CSP wymuszane (dziś report-only), SRI dla zasobów z CDN (tree-sitter, WebLLM).
+- [x] Bezpieczeństwo: CSP egzekwowane (meta + nagłówek Caddy), Runner przez `runner.html`, SRI dla tree-sitter
+  (`tools/sri.mjs`, weryfikacja bajtów przed wykonaniem). WebLLM / rough.js / php-wasm (+esm) — tylko przypięta wersja.
 - [x] README po angielsku jako główne (`README.md`), polskie w `README.pl.md`.
 - [x] Wspólny kod zamiast kopii wskazanych przez Inspect: `js/physics.js`, `tools/cdp.mjs`, `js/ui-kit.js`.
 - Społeczność: galeria przykładowych repozytoriów

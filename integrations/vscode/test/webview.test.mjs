@@ -47,6 +47,12 @@ describe('HTML webview', () => {
     assert.match(html, new RegExp(`<base href="${(ORIGIN + APP + '/').replace(/[.+]/g, '\\$&')}">`));
   });
 
+  test('CSP aplikacji z index.html usunięte — w webview obowiązuje tylko polityka z nonce (dwie by się przecinały)', () => {
+    assert.ok(/http-equiv="Content-Security-Policy"/.test(INDEX), 'aplikacja ma własną metę CSP');
+    assert.equal((html.match(/http-equiv="Content-Security-Policy"/g) || []).length, 1);
+    assert.ok(!html.includes("script-src 'self'"), 'polityka aplikacji nie trafia do webview');
+  });
+
   test('każdy <script> ma nonce; manifest i ikony PWA usunięte', () => {
     const scripts = html.match(/<script\b[^>]*>/gi);
     assert.ok(scripts.length > 40);

@@ -4,13 +4,26 @@
    • HTML / SVG — render bezpośredni,        • CSS — arkusz + żywe elementy demo,
    • JS — wykonanie + przechwycona konsola,  • JSON — walidacja + kolorowany pretty-print,
    • Markdown — własny mini-renderer,        • PHP — PRAWDZIWY interpreter php-wasm (CDN, on-demand).
-   Dodatkowo „otwórz w nowej karcie" (blob URL). Kod trafia do iframe jako JSON — zero wstrzyknięć. */
+   Dodatkowo „otwórz w nowej karcie". Kod trafia do iframe jako JSON — zero wstrzyknięć.
+   Aplikacja ma egzekwowane CSP (bez skryptów inline), które dziedziczyłby <iframe srcdoc> — dlatego ramka ładuje
+   runner.html (własna, luźna polityka; kod modelu w jego zagnieżdżonej ramce w piaskownicy), a gotowy dokument dostaje przez postMessage po sygnale
+   „ready"; karta otwiera tę samą stronę (zamiast dawnego blob:, który też dziedziczyłby CSP aplikacji). */
 CM.Runner = (function(){
   const U=CM.util, el=U.el, ic=CM.icons, I=CM.i18n;
   const pl=()=>I.getLang()!=='en';
   const T=(p,e)=>pl()?p:e;
 
   let win=null, frame=null, titleEl=null, lastCode='', lastLang='';
+  const RUNNER_URL='runner.html';
+  let frameReady=false, pending=null, posted=0;
+  const tabs=new Map();   // okno karty → {html, title} (wysyłane po jego „ready")
+  const post=(w, html, title)=>{ try{ w.postMessage({type:'codemap-runner', html, title}, '*'); posted++; }catch(e){} };
+  window.addEventListener('message', (e)=>{
+    const d=e.data; if(!d || d.type!=='codemap-runner-ready') return;
+    if(frame && e.source===frame.contentWindow){ frameReady=true; if(pending){ post(frame.contentWindow, pending.html, pending.title); pending=null; } return; }
+    for(const [w, v] of tabs) if(e.source===w){ post(w, v.html, v.title); tabs.delete(w); return; }
+  });
+  const titleOf=(lang)=>(lang?lang.toUpperCase():'JS')+' · '+T('podgląd','preview');
 
   const BASE_CSS='body{margin:0;padding:14px;font:14px/1.55 system-ui,Segoe UI,sans-serif;background:#fff;color:#111}'+
     'pre{background:#f4f5f7;padding:10px;border-radius:8px;overflow:auto}'+
@@ -91,7 +104,9 @@ CM.Runner = (function(){
     head.appendChild(el('button',{class:'rn-btn',title:T('Zamknij','Close'),html:ic.svg('x',{size:14}),onclick:close}));
     win.appendChild(head);
     const body=el('div',{class:'rn-body'});
-    frame=el('iframe',{class:'rn-frame',sandbox:'allow-scripts allow-modals',title:'runner'});
+    // runner.html to nasz kod z tego samego pochodzenia (bez piaskownicy); kod z ChatBota działa w JEGO zagnieżdżonym
+    // <iframe sandbox srcdoc> — nieprzezroczyste pochodzenie, bez dostępu do aplikacji (localStorage, OPFS, klucze)
+    frame=el('iframe',{class:'rn-frame',title:'runner'});
     body.appendChild(frame); win.appendChild(body);
     win.appendChild(el('div',{class:'rn-hint',text:T('Sandbox — kod nie ma dostępu do aplikacji. Zmieniaj rozmiar za prawy dolny róg.','Sandboxed — the code cannot touch the app. Resize from the bottom-right corner.')}));
     document.body.appendChild(win);
@@ -110,29 +125,24 @@ CM.Runner = (function(){
 
   function run(code, lang){
     lastCode=code; lastLang=lang;
-    frame.srcdoc=compose(code, lang);
-    titleEl.textContent=(lang?lang.toUpperCase():'JS')+' · '+T('podgląd','preview');
+    const html=compose(code, lang), title=titleOf(lang);
+    titleEl.textContent=title;
+    if(frameReady) post(frame.contentWindow, html, title);
+    else { pending={html, title}; if(!frame.getAttribute('src')) frame.src=RUNNER_URL; }
   }
   function openTab(){
-    // The new tab must NOT run model code in the app origin (a blob: document inherits it and could
-    // read localStorage/API keys, OPFS/Sejf). Open a tiny wrapper page that hosts the code inside a
-    // sandboxed <iframe srcdoc> (no allow-same-origin ⇒ opaque origin), set via a JSON literal so
-    // there is still zero injection surface.
-    const inner=compose(lastCode,lastLang);
-    const wrap='<!doctype html><meta charset="utf-8"><title>'+(lastLang?lastLang.toUpperCase():'JS')+' · '+T('podgląd','preview')+'</title>'+
-      '<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100vh;display:block}</style>'+
-      '<iframe sandbox="allow-scripts allow-modals" title="preview"></iframe>'+
-      '<script>document.querySelector("iframe").srcdoc='+J(inner)+';<\/script>';
-    const blob=new Blob([wrap],{type:'text/html'});
-    const url=URL.createObjectURL(blob);
-    window.open(url,'_blank','noopener');
-    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    // Karta NIE może wykonywać kodu modelu w pochodzeniu aplikacji (localStorage z kluczami API, OPFS/Sejf):
+    // runner.html (nasz kod) trzyma go w zagnieżdżonym <iframe sandbox> bez allow-same-origin.
+    const w=window.open(RUNNER_URL, '_blank');
+    if(!w){ U.toast(T('Przeglądarka zablokowała nowe okno.','The browser blocked the new window.'),'error'); return; }
+    tabs.set(w, {html:compose(lastCode,lastLang), title:titleOf(lastLang)});
+    setTimeout(()=>tabs.delete(w), 60000);
   }
   function open(code, lang){
     buildWin(); win.classList.remove('hidden');
     run(code, (lang||'').toLowerCase()==='javascript'?'js':lang);
   }
-  function close(){ if(win){ win.classList.add('hidden'); frame.srcdoc=''; } }
+  function close(){ if(win){ win.classList.add('hidden'); pending=null; if(frameReady) post(frame.contentWindow, '', ''); } }
 
-  return { open, close, _compose:compose };
+  return { open, close, _compose:compose, state:()=>({ready:frameReady, posted, open:!!(win && !win.classList.contains('hidden'))}) };
 })();

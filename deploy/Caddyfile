@@ -7,17 +7,24 @@ codemap.twojadomena.pl {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
+        X-Frame-Options "SAMEORIGIN"   # runner.html (Runner ChatBota) jest osadzany przez aplikację z tego samego pochodzenia
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-        # CSP w trybie REPORT-ONLY jako punkt startowy: nic nie blokuje, naruszenia widać w konsoli
-        # przeglądarki. Lista hostów = to, z czym aplikacja realnie rozmawia (API repozytoriów, Mistral,
-        # CDN WebLLM/php-wasm/rough.js, wagi modeli z Hugging Face, lokalna Ollama). Runner osadza kod
-        # w iframe srcdoc, który dziedziczy CSP — przed przełączeniem na tryb wymuszający potrzebuje
-        # nonce/hash albo blob: URL. Po tygodniu bez naruszeń zmień nazwę nagłówka na Content-Security-Policy.
-        Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://esm.run https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src blob:; img-src 'self' data: blob: https://avatars.githubusercontent.com https://github.com https://gitlab.com https://bitbucket.org; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://gist.githubusercontent.com https://gitlab.com https://api.bitbucket.org https://api.mistral.ai https://esm.run https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co http://127.0.0.1:11434 http://localhost:11434; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
         -Server
     }
+
+    # CSP EGZEKWOWANE — ta sama polityka co <meta> w index.html (GitHub Pages nie ustawia nagłówków) plus frame-ancestors,
+    # którego meta nie obsługuje: skrypty tylko z tej strony i CDN (esm.run / jsDelivr), bez inline i eval. NIE dla
+    # runner.html — Runner ChatBota ma tam własną, luźną politykę (kod w zagnieżdżonej ramce w piaskownicy), a dwie
+    # polityki (nagłówek + meta) by się przecięły. REPORT-ONLY z wąską listą connect-src tylko raportuje hosty.
+    # blob: w script-src dotyczy workera grafu symboli (tree-sitter.js z blob: po sprawdzeniu SHA-384, sri.js);
+    # na stronie i tak obowiązuje meta bez blob: (polityki się przecinają).
+    @notRunner not path /runner.html
+    header @notRunner {
+        Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://esm.run https://cdn.jsdelivr.net blob:; worker-src 'self' blob:; frame-src 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' https: http: data: blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+        Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://esm.run https://cdn.jsdelivr.net; worker-src 'self' blob:; frame-src 'self'; img-src 'self' data: blob: https://avatars.githubusercontent.com https://github.com https://gitlab.com https://bitbucket.org; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://gist.githubusercontent.com https://gitlab.com https://api.bitbucket.org https://api.mistral.ai https://esm.run https://cdn.jsdelivr.net https://huggingface.co https://*.huggingface.co https://*.hf.co http://127.0.0.1:11434 http://localhost:11434; style-src 'self' 'unsafe-inline'; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    }
+    header /runner.html Content-Security-Policy "frame-ancestors 'self'"
 
     handle /api/* {
         reverse_proxy 127.0.0.1:8787

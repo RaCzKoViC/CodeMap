@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<!-- Strona pośrednia Runnera (js/runner.js). Aplikacja ma egzekwowane CSP bez skryptów inline, a kod wygenerowany
+     przez ChatBota (HTML / JS / PHP…) potrzebuje ich i eval — dlatego działa TU, z własną, luźniejszą polityką:
+     ta strona (nasz kod, to samo pochodzenie co aplikacja) trzyma kod w zagnieżdżonym <iframe sandbox="allow-scripts
+     allow-modals" srcdoc> — nieprzezroczyste pochodzenie, bez dostępu do danych aplikacji (localStorage, OPFS, klucze);
+     srcdoc dziedziczy politykę TEJ strony, nie aplikacji.
+     Kod przychodzi przez postMessage od rodzica / okna, które otworzyło kartę. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://esm.run blob: data:; style-src 'unsafe-inline' https: data:; img-src * data: blob:; media-src * data: blob:; font-src * data:; connect-src *; frame-src 'self' blob: data:; worker-src blob: data: https://cdn.jsdelivr.net; base-uri 'none'; form-action 'none'">
+<title>CodeMap Runner</title>
+<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100vh;display:block}</style>
+</head>
+<body>
+<iframe id="f" sandbox="allow-scripts allow-modals" title="preview"></iframe>
+<script>
+(function(){
+  var host = window.opener || (window.parent !== window ? window.parent : null);
+  var f = document.getElementById('f'), n = 0;
+  window.addEventListener('message', function(e){
+    if(!host || e.source !== host) return;
+    var d = e.data || {};
+    if(d.type !== 'codemap-runner' || typeof d.html !== 'string') return;
+    if(d.title) document.title = String(d.title).slice(0, 120);
+    // komentarz z licznikiem: ta sama treść ponownie (przycisk „uruchom ponownie") też przeładowuje ramkę
+    f.srcdoc = d.html ? d.html + '\n<!-- run ' + (++n) + ' -->' : '';
+  });
+  if(host) host.postMessage({type:'codemap-runner-ready'}, '*');
+})();
+</script>
+</body>
+</html>

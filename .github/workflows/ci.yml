@@ -29,6 +29,8 @@ jobs:
         run: npm run vscode-test
       - name: ESLint
         run: npm run lint
+      - name: SRI — przypięte skróty plików z CDN zgodne z jsDelivr (js/sri.js)
+        run: node tools/sri.mjs --check
       - name: Smoke w headless Chrome (demo → mapa, 0 wyjątków)
         run: npm run smoke
         env:
@@ -68,6 +70,7 @@ jobs:
           cat server.log
           test "$ok" = "1"
           test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/server/.env)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/runner.html)" = "200"
 
   # CodeMap na własnym kodzie przez akcję z tego repozytorium (action.yml): raport w podsumowaniu kroku,
   # SARIF i Markdown jako artefakt. BEZ progów — repozytorium ma dziś niski health score (duplikaty,

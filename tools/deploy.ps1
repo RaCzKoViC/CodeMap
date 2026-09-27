@@ -12,8 +12,8 @@ $root = Split-Path -Parent $PSScriptRoot   # katalog projektu (D:\Projekty\CodeM
 Write-Host "== CodeMap deploy -> $Server ==" -ForegroundColor Cyan
 
 # 1. Frontend -> /opt/codemap/app/
-Write-Host "[1/4] Frontend (index.html, sw.js, manifest, ikony, css/, js/)..."
-$front = @("index.html", "sw.js", "manifest.webmanifest",
+Write-Host "[1/4] Frontend (index.html, runner.html, sw.js, manifest, ikony, css/, js/)..."
+$front = @("index.html", "runner.html", "sw.js", "manifest.webmanifest",
            "icon-192.png", "icon-512.png", "icon-maskable-512.png")
 foreach ($f in $front) { scp -q (Join-Path $root $f) "${Server}:/opt/codemap/app/" }
 scp -q -r (Join-Path $root "css") (Join-Path $root "js") "${Server}:/opt/codemap/app/"

@@ -60,7 +60,7 @@ export async function buildApp({ logger = LOGGER, serveStatic = !CFG.prod } = {}
     // Root to katalog repozytorium, więc serwujemy WYŁĄCZNIE pliki frontendu z allowlisty —
     // nigdy server/ (.env, SQLite, logi), Sejf/, .git, .claude, docs ani plików z kropką.
     // no-store: edytowane pliki mają być widoczne od razu, bez walki z cache przeglądarki.
-    const FRONT_RE = /^\/(index\.html|manifest\.webmanifest|sw\.js|icon-[\w-]+\.png|js\/[\w.-]+\.js|css\/[\w.-]+\.css)?$/;
+    const FRONT_RE = /^\/(index\.html|runner\.html|manifest\.webmanifest|sw\.js|icon-[\w-]+\.png|js\/[\w.-]+\.js|css\/[\w.-]+\.css)?$/;
     await app.register(fastifyStatic, {
       root: join(HERE, '..'),
       dotfiles: 'deny',

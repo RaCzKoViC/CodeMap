@@ -54,10 +54,14 @@ CM.Symbols = (function(){
     });
   }
   let mainTS = null; const mainLangs = new Map();
-  function loadScript(src){ return new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = ()=>rej(new Error('CDN: ' + src)); document.head.appendChild(s); }); }
+  // bez workera (file://): natywne SRI dla skryptu (integrity + crossorigin), WASM z bajtów sprawdzonych przez CM.SRI
+  function loadScript(src){ return new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous';
+    const i = CM.SRI && CM.SRI.integrity(src); if(i) s.integrity = i; else return rej(new Error('SRI: brak przypiętego skrótu dla ' + src));
+    s.onload = res; s.onerror = ()=>rej(new Error('CDN / SRI: ' + src)); document.head.appendChild(s); }); }
   async function viaMainThread(files, my, onProgress){
-    if(!mainTS){ if(!window.TreeSitter) await loadScript(LIB + 'tree-sitter.js'); await window.TreeSitter.init({locateFile:(f)=>LIB + f}); mainTS = window.TreeSitter; }
-    const load = (g)=>{ if(!mainLangs.has(g)) mainLangs.set(g, mainTS.Language.load(GRAMMARS + 'tree-sitter-' + g + '.wasm').catch((e)=>{ mainLangs.delete(g); throw e; })); return mainLangs.get(g); };
+    if(!mainTS){ if(!window.TreeSitter) await loadScript(LIB + 'tree-sitter.js');
+      await window.TreeSitter.init({locateFile:(f)=>LIB + f, wasmBinary:new Uint8Array(await CM.SRI.fetchVerified(LIB + 'tree-sitter.wasm'))}); mainTS = window.TreeSitter; }
+    const load = (g)=>{ if(!mainLangs.has(g)) mainLangs.set(g, CM.SRI.fetchVerified(GRAMMARS + 'tree-sitter-' + g + '.wasm').then((b)=>mainTS.Language.load(new Uint8Array(b))).catch((e)=>{ mainLangs.delete(g); throw e; })); return mainLangs.get(g); };
     return CM.SymbolsCore.analyzeBatch(mainTS, files, load, {
       cancelled:()=>my !== gen,
       onProgress:(d, t)=>{ if(onProgress) onProgress(d, t); return new Promise((r)=>setTimeout(r, 0)); },

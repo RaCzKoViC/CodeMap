@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const DROP_LINKS = /<link\b[^>]*\brel="(?:manifest|icon|shortcut icon|apple-touch-icon)"[^>]*>[ \t]*\r?\n?/gi;
-const DROP_META = /<meta\b[^>]*\bname="apple-mobile-web-app-[\w-]+"[^>]*>[ \t]*\r?\n?/gi;   // PWA na iOS; w webview tylko ostrzeżenie w konsoli
+const DROP_META = /<meta\b[^>]*\b(?:name="apple-mobile-web-app-[\w-]+"|http-equiv="Content-Security-Policy")[^>]*>[ \t]*\r?\n?/gi;   // PWA na iOS (w webview tylko ostrzeżenie); CSP aplikacji — webview ma własną z nonce
 const ABS_URL = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#|$)/i;
 
 const makeNonce = () => crypto.randomBytes(18).toString('base64');

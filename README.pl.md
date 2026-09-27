@@ -167,7 +167,8 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   nazwy symboli — więc działa też z modelem w chmurze). Odtwarzana na mapie: karta kroku, ponumerowane kroki ze
   strzałkami, ← / → / Esc; notatki można edytować, trasa zapisuje się w mapie, idzie linkiem (`#tour=…`, sama albo
   z `#repo=`) i do / z **VS Code CodeTour** (`.tour`).
-- **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
+- **Runner** — sandbox do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP: `runner.html` trzyma kod w zagnieżdżonym
+  `iframe sandbox` bez `allow-same-origin`, więc nie ma on dostępu do aplikacji, choć aplikacja ma ścisłe CSP.
 - Do modeli w chmurze trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików; fragmenty
   kodu (tryb 📚, podgląd załączników) dostają tylko modele **lokalne** — WebLLM i Ollama.
 

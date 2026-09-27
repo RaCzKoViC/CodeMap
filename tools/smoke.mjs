@@ -262,6 +262,25 @@ const tourRes = await evalJs(`(async()=>{ try{
   return {steps:tr.steps.length, kinds:tr.steps.map(s=>s.kind).join(','), card, first, i1, closed, saved, hashHead:hash.slice(0,6), back, ct:ct.steps.length, act};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// bezpieczeństwo (faza 8): egzekwowane CSP z <meta> — wstrzyknięty skrypt inline i atrybut on* zablokowane;
+// Runner działa pod CSP (runner.html + zagnieżdżona ramka w piaskownicy, kod przez postMessage), bez naruszeń
+const errBeforeCsp = errors.length;
+const cspRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); const v=[]; const h=(e)=>v.push(e.violatedDirective);
+  document.addEventListener('securitypolicyviolation', h);
+  const meta=(document.querySelector('meta[http-equiv="Content-Security-Policy"]')||{}).content||'';
+  window.__inj=0; const s=document.createElement('script'); s.textContent='window.__inj=1'; document.body.appendChild(s);
+  const d=document.createElement('div'); d.innerHTML='<img src="data:," onerror="window.__inj=2">'; document.body.appendChild(d);
+  await sleep(300); const blocked=window.__inj===0 && v.includes('script-src-elem'); const vBefore=v.length;
+  CM.Runner.open('console.log(6*7)', 'js'); await sleep(1500); const st=CM.Runner.state();
+  const outer=document.querySelector('#cm-runner iframe'); let inner='?';
+  try{ const f=outer.contentDocument.getElementById('f'); inner=(f.getAttribute('sandbox')||'')+'|'+((f.getAttribute('srcdoc')||'').length>100); try{ f.contentDocument.body; inner+='|dostęp'; }catch(e){ inner+='|izolacja'; } }catch(e){ inner='ERR '+e.message; }
+  CM.Runner.close(); s.remove(); d.remove(); document.removeEventListener('securitypolicyviolation', h);
+  return {strict:/script-src 'self'/.test(meta) && !/script-src[^;]*unsafe-inline/.test(meta), blocked, runner:st, inner, runnerViolations:v.length-vBefore};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+// celowe naruszenia z tego kroku (zablokowany skrypt inline i atrybut on*) nie są błędami aplikacji
+for (let k = errors.length - 1; k >= errBeforeCsp; k--) if (/Content Security Policy|Refused to/i.test(errors[k])) errors.splice(k, 1);
+
 // pamięć analizy w OPFS (faza 6): 80 plików wczytanych dwa razy z tymi samymi datami → drugi raz bez analizy
 // i bez workerów; zmieniony plik analizowany na nowo; te same daty inne, treść ta sama → trafienia po skrócie;
 // graf identyczny jak po pełnej analizie; „wyczyść" usuwa pamięć
@@ -395,6 +414,9 @@ check(docRes && !docRes.error && docRes.path === 'src/store/reducer.js' && docRe
 check(tourRes && !tourRes.error && tourRes.steps >= 4 && /^readme,entry/.test(tourRes.kinds) && tourRes.card && tourRes.first === 'README.md'
   && tourRes.i1 === 1 && tourRes.closed && tourRes.saved && /^tour=[zj]/.test(tourRes.hashHead) && tourRes.back && tourRes.ct === tourRes.steps,
   `trasa po kodzie: automatyczna, odtwarzacz, zapis w mapie, link #tour=, CodeTour: ${JSON.stringify(tourRes)}`);
+check(cspRes && !cspRes.error && cspRes.strict && cspRes.blocked && cspRes.runner.ready && cspRes.runner.posted >= 1
+  && cspRes.inner === 'allow-scripts allow-modals|true|izolacja' && cspRes.runnerViolations === 0,
+  `CSP egzekwowane, Runner pod CSP (runner.html + ramka w piaskownicy): ${JSON.stringify(cspRes)}`);
 check(cacheRes && !cacheRes.error && cacheRes.a1 === 0 && cacheRes.a2[0] === 80 && cacheRes.a2[1] === 0 && cacheRes.same2
   && cacheRes.a3 === 79 && cacheRes.changed && cacheRes.a4 === 79 && cacheRes.same4 && cacheRes.cleared,
   `pamięć analizy (OPFS): ponowne wczytanie bez analizy, zmieniony plik od nowa, trafienia po skrócie: ${JSON.stringify(cacheRes)}`);

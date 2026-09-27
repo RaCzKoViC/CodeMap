@@ -5,6 +5,23 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 
 ## [Unreleased]
 
+### Bezpieczeństwo — Faza 8
+- **CSP egzekwowane** z `<meta>` w `index.html` (GitHub Pages nie ustawia nagłówków): skrypty tylko z tej strony
+  i z esm.run / jsDelivr, bez inline / `on…=` / `eval`, `wasm-unsafe-eval` dla WASM, `object-src 'none'`,
+  `base-uri 'self'`, ramki tylko własne; `connect-src` celowo szeroki (dostawcy AI, własna Ollama, API repozytoriów).
+  Sprawdzone pod polityką: Runner, graf symboli (tree-sitter), rough.js, embeddingi WebLLM (worker z `blob:`),
+  Ollama, renderer WebGL — zero naruszeń. Rozszerzenie VS Code usuwa tę metę (ma własną z nonce).
+- **Runner przez `runner.html`**: `<iframe srcdoc>` dziedziczyłby CSP aplikacji, więc kod z ChatBota trafia przez
+  `postMessage` (po sygnale „ready") do strony pośredniej z własną polityką, a tam do zagnieżdżonej ramki
+  w piaskownicy bez `allow-same-origin`; „otwórz w nowej karcie" — ta sama strona zamiast dokumentu `blob:`.
+  `runner.html` w precache service workera, na liście plików serwera dev i w `tools/deploy.ps1`.
+- **SRI dla tree-sitter**: `tools/sri.mjs` przypina SHA-384 dla `tree-sitter.js`, `tree-sitter.wasm` i 12 gramatyk
+  (`js/sri.js`); worker sprawdza bajty przed wykonaniem (skrypt z `blob:`, WASM przez `wasmBinary` /
+  `Language.load(bytes)`), tryb bez workera — natywny `integrity`. CI: `node tools/sri.mjs --check`.
+- `deploy/Caddyfile`: CSP w nagłówku egzekwowane (+ `frame-ancestors 'self'`, bez `runner.html`),
+  `X-Frame-Options: SAMEORIGIN` (DENY blokowałby Runnera), report-only z wąską listą hostów zostaje do obserwacji.
+- Testy: SRI (manifest, podmiana, adres spoza listy), webview VS Code (jedna polityka), krok smoke „CSP + Runner".
+
 ## [1.3.0] — 2026-09-27
 
 Skala i lokalne AI: rysowanie na GPU, pamięć analizy, folder na żywo po przeładowaniu (faza 6) oraz agent kodu —

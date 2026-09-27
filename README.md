@@ -167,7 +167,8 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
   names — so cloud models work too). Played on the map: a step card, numbered steps with arrows, ← / → / Esc; notes
   are editable, the tour is saved with the map, shared as a link (`#tour=…`, alone or with `#repo=`), and exported /
   imported as **VS Code CodeTour** (`.tour`).
-- **Runner** — a sandbox (`iframe` without `allow-same-origin`) for running generated HTML/SVG/CSS/JS/PHP.
+- **Runner** — a sandbox for running generated HTML/SVG/CSS/JS/PHP: `runner.html` hosts the code in a nested
+  `iframe sandbox` without `allow-same-origin`, so it cannot touch the app even though the app enforces a strict CSP.
 - Cloud models only ever receive the project's **structure** (names, numbers), never file contents; code
   snippets (📚 mode, attachment previews) go to **local** models only — WebLLM and Ollama.
 
