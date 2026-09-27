@@ -36,6 +36,9 @@ CM.Inspect = (function(){
     'r.minified':'Pliki zminifikowane / vendored','r.minified.d':'Wyglądają na zbudowane/obce artefakty — zwykle warto je wykluczyć z analizy.',
     'r.archviolation':'Naruszenia reguł architektury','r.archviolation.d':'Importy zakazane przez `.codemap.rules.json` w repozytorium (warstwy, `forbid`, `noCycles`).',
     'r.archrules':'Plik reguł architektury nie dał się wczytać','r.archrules.d':'`.codemap.rules.json` istnieje, ale nie jest poprawnym JSON-em o oczekiwanym kształcie — reguły nie były sprawdzane.',
+    'r.untested':'Złożone pliki bez testów','r.untested.d':'Pliki kodu o złożoności ≥ 15 albo ≥ 200 liniach, do których nie prowadzi żaden test (ani po nazwie, ani po importach). Reguła działa tylko w projektach z plikami testowymi.',
+    'r.lowcov':'Niskie pokrycie testami','r.lowcov.d':'Pliki o złożoności ≥ 10 z pokryciem linii poniżej 50 % według wczytanego raportu (lcov / Istanbul / Cobertura / JaCoCo / Clover).',
+    'covPct':'pokrycie {p} % ({lh}/{lf} linii)',
   },
   en:{
     'title':'Static analysis',
@@ -64,6 +67,9 @@ CM.Inspect = (function(){
     'r.minified':'Minified / vendored files','r.minified.d':'Look like built/third-party artifacts — usually worth excluding from analysis.',
     'r.archviolation':'Architecture rule violations','r.archviolation.d':'Imports forbidden by `.codemap.rules.json` in the repository (layers, `forbid`, `noCycles`).',
     'r.archrules':'Architecture rules file could not be loaded','r.archrules.d':'`.codemap.rules.json` exists but is not valid JSON of the expected shape — rules were not checked.',
+    'r.untested':'Complex files without tests','r.untested.d':'Code files with complexity ≥ 15 or ≥ 200 lines that no test reaches (neither by name nor by imports). Only checked in projects that have test files.',
+    'r.lowcov':'Low test coverage','r.lowcov.d':'Files with complexity ≥ 10 and line coverage below 50 % according to the loaded report (lcov / Istanbul / Cobertura / JaCoCo / Clover).',
+    'covPct':'coverage {p} % ({lh}/{lf} lines)',
   }};
   function t(k,sub){ const l=I.getLang(); const d=STR[l]||STR.pl; let s=(d&&k in d)?d[k]:(STR.pl[k]||k); if(sub) for(const p in sub) s=s.replace('{'+p+'}',sub[p]); return s; }
 
@@ -91,7 +97,7 @@ CM.Inspect = (function(){
 
     // ---- graph rules: fan-in / fan-out over import+reference edges (single O(E) pass) ----
     const fin=new Map(), fout=new Map();
-    { let i=0; for(const e of graph.edges){ if(e.type==='contains') continue;
+    { let i=0; for(const e of graph.edges){ if(e.type==='contains'||e.type==='test') continue;   // test → kod to nie zależność
         fout.set(e.source,(fout.get(e.source)||0)+1); fin.set(e.target,(fin.get(e.target)||0)+1);
         if((++i&8191)===0) await tick(); } }
     const degs=files.map(f=>(fin.get(f.id)||0)+(fout.get(f.id)||0));
@@ -100,6 +106,11 @@ CM.Inspect = (function(){
     const godThr=Math.max(20, mean+3*sd);
     // no dependency edges at all (tree-only load, no file contents) → orphan detection is meaningless
     const hasDeps=fin.size>0||fout.size>0;
+    // testy (CM.TestMap): „złożony plik bez testów" tylko, gdy projekt ma pliki testowe; „niskie pokrycie" po wczytaniu raportu
+    const TM=CM.TestMap, ti=graph.testInfo&&graph.testInfo.tests!=null ? graph.testInfo : (TM ? TM.mapTests(graph) : null);
+    const hasTests=!!(ti && ti.tests>0), hasCov=!!(ti && ti.coverage && ti.coverage.files>0);
+    const isCode=(f)=>TM ? TM.isCodeFile(f.path||f.id) : CODE_RE.test(f.lang||'');
+    const untested=[], lowcov=[];
 
     let idx=0;
     for(const f of files){
@@ -110,7 +121,7 @@ CM.Inspect = (function(){
       if(deg>=godThr) add(F,'god','high',f, deg+' '+t('deps')+' (fan-in '+fi+' / fan-out '+fo+')');
       else if(fo>=15) add(F,'fanout','med',f, 'fan-out '+fo);
       if(fi>=8&&fo>=8&&deg<godThr) add(F,'unstable','med',f, 'fan-in '+fi+' / fan-out '+fo);
-      if(hasDeps && deg===0 && CODE_RE.test(f.lang||'') && !ENTRY_RE.test(base)) add(F,'orphan','low',f, (m?m.lines+' '+t('loc'):U.fmtBytes(f.size||0)));
+      if(hasDeps && deg===0 && !f.isTest && CODE_RE.test(f.lang||'') && !ENTRY_RE.test(base)) add(F,'orphan','low',f, (m?m.lines+' '+t('loc'):U.fmtBytes(f.size||0)));
       if(m){
         const minified = m.longest>2500 || (m.lines>1 && m.chars/m.lines>600);
         if(minified){ add(F,'minified','info',f, m.longest+' ch/line'); }
@@ -118,6 +129,12 @@ CM.Inspect = (function(){
           if(m.lines>=800) add(F,'huge', m.lines>=2000?'high':'med', f, m.lines+' '+t('loc'));
           if(m.complexity>=150) add(F,'complex', m.complexity>=400?'high':'med', f, 'CC≈'+m.complexity);
           if(m.todos>=10) add(F,'todo','low',f, m.todos+' × TODO/FIXME');
+          if(!f.isTest && isCode(f)){
+            const cx=m.complexity||0;
+            if(hasTests && !(f.testedBy&&f.testedBy.length) && (cx>=15 || m.lines>=200)) untested.push(f);
+            const cv=f.coverage;
+            if(hasCov && cv && cv.pct!=null && cv.pct<50 && cx>=10) lowcov.push(f);
+          }
         }
         const pv=f.preview;
         if(pv && !minified && CODE_JS.test(f.lang||'')){
@@ -130,6 +147,14 @@ CM.Inspect = (function(){
         }
       }
     }
+
+    // ---- testy: najpierw najbardziej złożone / najsłabiej pokryte (listy mają limit LIMIT) ----
+    untested.sort((a,b)=>(b.metrics.complexity||0)-(a.metrics.complexity||0) || b.metrics.lines-a.metrics.lines);
+    for(const f of untested){ const m=f.metrics;
+      add(F,'untested', (m.complexity>=50||m.lines>=600)?'med':'low', f, 'CC≈'+(m.complexity||0)+' · '+m.lines+' '+t('loc')); }
+    lowcov.sort((a,b)=>a.coverage.pct-b.coverage.pct || (b.metrics.complexity||0)-(a.metrics.complexity||0));
+    for(const f of lowcov){ const c=f.coverage;
+      add(F,'lowcov', c.pct<20?'med':'low', f, t('covPct',{p:String(c.pct).replace('.', I.getLang()==='en'?'.':','), lh:c.lh, lf:c.lf})+' · CC≈'+(f.metrics.complexity||0)); }
 
     // ---- folder rules ----
     for(const fd of folders){
@@ -185,7 +210,7 @@ CM.Inspect = (function(){
     // ---- health score: 100 minus severity-weighted density ----
     let penalty=0; for(const f of F.values()) penalty+=SEV_W[f.sev]*f.count;
     const score=Math.max(0, Math.round(100 - 100*penalty/(penalty + 3*N)));
-    const order=['archviolation','cycles','god','unstable','fanout','huge','complex','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
+    const order=['archviolation','cycles','god','unstable','fanout','huge','complex','lowcov','untested','risky','dupcode','orphan','emptycatch','debug','todo','deep','crowded','minified','archrules'];
     const findings=[...F.values()].sort((a,b)=>order.indexOf(a.rule)-order.indexOf(b.rule));
     return {findings, score, files:files.length, ms:Math.round(performance.now()-t0)};
   }

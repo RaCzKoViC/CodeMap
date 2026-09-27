@@ -129,6 +129,7 @@
       <button class="menu-item" id="btn-cycles" data-ic="flow" data-i18n="project.cycles">Wykryj cykle zależności</button>
       <button class="menu-item" id="btn-hotspots" data-ic="target" data-i18n="project.hotspots">Hotspoty (rozmiar × zależności)</button>
       <button class="menu-item" id="btn-inspect" data-ic="search" data-i18n="project.inspect">Analiza statyczna (antywzorce)</button>
+      <button class="menu-item" id="btn-coverage" data-ic="upload" data-i18n="project.coverage">Wczytaj pokrycie testów (lcov / JSON / XML)…</button>
       <div class="menu-sep"></div>
       <button class="menu-item" id="btn-compare-add" data-ic="layers" data-i18n="project.compareadd">Porównaj: dodaj schemat na mapę</button>
       <button class="menu-item" id="btn-compare-clear" data-ic="x" data-i18n="project.compareclear">Usuń schematy porównawcze</button>
@@ -185,6 +186,7 @@
         <label class="chk"><input type="checkbox" id="edge-import" checked> <span data-i18n="conn.import">Importy / zależności</span></label>
         <label class="chk"><input type="checkbox" id="edge-reference"> <span data-i18n="conn.reference">Referencje (zasoby)</span></label>
         <label class="chk"><input type="checkbox" id="edge-call" checked> <span data-i18n="conn.call">Wywołania (symbole)</span></label>
+        <label class="chk"><input type="checkbox" id="edge-test" checked> <span data-i18n="conn.test">Testy (test → kod)</span></label>
       </section>
 
       <section class="filter-block">
@@ -552,6 +554,7 @@
 <input type="file" id="input-import-hist" accept=".json" hidden>
 <input type="file" id="input-compare" accept=".json,.codemap,.codemap.json" hidden>
 <input type="file" id="input-compare-files" multiple hidden>
+<input type="file" id="input-coverage" accept=".info,.lcov,.json,.xml" multiple hidden>
 
 <!-- ===================== SCRIPTS ===================== -->
 <script src="js/util.js?v=20260927i"></script>
@@ -564,6 +567,7 @@
 <script src="js/export.js?v=20260927i"></script>
 <script src="js/metrics.js?v=20260927i"></script>
 <script src="js/rules.js?v=20260927i"></script>
+<script src="js/testmap.js?v=20260927i"></script>
 <script src="js/symbols-core.js?v=20260927i"></script>
 <script src="js/symbols.js?v=20260927i"></script>
 <script src="js/renderer.js?v=20260927i"></script>
@@ -589,6 +593,7 @@
 <script src="js/compare.js?v=20260927i"></script>
 <script src="js/navigation.js?v=20260927i"></script>
 <script src="js/ai-bridge.js?v=20260927i"></script>
+<script src="js/tests-ui.js?v=20260927i"></script>
 <script src="js/app.js?v=20260927i"></script>
 </body>
 </html>

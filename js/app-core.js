@@ -23,7 +23,7 @@
     gidSeq:0,
     cyclesOn:false,
   };
-  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, symbols:false, call:true, langsOff:new Set(), metric:'lines', minMetric:0};
+  const filters={folders:true, files:true, externals:false, contains:true, import:true, reference:false, symbols:false, call:true, test:true, langsOff:new Set(), metric:'lines', minMetric:0};
 
   // ---------------- init ----------------
   function init(){
@@ -442,9 +442,9 @@
     const sp=$('#rng-spacing'); if(sp){ sp.value=Math.round(spacing*100); $('#val-spacing').textContent=Math.round(spacing*100)+'%'; }
     // very large graphs: declutter (drop edges + externals) so the structure stays legible
     if(N > 1200){
-      filters.contains=false; filters.import=false; filters.reference=false; filters.externals=false;
+      filters.contains=false; filters.import=false; filters.reference=false; filters.externals=false; filters.test=false;
       const set=(id,v)=>{ const e=$('#'+id); if(e) e.checked=v; };
-      set('edge-contains',false); set('edge-import',false); set('edge-reference',false); set('show-externals',false);
+      set('edge-contains',false); set('edge-import',false); set('edge-reference',false); set('show-externals',false); set('edge-test',false);
       U.toast(I.t('ca.bigRepo','Duże repozytorium — automatycznie odchudzono widok (bez połączeń, małe figury, duży rozrzut).'),'',4200);
     }
   }

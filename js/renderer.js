@@ -302,11 +302,12 @@ CM.Renderer = (function(){
       const edgeLOD = this.edges.length>lodBudget || z<0.18;
       const skipRef = edgeLOD && (z<0.5 || this.edges.length>lodBudget*1.5);
       const lodCap = edgeLOD ? Math.max(2000, lodBudget) : Infinity;   // max strands actually batched
-      const imp=new Map(), ref=new Map(), callM=new Map(); let lodCount=0;
+      const imp=new Map(), ref=new Map(), callM=new Map(), testE=[]; let lodCount=0;
       for(const e of this.edges){ if(e.type==='contains') continue;
-        if(skipRef && e.type==='reference') continue;
+        if(skipRef && (e.type==='reference'||e.type==='test')) continue;
         if(lodCount>=lodCap) break;
         const s=byId.get(e.source), t=byId.get(e.target); if(!s||!t||cull(s,t)||!vis(e)) continue;
+        if(e.type==='test'){ testE.push(s,t); lodCount++; continue; }   // test → kod: osobna partia (zielone kropki)
         const col=cosmic ? this.cosmicColor(s._cosmic) : (e._ec || (e._ec=badgeColor(s)));
         const m=(e.type==='reference')?ref:(e.type==='call'?callM:imp); let a=m.get(col); if(!a){ a=[]; m.set(col,a); } a.push(s,t);
         lodCount++;
@@ -319,6 +320,11 @@ CM.Renderer = (function(){
       batch(ref, cosmic?0.42:(dimMode?0.5:0.4), cosmic?0.9:0.8, [3.4/z, 3.4/z]);
       if(callM.size) batch(callM, cosmic?0.45:(dimMode?0.6:0.5), 0.6, [1.4/z, 2.6/z]);   // wywołania symbol → symbol (tree-sitter)
       if(cosmic) ctx.globalCompositeOperation='source-over';
+      if(testE.length){   // testy → testowany kod: kropkowana zieleń (ciemniejsza na jasnym motywie)
+        const light=document.body.classList.contains('light');
+        ctx.setLineDash([0.01, 3.6/z]); ctx.lineWidth=2/z; ctx.strokeStyle=U.rgba(light?'#15803d':'#4ade80', dimMode?0.95:0.8);
+        ctx.beginPath(); for(let i=0;i<testE.length;i+=2) seg(testE[i], testE[i+1]); ctx.stroke();
+      }
       ctx.setLineDash([]);
 
       // dependency-IMPACT overlay — recolour the strands by direction (upstream warm, downstream cool)
@@ -627,6 +633,7 @@ CM.Renderer = (function(){
         let col,wdt,op,dash='';
         if(e.type==='contains'){ col='#3b4d63'; wdt=0.9; op=0.5; }
         else if(e.type==='import'){ col='#22d3ee'; wdt=1.3; op=0.7; }
+        else if(e.type==='test'){ col='#22c55e'; wdt=1.4; op=0.8; dash=' stroke-dasharray="0.1 4" stroke-linecap="round"'; }
         else { col='#a78bfa'; wdt=1.1; op=0.6; dash=' stroke-dasharray="4 4"'; }
         if(e.type!=='contains' && this.opts.curvedImports){
           const mx=(s.x+t.x)/2,my=(s.y+t.y)/2,dx=t.x-s.x,dy=t.y-s.y,L=Math.hypot(dx,dy)||1;

@@ -80,6 +80,10 @@ CM.UI = (function(){
     return card;
   }
 
+  // sekcje panelu szczegółów dopisywane przez moduły: fn(node, graph, H) → element | null
+  const detailSections=[];
+  function addDetailSection(fn){ if(typeof fn==='function') detailSections.push(fn); }
+
   function renderDetails(node, graph, H){
     const body=$('#details-body'); body.innerHTML='';
     if(!node){
@@ -148,6 +152,8 @@ CM.UI = (function(){
         sec.appendChild(row); body.appendChild(sec);
       }
     }
+    // sekcje modułów ładowanych później (tests-ui.js: „Testy i pokrycie")
+    for(const fn of detailSections){ try{ const s=fn(node, graph, H); if(s) body.appendChild(s); }catch(e){ console.warn('details section', e); } }
     if(node.type==='external' && node.version){
       const src={npm:'npm',pip:'PyPI',cargo:'crates.io',go:'Go modules'}[node.depSource]||node.depSource||'';
       body.appendChild(el('div',{class:'det-ver',html:CM.icons.svg('package',{size:13})+` <b>${esc(node.name)}</b> <span>v${esc(node.version.replace(/^v/,''))}</span>${src?` <span class="muted">· ${src}</span>`:''}`}));
@@ -355,7 +361,11 @@ CM.UI = (function(){
     if(pv){
       const wrap=el('div',{class:'fv-codewrap'});
       const gutter=el('div',{class:'fv-gutter'}); const n=pv.split('\n').length;
-      gutter.textContent=Array.from({length:n},(_,i)=>i+1).join('\n');
+      const unc=node.coverage&&node.coverage.uncovered;   // pokrycie z raportu (testmap.js): niepokryte linie na czerwono
+      if(unc&&unc.length){ const bad=new Set(); for(const [a,b] of unc) for(let l=a;l<=b&&l<=n;l++) bad.add(l);
+        gutter.innerHTML=Array.from({length:n},(_,i)=>bad.has(i+1)?'<span class="fv-unc">'+(i+1)+'</span>':String(i+1)).join('\n');
+        gutter.title=I.t('cu.uncoveredLines','Czerwone numery = linie niepokryte testami (wczytany raport pokrycia)'); }
+      else gutter.textContent=Array.from({length:n},(_,i)=>i+1).join('\n');
       const pre=el('pre',{class:'fv-code hl'}); pre.innerHTML=highlight(pv, node.lang||node.ext);
       wrap.appendChild(gutter); wrap.appendChild(pre); body.appendChild(wrap);
     } else {
@@ -369,6 +379,7 @@ CM.UI = (function(){
     if(!s||!t){ body.appendChild(el('div',{class:'details-empty'}, el('p',{class:'muted',text:I.t('cu.edgeNodesNotFound','Nie znaleziono węzłów tej zależności.')}))); return; }
     const meta = edge.type==='import' ? {col:'#22d3ee', name:I.t('cu.importDep','Import / zależność'), verb:I.t('cu.verbImports','importuje / używa')}
                : edge.type==='reference' ? {col:'#a78bfa', name:I.t('cu.refResource','Referencja (zasób)'), verb:I.t('cu.verbRefs','odwołuje się do')}
+               : edge.type==='test' ? {col:'#22c55e', name:I.t('cu.testEdge','Test → testowany kod'), verb:I.t('cu.verbTests','testuje')}
                : {col:'#3b4d63', name:I.t('cu.structContains','Struktura (zawiera)'), verb:I.t('cu.verbContains','zawiera')};
     body.appendChild(el('div',{class:'det-header'},
       el('div',{class:'det-icon',style:`background:${U.rgba(meta.col,0.16)};color:${meta.col}`, html:CM.icons.svg('flow',{size:18})}),
@@ -617,5 +628,5 @@ CM.UI = (function(){
     });
   }
 
-  return {renderDetails, renderEdgeDetails, renderFileView, highlight, renderLangFilters, renderSearch, tooltip, filePreview, ctxMenu, hideCtx, renderHistory, renderDiff, nodeIcon, renderHotspots};
+  return {renderDetails, renderEdgeDetails, renderFileView, highlight, renderLangFilters, renderSearch, tooltip, filePreview, ctxMenu, hideCtx, renderHistory, renderDiff, nodeIcon, renderHotspots, addDetailSection};
 })();
