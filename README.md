@@ -154,6 +154,11 @@ Mermaid and GraphML (yEd) — from the Project menu or with the ChatBot action `
   cited as `[n]` like the snippets, and the steps are shown in a collapsible "Agent steps" list. Up to 5 steps,
   then the model has to answer. A file named in the question (`agent.js`) is always included in the context.
   Can be switched off in Settings → AI → Ollama.
+- **🩺 Hotspot doctor** — a refactoring plan for one risky file: the file panel shows its risk rank and a
+  *Refactoring plan* button (or `/hotspotDoctor`, by default the top hotspot). The model gets a record of the file —
+  size, complexity, git changes and owners, tests and coverage, dependent files — and numbered excerpts of its longest
+  functions, and answers in four fixed sections: diagnosis, 3–5 small steps citing the code `[n]`, tests to add before
+  the change, risk. Local models only (the code never leaves your computer).
 - **Runner** — a sandbox (`iframe` without `allow-same-origin`) for running generated HTML/SVG/CSS/JS/PHP.
 - Cloud models only ever receive the project's **structure** (names, numbers), never file contents; code
   snippets (📚 mode, attachment previews) go to **local** models only — WebLLM and Ollama.
@@ -259,6 +264,7 @@ js/git-core.js             # DOM-free git history: authors, ownership, bus facto
 js/git-local.js  js/git-worker.js   # local .git reader (objects, packs, deltas, packed-refs) in a Web Worker
 js/rag.js                  # RAG: code snippets by symbol, BM25 + Ollama embeddings (IndexedDB), context with citations
 js/agent.js                # agent loop: read-only tools (codeSearch, readFile, dependents…), native tool_calls or JSON in text
+js/doctor.js  js/doctor-ui.js   # hotspot doctor: file record + prompt (pure), file-panel section and hotspotDoctor action
 js/testmap.js              # tests ↔ code, coverage parsers (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: drawing, hit-testing, interaction, minimap, module decorators
 js/gl-layer.js             # WebGL2 layer under the map: edges and shapes on the GPU (instanced, camera as a uniform)

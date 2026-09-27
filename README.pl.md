@@ -154,6 +154,11 @@ Mermaid i GraphML (yEd) — menu Projekt albo akcja ChatBota `exportGraph`.
   narzędzi są cytowane jako `[n]` jak fragmenty, a kroki widać w zwijanej liście „Kroki agenta". Najwyżej
   5 kroków, potem model musi odpowiedzieć. Plik wymieniony w pytaniu (`agent.js`) zawsze trafia do kontekstu.
   Wyłączany w Ustawieniach → AI → Ollama.
+- **🩺 Doktor hotspotów** — plan refaktoryzacji jednego ryzykownego pliku: panel pliku pokazuje jego miejsce w rankingu
+  ryzyka i przycisk *Plan refaktoryzacji* (albo `/hotspotDoctor`, domyślnie plik z czoła hotspotów). Model dostaje
+  kartotekę pliku — rozmiar, złożoność, zmiany i autorów z git, testy i pokrycie, zależne pliki — i ponumerowane
+  fragmenty najdłuższych funkcji, a odpowiada w czterech stałych sekcjach: diagnoza, 3–5 małych kroków z cytatami
+  kodu `[n]`, testy do dopisania przed zmianą, ryzyko. Tylko modele lokalne (kod nie wychodzi z komputera).
 - **Runner** — sandbox (`iframe` bez `allow-same-origin`) do uruchamiania wygenerowanego HTML/SVG/CSS/JS/PHP.
 - Do modeli w chmurze trafia wyłącznie **struktura** projektu (nazwy, liczby), nigdy treść plików; fragmenty
   kodu (tryb 📚, podgląd załączników) dostają tylko modele **lokalne** — WebLLM i Ollama.
@@ -258,6 +263,7 @@ js/git-core.js             # historia git bez DOM: autorzy, własność, bus fac
 js/git-local.js  js/git-worker.js   # czytnik lokalnego .git (obiekty, paczki, delty, packed-refs) w Web Workerze
 js/rag.js                  # RAG: fragmenty kodu wg symboli, BM25 + embeddingi Ollamy (IndexedDB), kontekst z cytatami
 js/agent.js                # pętla agenta: narzędzia tylko do odczytu (codeSearch, readFile, dependents…), tool_calls albo JSON w treści
+js/doctor.js  js/doctor-ui.js   # Doktor hotspotów: kartoteka pliku + prompt (czyste), sekcja w panelu pliku i akcja hotspotDoctor
 js/testmap.js              # testy ↔ kod, parsery pokrycia (lcov / Istanbul / Cobertura / JaCoCo / Clover)
 js/renderer.js             # canvas: rysowanie, hit-test, interakcje, minimapa, dekoratory modułów
 js/gl-layer.js             # warstwa WebGL2 pod mapą: krawędzie i figury na GPU (instancje, kamera jako uniform)

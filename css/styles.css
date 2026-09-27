@@ -2192,6 +2192,9 @@ body.light .set-ai-prov{background:rgba(20,30,45,.08)}
 .st-live-dot.paused{background:#94a3b8;animation:none}
 .st-live-btn{background:none;border:0;color:inherit;cursor:pointer;font-size:11px;padding:0 3px;opacity:.8}
 .st-live-btn:hover{opacity:1}
+.det-doctor .tag{margin-right:6px}
+.det-doctor .doc-hot{background:rgba(248,113,113,.16);color:#f87171}
+.det-doctor .doc-btn{margin:6px 0 4px}
 .st-live-resume{background:rgba(148,163,184,.12);color:var(--accent,#22d3ee);letter-spacing:0}
 .st-live-go{font:600 10.5px var(--mono);opacity:.95;text-decoration:underline dotted;text-underline-offset:2px}
 @keyframes stLive{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 7px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}

@@ -6,6 +6,15 @@ Numer wersji aplikacji: `CM.VERSION` w `js/util.js` (Ustawienia → O aplikacji)
 ## [Unreleased]
 
 ### Dodane — Faza 7 (agent z narzędziami)
+- **🩺 Doktor hotspotów** (`js/doctor.js`, `js/doctor-ui.js`): plan refaktoryzacji jednego pliku liczony modelem
+  lokalnym. Kartoteka pliku (linie, złożoność, liczba funkcji, miejsce w rankingu ryzyka — z git częstość zmian ×
+  złożoność, bez git rozmiar × zależne × złożoność — zmiany i autorzy, testy i pokrycie, pliki zależne bezpośrednio
+  i pośrednio) + ponumerowane fragmenty najdłuższych funkcji (budżet dzielony równo, całe linie); prompt z czterema
+  stałymi sekcjami: diagnoza, 3–5 małych kroków z cytatami `[n]`, testy przed zmianą, ryzyko (bez zgadywania zależnych
+  i autorów spoza kartoteki). Wejścia: sekcja „Doktor hotspotów" w panelu pliku (miejsce w rankingu + przycisk
+  „🩺 Plan refaktoryzacji"), akcja `hotspotDoctor {query?}` (domyślnie czoło rankingu). Nowa rozmowa „🩺 plik" w ChatBocie,
+  cytaty i źródła jak w trybie 📚 (`runRag` przyjmuje własne przygotowanie kontekstu); model w chmurze → komunikat
+  o modelach lokalnych. Sprawdzone na qwen3:8b: 30–40 s, każdy krok cytuje właściwy fragment. 6 testów, krok smoke.
 - **Agent kodu w trybie 📚 z Ollamą** (`js/agent.js`): gdy fragmenty z RAG nie wystarczą, model sam woła narzędzia
   tylko do odczytu — `codeSearch`, `readFile` (do 150 linii), `findFiles`, `dependencies`, `dependents`,
   `fileInfo`, `hotspots`, `owners` (autorzy i bus factor z git), `tests` (testy pliku, folderu, najbardziej złożone

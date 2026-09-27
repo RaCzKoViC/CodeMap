@@ -230,6 +230,19 @@ const glRes = await evalJs(`(async()=>{ try{
     disp, back:R.activeBackend, hidden:L.canvas.style.display==='none'};
 }catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
 
+// Doktor hotspotów (faza 7) bez modelu: kartoteka pliku demo, sekcja w panelu szczegółów, akcja hotspotDoctor,
+// rozmowa „🩺 plik" — a przy dostawcy w chmurze (profil smoke) komunikat o modelach lokalnych, bez wysyłania kodu
+const docRes = await evalJs(`(async()=>{ try{
+  const sleep=(ms)=>new Promise(r=>setTimeout(r,ms)); CMApp.loadDemo(); await sleep(900);
+  const g=CMApp.graph, n=CM.Doctor.find(g,'reducer.js'), d=CM.Doctor.dossier(g, n, {local:true});
+  CM.App.select(n); await sleep(200); const sec=document.querySelector('#details-body .det-doctor .doc-btn');
+  const act=await CMApp.exec('hotspotDoctor',{query:'reducer.js'}); await sleep(400);
+  const c=CM.ChatBot._convs()[0], last=c&&c.messages[c.messages.length-1];
+  const localOnly=!!(last && last.role==='assistant' && /lokaln|local/i.test(last.content||'') && !last.sources);
+  CM.ChatBot.close(); CM.App.select(null);
+  return {path:d&&d.path, facts:d&&d.facts.length, sources:d&&d.sources.length, btn:!!sec, act:String(act), title:c&&c.title, localOnly};
+}catch(e){ return {error:String(e&&e.stack||e)}; } })()`);
+
 // pamięć analizy w OPFS (faza 6): 80 plików wczytanych dwa razy z tymi samymi datami → drugi raz bez analizy
 // i bez workerów; zmieniony plik analizowany na nowo; te same daty inne, treść ta sama → trafienia po skrócie;
 // graf identyczny jak po pełnej analizie; „wyczyść" usuwa pamięć
@@ -357,6 +370,9 @@ check(gitRes && !gitRes.error && ["owner","churn","hotspot","age"].every(m=>gitR
   `historia git: nakładki, panel, hotspoty, oś czasu, akcje ChatBota: ${JSON.stringify(gitRes)}`);
 check(ragRes && !ragRes.error && ragRes.chunks > 0 && ragRes.csOk && ragRes.lexHits > 0 && ragRes.had && ragRes.localOnly,
   `RAG: indeks fragmentów, /codeSearch, tryb 📚 tylko z modelem lokalnym: ${JSON.stringify(ragRes)}`);
+check(docRes && !docRes.error && docRes.path === 'src/store/reducer.js' && docRes.facts >= 2 && docRes.sources >= 1 && docRes.btn
+  && /reducer\.js/.test(docRes.act) && /🩺/.test(docRes.title || '') && docRes.localOnly,
+  `Doktor hotspotów: kartoteka, przycisk w panelu, akcja, tylko modele lokalne: ${JSON.stringify(docRes)}`);
 check(cacheRes && !cacheRes.error && cacheRes.a1 === 0 && cacheRes.a2[0] === 80 && cacheRes.a2[1] === 0 && cacheRes.same2
   && cacheRes.a3 === 79 && cacheRes.changed && cacheRes.a4 === 79 && cacheRes.same4 && cacheRes.cleared,
   `pamięć analizy (OPFS): ponowne wczytanie bez analizy, zmieniony plik od nowa, trafienia po skrócie: ${JSON.stringify(cacheRes)}`);
