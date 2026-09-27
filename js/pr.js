@@ -23,13 +23,11 @@
     'pr.needRun':'Run a PR review first (Project → PR review).','cb.prRun':'Analysing PR #','cb.prNone':'No PR analysed — use prReview {pr}.'});
 
   // ---------------- postęp i anulowanie ----------------
-  let job=null, pillEl=null;
-  function pill(text){ let wrap=$('#toast-wrap'); if(!wrap){ wrap=el('div',{id:'toast-wrap'}); document.body.appendChild(wrap); }
-    if(!pillEl){ pillEl=el('div',{class:'toast sym-pill git-pill'}, el('span',{class:'gp-t'}), el('button',{class:'gp-x',title:T('pr.cancel','Anuluj'),text:'×',onclick:()=>cancel()})); wrap.appendChild(pillEl); }
-    pillEl.querySelector('.gp-t').textContent=text; }
-  function hidePill(){ if(pillEl){ const p=pillEl; pillEl=null; p.remove(); } }
+  let job=null;
+  const PILL=CM.UIKit.pill(T('pr.cancel','Anuluj'), ()=>cancel());
+  const pill=(t)=>PILL.show(t), hidePill=()=>PILL.hide();
   function cancel(){ if(job){ try{ job.ctrl.abort(); }catch(e){} job=null; } hidePill(); }
-  function tokenFor(){ return (($('#gh-token')&&$('#gh-token').value.trim())||state._ghToken||'')||undefined; }
+  const tokenFor=CM.UIKit.repoToken;
   function stripSub(files, sub){
     const P0=String(sub||'').replace(/^\/+|\/+$/g,''); if(!P0) return files; const pre=P0+'/';
     const cut=(p)=>p&&p.startsWith(pre)?p.slice(pre.length):null;
@@ -86,21 +84,13 @@
   async function copy(text){ try{ await navigator.clipboard.writeText(text); U.toast(T('pr.copied','Skopiowano.'),'success',2000); }catch(e){ U.toast(text.slice(0,300),'',8000); } }
 
   // ---------------- okno „Przegląd PR…" ----------------
-  function closeModal(){ const m=$('#modal-pr'); if(m) m.classList.add('hidden'); }
+  const dlg=()=>CM.UIKit.modal('modal-pr','share-modal','pr');
+  function closeModal(){ dlg().close(); }
   function openDialog(){
     if(!state.counts.nodes){ U.toast(T('ca.loadFirst','Najpierw wczytaj projekt.'),'error'); return; }
-    let m=$('#modal-pr');
-    if(!m){
-      m=el('div',{class:'modal-backdrop hidden',id:'modal-pr',role:'dialog','aria-modal':'true','aria-labelledby':'pr-title'},
-        el('div',{class:'modal share-modal'},
-          el('div',{class:'modal-head'}, el('h3',{id:'pr-title'}), el('button',{class:'modal-x',type:'button','aria-label':'✕',text:'✕',onclick:closeModal})),
-          el('div',{class:'modal-body',id:'pr-body'}), el('div',{class:'modal-foot',id:'pr-foot'})));
-      m.addEventListener('mousedown',(e)=>{ if(e.target===m) closeModal(); });
-      m.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeModal(); });
-      document.body.appendChild(m);
-    }
-    $('#pr-title').textContent=T('pr.title','Przegląd PR — mapa wpływu');
-    const body=$('#pr-body'), foot=$('#pr-foot'); body.innerHTML=''; foot.innerHTML='';
+    const m=dlg().clear();
+    m.title(T('pr.title','Przegląd PR — mapa wpływu'));
+    const body=m.body, foot=m.foot;
     const inp=el('input',{type:'text',id:'pr-input',autocomplete:'off',spellcheck:'false',placeholder:'42 · https://github.com/owner/repo/pull/42'});
     if(A.graph.prInfo) inp.value=String(A.graph.prInfo.number);
     body.appendChild(el('label',{class:'field-label','for':'pr-input',text:T('pr.input','Numer albo adres pull / merge requesta')}));
@@ -110,7 +100,7 @@
     foot.appendChild(el('button',{class:'tb-btn',type:'button',text:T('pr.cancel','Anuluj'),onclick:closeModal})); foot.appendChild(go);
     const submit=()=>{ const v=inp.value.trim(); if(!v) return; closeModal(); run(v); };
     go.onclick=submit; inp.onkeydown=(e)=>{ if(e.key==='Enter') submit(); };
-    m.classList.remove('hidden'); setTimeout(()=>inp.focus(),30);
+    m.open(); setTimeout(()=>inp.focus(),30);
   }
 
   // ---------------- nakładka i znaczniki ----------------

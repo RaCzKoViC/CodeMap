@@ -160,19 +160,9 @@
     if(e.status===400 || e.status===415) return T('share.errMap','Serwer odrzucił mapę (nieprawidłowy format).');
     return T('share.err','Nie udało się utworzyć linku: ')+(e.message||'?');
   }
-  function closeModal(){ const m=$('#modal-share'); if(m) m.classList.add('hidden'); }
-  function ensureModal(){
-    let m=$('#modal-share'); if(m) return m;
-    m=el('div',{class:'modal-backdrop hidden',id:'modal-share',role:'dialog','aria-modal':'true','aria-labelledby':'share-title'},
-      el('div',{class:'modal share-modal'},
-        el('div',{class:'modal-head'}, el('h3',{id:'share-title'}), el('button',{class:'modal-x',type:'button','aria-label':'✕',text:'✕',onclick:closeModal})),
-        el('div',{class:'modal-body',id:'share-body'}),
-        el('div',{class:'modal-foot',id:'share-foot'})));
-    m.addEventListener('mousedown',(e)=>{ if(e.target===m) closeModal(); });
-    m.addEventListener('keydown',(e)=>{ if(e.key==='Escape') closeModal(); });
-    document.body.appendChild(m);
-    return m;
-  }
+  // okno z ui-kit.js (identyfikatory share-title / share-body / share-foot bez zmian)
+  function closeModal(){ CM.UIKit.modal('modal-share','share-modal','share').close(); }
+  function ensureModal(){ return CM.UIKit.modal('modal-share','share-modal','share').el; }
   const EXPIRY=[['1','share.d1','1 dzień'],['7','share.d7','7 dni'],['30','share.d30','30 dni'],['90','share.d90','90 dni'],
     ['365','share.d365','1 rok'],['','share.never','nigdy (do unieważnienia)']];
   function openShareDialog(){

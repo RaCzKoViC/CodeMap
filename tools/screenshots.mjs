@@ -3,20 +3,13 @@
 // a potem ustawia widoki: mapa projektu, graf symboli (tree-sitter), ChatBot z menu narzędzi „/" oraz
 // historia git czytana z lokalnego katalogu .git (git-local.js) — nakładka częstości zmian + oś czasu.
 //   node tools/screenshots.mjs            (CHROME=ścieżka/do/chrome, gdy autodetekcja zawiedzie)
-import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
-import { readFile, readdir, stat, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, extname, normalize, relative, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, extname, relative, sep } from 'node:path';
+import { startBrowser, sleep, ROOT } from './cdp.mjs';
 
-const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
 const OUT = join(ROOT, 'docs');
 const W = 1600, H = 900;
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const CHROME = [process.env.CHROME, 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find((p) => existsSync(p));
-if (!CHROME) { console.error('✖ Nie znaleziono Chrome'); process.exit(2); }
 
 // ---- pliki repozytorium jako projekt (bez zależności, danych, obrazów i historii) ----
 const SKIP_DIR = new Set(['node_modules', '.git', 'Sejf', 'data', '_site', '.claude']);
@@ -45,33 +38,14 @@ async function collectGit(dir, rel, out) {
 }
 const gitFiles = existsSync(join(ROOT, '.git')) && (await stat(join(ROOT, '.git'))).isDirectory() ? await collectGit(join(ROOT, '.git'), '', []) : [];
 
-// ---- serwer statyczny + Chrome ----
-const server = createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://x'); let p = decodeURIComponent(url.pathname); if (p.endsWith('/')) p += 'index.html';
-  const file = normalize(join(ROOT, p));
-  if (!file.startsWith(ROOT) || /[\\/](server|Sejf|\.git|node_modules)[\\/]/.test(file)) { res.writeHead(404); return res.end(); }
-  try { const d = await readFile(file); res.writeHead(200, { 'content-type': MIME[extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' }); res.end(d); } catch { res.writeHead(404); res.end(); }
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const prof = await mkdtemp(join(tmpdir(), 'codemap-shots-'));
-const dbg = 9300 + Math.floor(Math.random() * 400);
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${dbg}`, `--user-data-dir=${prof}`, `--window-size=${W},${H}`, '--hide-scrollbars', '--no-first-run', '--no-default-browser-check', 'about:blank'], { stdio: 'ignore' });
-let targets = null;
-for (let i = 0; i < 60 && !targets; i++) { try { targets = await (await fetch(`http://127.0.0.1:${dbg}/json`)).json(); } catch { await sleep(250); } }
-const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
-await new Promise((r) => (ws.onopen = r));
-let id = 0; const pending = new Map();
-ws.onmessage = (ev) => { const m = JSON.parse(ev.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } };
-const send = (method, params = {}) => new Promise((res) => { const i = ++id; pending.set(i, res); ws.send(JSON.stringify({ id: i, method, params })); });
-const js = async (expr) => { const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }); if (r.result?.exceptionDetails) throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0, 400)); return r.result?.result?.value; };
+// ---- serwer statyczny + Chrome (tools/cdp.mjs) ----
+const B = await startBrowser({ width: W, height: H, prefix: 'codemap-shots-' });
+const { send, js } = B;
 const shot = async (name) => { await js("document.querySelectorAll('#toast-wrap .toast').forEach(t=>t.remove())"); await sleep(150);
   const r = await send('Page.captureScreenshot', { format: 'png' }); const buf = Buffer.from(r.result.data, 'base64'); await writeFile(join(OUT, name), buf); console.log(`✔ docs/${name} (${Math.round(buf.length / 1024)} KB)`); };
 
 try {
-  await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
-  await send('Page.enable'); await send('Runtime.enable');
-  await send('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/index.html` });
+  await send('Page.navigate', { url: B.url('index.html') });
   for (let i = 0; i < 60; i++) { if (await js('!!(window.CMApp && CM.App && CM.App.filters)')) break; await sleep(200); }
   await sleep(800);
 
@@ -135,6 +109,5 @@ try {
 } catch (e) {
   console.error('✖', e.message); process.exitCode = 1;
 } finally {
-  try { ws.close(); } catch {}
-  chrome.kill(); server.close(); await sleep(300); await rm(prof, { recursive: true, force: true }).catch(() => {});
+  await B.close();
 }

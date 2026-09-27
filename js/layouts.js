@@ -828,52 +828,9 @@ CM.Layouts = (function(){
   }
   function scaleNodes(nodes, f){ if(!f||f===1) return; for(const n of nodes){ n.x*=f; n.y*=f; } }
 
-  // ---------- Barnes-Hut quadtree repulsion (O(n log n)) ----------
-  // far cells approximated by their centre of mass; near leaves get exact + anti-collision push.
-  function bhRepulse(nodes, strength, theta){
-    const N=nodes.length; if(N<2) return;
-    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    for(const n of nodes){ if(n.x<minX)minX=n.x; if(n.x>maxX)maxX=n.x; if(n.y<minY)minY=n.y; if(n.y>maxY)maxY=n.y; }
-    if(!isFinite(minX)) return;
-    const size=Math.max(maxX-minX, maxY-minY, 1)+1;
-    const cell=(x,y,s)=>({x,y,s,m:0,cx:0,cy:0,body:null,extra:null,kids:null});
-    const root=cell(minX,minY,size);
-    const sub=(c)=>{ const h=c.s/2; c.kids=[cell(c.x,c.y,h),cell(c.x+h,c.y,h),cell(c.x,c.y+h,h),cell(c.x+h,c.y+h,h)]; };
-    const quad=(c,n)=>{ const h=c.s/2; return c.kids[(n.y>=c.y+h?2:0)+(n.x>=c.x+h?1:0)]; };
-    const insert=(c,n,depth)=>{
-      while(true){
-        if(c.kids){ c=quad(c,n); depth++; if(depth>48){ (c.extra||(c.extra=[])).push(n); return; } continue; }
-        if(c.body===null){ c.body=n; return; }
-        if(depth>=48){ (c.extra||(c.extra=[])).push(n); return; }
-        const old=c.body; c.body=null; sub(c); insert(quad(c,old),old,depth+1); c=quad(c,n); depth++;
-      }
-    };
-    for(const n of nodes) insert(root,n,0);
-    const mass=(c)=>{ if(c.kids){ let m=0,sx=0,sy=0; for(const k of c.kids){ mass(k); if(k.m){ m+=k.m; sx+=k.cx*k.m; sy+=k.cy*k.m; } } c.m=m; if(m){ c.cx=sx/m; c.cy=sy/m; } return; }
-      let m=0,sx=0,sy=0; if(c.body){ m++; sx+=c.body.x; sy+=c.body.y; } if(c.extra){ for(const e of c.extra){ m++; sx+=e.x; sy+=e.y; } } c.m=m; if(m){ c.cx=sx/m; c.cy=sy/m; } };
-    mass(root);
-    const t2=theta*theta;
-    const stack=[];
-    for(const n of nodes){ if(n.fixed) continue;
-      stack.length=0; stack.push(root);
-      while(stack.length){ const c=stack.pop(); if(!c.m) continue;
-        if(c.kids){ const dx=n.x-c.cx, dy=n.y-c.cy; let d2=dx*dx+dy*dy||0.01;
-          if((c.s*c.s)/d2 < t2){ const mag=strength*c.m/d2, inv=1/Math.sqrt(d2); n.vx+=dx*inv*mag; n.vy+=dy*inv*mag; }
-          else { stack.push(c.kids[0],c.kids[1],c.kids[2],c.kids[3]); }
-          continue; }
-        // leaf: exact repulsion (+anti-collision) for its body & any coincident overflow
-        const bodies = c.extra ? (c.body?[c.body].concat(c.extra):c.extra) : (c.body?[c.body]:null);
-        if(!bodies) continue;
-        for(const b of bodies){ if(b===n) continue;
-          let dx=n.x-b.x, dy=n.y-b.y, d2=dx*dx+dy*dy; if(d2<0.01){ dx=(Math.sin(n.x+b.y)*0.3)||0.1; dy=(Math.cos(n.y+b.x)*0.3)||0.1; d2=dx*dx+dy*dy||0.01; }
-          const minD=n.r+b.r+12, overlap=d2<minD*minD?3.2:1;
-          const mag=strength*overlap/d2, inv=1/Math.sqrt(d2); n.vx+=dx*inv*mag; n.vy+=dy*inv*mag;
-        }
-      }
-    }
-  }
+  // ---------- fizyka: Barnes-Hut + sprężyny + grawitacja — wspólna z sim-worker.js (js/physics.js) ----------
+  const bhRepulse=(nodes, strength, theta)=>CM.Physics.bhRepulse(nodes, strength, theta);
 
-  // ---------- FORCE-DIRECTED (animated) ----------
   function forceSim(graph, nodes, edges){
     const map = byId(nodes);
     // seed unplaced nodes
@@ -885,42 +842,12 @@ CM.Layouts = (function(){
       }
       n.vx=0; n.vy=0; i++;
     }
+    const springs=[]; for(const e of edges){ const s=map.get(e.source), t=map.get(e.target); if(s&&t) springs.push({s, t, c:e.type==='contains', w:e.weight||1}); }
     const sim = {
       alpha:1, alphaMin:0.02, alphaDecay:0.019, velDecay:0.82, spacing:1,
       running:true, nodes, edges, map,
       reheat(v=0.7){ this.alpha = Math.max(this.alpha, v); this.running=true; },
-      tick(){
-        const a = this.alpha;
-        const n = nodes.length;
-        const sp = this.spacing||1;
-        // gravity toward center (weaker when spread out more)
-        const g = 0.0055*a/sp;
-        for(const nd of nodes){ if(nd.fixed) continue; nd.vx -= nd.x*g; nd.vy -= nd.y*g; }
-        // spring attraction along edges
-        for(const e of edges){
-          const s=map.get(e.source), t=map.get(e.target); if(!s||!t) continue;
-          let dx=t.x-s.x, dy=t.y-s.y; let d=Math.hypot(dx,dy)||0.01;
-          const desired = (e.type==='contains' ? (s.r+t.r+34) : (s.r+t.r+90)) * sp;
-          const k = (e.type==='contains'?0.08:0.03) * a * Math.min(2,(e.weight||1));
-          const f = ((d-desired)/d)*k; const fx=dx*f, fy=dy*f;
-          if(!s.fixed){ s.vx+=fx; s.vy+=fy; }
-          if(!t.fixed){ t.vx-=fx; t.vy-=fy; }
-        }
-        // repulsion via Barnes-Hut quadtree — O(n log n), scales to large graphs
-        bhRepulse(nodes, 1900*a*sp*sp, 0.9);
-        // collision relaxation (light)
-        // integrate
-        for(const nd of nodes){
-          if(nd.fixed){ nd.vx=0; nd.vy=0; continue; }
-          nd.vx*=this.velDecay; nd.vy*=this.velDecay;
-          const sp = Math.hypot(nd.vx,nd.vy); const maxv=28;
-          if(sp>maxv){ nd.vx=nd.vx/sp*maxv; nd.vy=nd.vy/sp*maxv; }
-          nd.x+=nd.vx; nd.y+=nd.vy;
-        }
-        this.alpha = a*(1-this.alphaDecay);
-        if(this.alpha < this.alphaMin) this.running=false;
-        return this.running;
-      }
+      tick(){ this.running=CM.Physics.step(nodes, springs, this); return this.running; },
     };
     return sim;
   }

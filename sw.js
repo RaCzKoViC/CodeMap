@@ -1,11 +1,11 @@
 /* ===================== sw.js — CodeMap service worker (offline app shell) ===================== */
-const CACHE = 'codemap-shell-v117';
+const CACHE = 'codemap-shell-v119';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 // Version-less fallback list (used only if parsing index.html fails); the fetch handler's
 // ignoreSearch fallback makes these serve ?v=... requests offline too.
 const ASSET_FALLBACK = ['css/styles.css','js/util.js','js/icons.js','js/i18n.js','js/languages.js',
-  'js/analysis.js','js/graph.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/testmap.js','js/git-core.js','js/git-remote.js','js/git.js','js/pr-core.js','js/pr.js','js/renderer.js','js/overlays.js','js/loaders.js','js/storage.js',
-  'js/ui.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js',
+  'js/analysis.js','js/graph.js','js/physics.js','js/layouts.js','js/export.js','js/metrics.js','js/rules.js','js/testmap.js','js/git-core.js','js/git-remote.js','js/git.js','js/pr-core.js','js/pr.js','js/renderer.js','js/overlays.js','js/loaders.js','js/storage.js',
+  'js/ui.js','js/ui-kit.js','js/settings.js','js/drive.js','js/auth.js','js/sync.js','js/inspect.js','js/localai.js','js/ollama.js','js/ai.js','js/runner.js','js/mmdraw.js','js/mindmap.js','js/chatbot.js',
   'js/app-core.js','js/chrome.js','js/repo-hosts.js','js/compare.js','js/navigation.js','js/ai-bridge.js','js/tests-ui.js','js/app.js','js/sim-worker.js','js/analysis-worker.js',
   'js/symbols-core.js','js/symbols.js','js/symbols-worker.js','js/git-local.js','js/git-worker.js','js/rag.js','js/deeplink.js','js/links.js'];
 

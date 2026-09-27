@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Moduły potrzebne analizie headless (kolejność = zależności przy ładowaniu, jak w index.html). */
-export const CLI_MODULES = ['util', 'icons', 'i18n', 'languages', 'analysis', 'graph', 'layouts', 'export', 'metrics',
+export const CLI_MODULES = ['util', 'icons', 'i18n', 'languages', 'analysis', 'graph', 'physics', 'layouts', 'export', 'metrics',
   'git-core', 'rules', 'testmap', 'pr-core', 'git-local', 'loaders', 'inspect'];
 
 export function memStorage() {

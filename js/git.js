@@ -46,18 +46,11 @@
     if(side && side.gitFile) return 'gitfile';
     return null;
   }
-  function tokenFor(){ return (($('#gh-token')&&$('#gh-token').value.trim())||state._ghToken||'')||undefined; }
-  function fileMap(g){ const m=new Map(); for(const n of g.nodes.values()) if(n.type==='file'&&n.path&&(!n.gid||n.gid==='base')) m.set(n.path,n); return m; }
+  const tokenFor=CM.UIKit.repoToken, fileMap=CM.UIKit.fileIndex;
 
   // ---------------- postęp (pigułka jak przy symbolach) + anulowanie ----------------
-  let pillEl=null;
-  function pill(text){
-    let wrap=$('#toast-wrap'); if(!wrap){ wrap=el('div',{id:'toast-wrap'}); document.body.appendChild(wrap); }
-    if(!pillEl){ pillEl=el('div',{class:'toast sym-pill git-pill'}); pillEl.appendChild(el('span',{class:'gp-t'}));
-      pillEl.appendChild(el('button',{class:'gp-x',title:T('ca.cancelLoad','Anuluj'),text:'×',onclick:()=>cancel(true)})); wrap.appendChild(pillEl); }
-    pillEl.querySelector('.gp-t').textContent=text;
-  }
-  function hidePill(){ if(pillEl){ const p=pillEl; pillEl=null; p.style.transition='opacity .3s'; p.style.opacity='0'; setTimeout(()=>p.remove(),300); } }
+  const PILL=CM.UIKit.pill(T('ca.cancelLoad','Anuluj'), ()=>cancel(true));
+  const pill=(t)=>PILL.show(t), hidePill=()=>PILL.hide();
 
   let job=null, gen=0;
   function cancel(user){ const had=!!job; if(job){ try{ job.ctrl.abort(); }catch(e){} job=null; } gen++; hidePill(); if(user&&had) U.toast(T('git.cancelled','Anulowano analizę historii git.')); }
