@@ -8,7 +8,7 @@
 const esc = (c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Wzorzec .gitignore (bez `!` i końcowego `/`) → RegExp na ścieżce względem katalogu pliku .gitignore. */
-export function patternRegExp(p) {
+function patternRegExp(p) {
   const anchored = p.startsWith('/') || p.includes('/');
   if (p.startsWith('/')) p = p.slice(1);
   let re = '';
